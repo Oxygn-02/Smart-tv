@@ -1,6 +1,15 @@
 # Launcher UI prototype
 
-**Design v2 (iPadOS-inspired, sized for a TV).** Floating glass tab bar along the top, a Home widget grid (analog clock, weather, now playing, continue watching) above a glass dock of apps, and a Customize panel for icon style (Default, Dark, Clear, Tinted), appearance (Light, Dark, Auto) and wallpaper (Photo, Gradient, Lights). The first design is backed up in `designs/v1-sidebar/`.
+**Design v2 (iPadOS-inspired, sized for a TV).** Floating glass tab bar along the top, a Home widget grid (analog clock, weather, now playing, continue watching) above a glass dock of apps, and a Customize panel for icon style (Default, Dark, Clear, Tinted), appearance (Light, Dark, Auto) and wallpaper (Photo, Gradient, Lights). Earlier designs are backed up in `designs/`.
+
+**Council review changes (v3).** Bright focus ring with a soft glow, distinct from "selected"; text at least 16px on the canvas (24px on a 1080p TV); 5% TV-safe margins; the clock widget is replaced by a Room status widget; Home starts focused on the dock; every Home widget has an empty state (turn off Settings › Sample content to preview them); plain labels in Room; top-right tools show their name on focus.
+
+## Notes for the Android port
+
+- Blur the wallpaper once when it's set and draw the panels as translucent fills over that image. Live blur behind every panel will stutter on a budget TV chip.
+- Watch memory: on a 1.5–2 GB TV, Android may close the launcher while an app is open. Keep startup fast and remember focus.
+- Prove each data source on the TV before relying on it: media session (Now playing), Watch Next (Continue watching), HDMI input switching, Govee LAN control. The empty states cover the ones that fail.
+- Disable the stock launcher only after this one is installed, set as default and working (see `HANDOFF.md`), and keep a way back. Re-check after firmware updates.
 
 Standalone web version of the TV home screen, built to match `mockup/index.html` and the spec in `HANDOFF.md`. It exists so the UI can be iterated on before it is ported to the Android launcher.
 

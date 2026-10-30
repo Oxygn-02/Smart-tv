@@ -14,6 +14,7 @@
     appearance: 'auto', // 'auto' (follow the TV/host) | 'light' | 'dark'
     theme: initialTheme(), // resolved 'dark' | 'light'
     iconStyle: 'default', // 'default' | 'dark' | 'clear' | 'tinted'
+    sampleData: true, // off = preview the empty states real data may need
     wallpaper: D.wallpapers.length ? 'photo' : 'gradient', // 'gradient' | 'photo'
     photoIndex: 0,
     view: 'home',
@@ -70,10 +71,20 @@
     return `
       <section class="view view-home" data-view="home">
         <div class="widgets">
-          <section class="widget glass w-clock" aria-label="Clock">${clockFace()}</section>
+          <button class="widget glass w-room" data-focus data-nav-to="room" aria-label="Room: open lights and soundbar">
+            <span class="w-label">Room</span>
+            <span class="w-room-row"><span class="w-room-swatch" data-room-swatch></span><span data-room-scene></span></span>
+            <span class="w-room-row">${icon('lamp', 20)}<span data-room-lights></span></span>
+            <span class="w-room-row">${icon('speaker', 20)}<span data-room-sound></span></span>
+          </button>
 
           <section class="widget glass tinted w-weather" data-weather-card aria-label="Weather">
             <div class="tint"></div>
+            <button class="w-empty" data-focus data-nav-to="settings">
+              ${icon('location', 28)}
+              <span class="w-empty-title">Add your town</span>
+              <span class="small">Set it in Settings to see the weather</span>
+            </button>
             <div class="w-weather-top">
               <span class="w-label" data-town></span>
               <svg class="w-weather-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${WEATHER_ICON}</svg>
@@ -87,6 +98,12 @@
 
           <section class="widget glass now-playing tinted w-music" data-np-card aria-label="Now playing">
             <div class="tint"></div>
+            <div class="w-empty">
+              ${icon('music', 34)}
+              <span class="w-empty-title">Nothing playing</span>
+              <span class="small">Music you play in YouTube Music shows up here</span>
+              <button class="btn lg" data-focus data-app="ytmusic">Open YouTube Music</button>
+            </div>
             <div class="np-top">
               <div class="np-meta">
                 <div class="eyebrow">${icon('playCircle', 15)}<span>${D.music.source}</span></div>
@@ -103,6 +120,11 @@
           </section>
 
           <section class="widget hero w-hero" aria-label="Continue watching">
+            <div class="w-empty">
+              ${icon('live', 34)}
+              <span class="w-empty-title">Nothing to continue</span>
+              <span class="small">Shows you start appear here when the app shares them</span>
+            </div>
             <div class="hero-art" style="background:${h.art}"></div>
             <div class="hero-shade"></div>
             <div class="hero-label">Continue watching</div>
@@ -119,8 +141,14 @@
             </div>
           </section>
 
+          ${D.recentApps.map((id) => `
+            <button class="widget glass w-mini w-recent" data-recent hidden data-focus data-app="${id}" aria-label="Open ${APP[id].name}">
+              ${appIcon(APP[id], 64)}
+              <span class="small">Recently used</span>
+              <span class="w-mini-title">${APP[id].name}</span>
+            </button>`).join('')}
           ${D.continueWatching.map((c) => `
-            <button class="widget glass w-mini" data-focus data-toast="Resuming ${c.title} on ${c.app}" aria-label="Continue ${c.title} on ${c.app}">
+            <button class="widget glass w-mini" data-cw data-focus data-toast="Resuming ${c.title} on ${c.app}" aria-label="Continue ${c.title} on ${c.app}">
               <span class="w-mini-art" style="background:${c.art}">${appIcon(APP[c.appId], 30)}</span>
               <span class="w-mini-title">${c.title}</span>
               <span class="small">${c.meta}</span>
@@ -132,7 +160,7 @@
           ${D.apps.map((a, i) => `
             ${!a.pinned && D.apps[i - 1]?.pinned ? '<span class="dock-divider"></span>' : ''}
             <button class="dock-app" data-focus data-app="${a.id}" aria-label="${a.name}" style="--accent:${a.color}">
-              ${appIcon(a, 64)}
+              ${appIcon(a, 76)}
               <span class="dock-label">${a.short || a.name}</span>
             </button>`).join('')}
         </nav>
@@ -154,7 +182,7 @@
         <label class="search-bar glass">
           <span class="lg chip" style="width:40px;height:40px;border-radius:50%">${icon('search', 18)}</span>
           <input id="search-input" data-focus type="search" autocomplete="off" spellcheck="false"
-            placeholder="Search shows and films on your apps" aria-label="Search">
+            placeholder="Search shows and films · press OK to type" aria-label="Search">
           <span class="small" data-search-count></span>
         </label>
         <div class="search-section">
@@ -302,12 +330,12 @@
           <section class="card glass room-card" aria-label="${H.backlights.name}">
             <div class="room-head">
               <span class="lg chip room-chip">${icon('room')}</span>
-              <span class="room-title">${H.backlights.name}<span class="small">Govee ${H.backlights.model} · <span data-backlight-status></span></span></span>
-              <button class="btn lg" data-focus data-action="match-lights">Match wallpaper: <span data-val="match"></span></button>
+              <span class="room-title">${H.backlights.name}<span class="small" data-backlight-status></span></span>
+              <button class="btn lg" data-focus data-action="match-lights">Wallpaper follows lights: <span data-val="match"></span></button>
             </div>
             <div class="swatches">
               <button class="swatch" data-focus data-action="backlight" data-id="sync">
-                <span class="swatch-dot lg chip">${icon('sync', 26)}</span><span class="small">Match picture</span>
+                <span class="swatch-dot lg chip">${icon('sync', 26)}</span><span class="small">Sync to TV</span>
               </button>
               ${H.backlights.scenes.map((s) => `
                 <button class="swatch" data-focus data-action="backlight" data-id="${s.id}">
@@ -332,7 +360,7 @@
               ${H.lights.map((l) => `
                 <button class="light-row" data-focus data-action="light" data-id="${l.id}">
                   <span class="light-dot"></span><span class="light-name">${l.name}</span>
-                  <span class="small" data-light-state="${l.id}"></span>
+                  <span class="switch" aria-hidden="true"><span></span></span>
                 </button>`).join('')}
             </div>
           </section>
@@ -341,7 +369,7 @@
         <section class="card glass soundbar" aria-label="Soundbar">
           <div class="room-head">
             <span class="lg chip room-chip">${icon('speaker')}</span>
-            <span class="room-title">${sb.name}<span class="small">${sb.connection} · <span data-sound-status></span></span></span>
+            <span class="room-title">Soundbar<span class="small" data-sound-status></span></span>
             <div class="volume">
               <button class="ctrl lg" data-focus data-action="vol-down" aria-label="Volume down">${icon('minus', 18)}</button>
               <span class="track vol-track"><span class="fill" data-vol-fill></span></span>
@@ -350,9 +378,6 @@
               <button class="ctrl lg" data-focus data-action="mute" aria-label="Mute">${icon('volume', 18)}</button>
               <button class="ctrl lg" data-focus data-action="sb-power" aria-label="Soundbar power">${icon('power', 18)}</button>
             </div>
-          </div>
-          <div class="pill-row">
-            <span class="small">Volume, mute and power go through the TV over HDMI-CEC. Sound modes stay on the D50 remote.</span>
           </div>
         </section>
       </section>`;
@@ -382,6 +407,7 @@
           ${row('toggle-auto', icon('games'), 'Switch input when Games opens', 'Turn off to stay on the launcher', 'auto')}
           ${row('cycle-countdown', icon('timer'), 'Switch countdown', 'Time to cancel before switching', 'countdown')}
           ${row('wifi', icon('wifi'), 'Wi-Fi', 'Opens Android network settings', 'wifi')}
+          ${row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to preview empty widgets', 'sample')}
         </section>
       </section>`;
   }
@@ -415,8 +441,8 @@
   // Customize panel, after the iPadOS one: icon style, appearance, wallpaper.
   function customizeSheet() {
     const sample = APP.youtube;
-    const opt = (action, id, label, inner) => `
-      <button class="opt" data-focus data-action="${action}" data-id="${id}">${inner}<span class="opt-label">${label}</span></button>`;
+    const opt = (action, id, label, desc, inner) => `
+      <button class="opt" data-focus data-action="${action}" data-id="${id}">${inner}<span class="opt-label">${label}</span><span class="opt-desc">${desc}</span></button>`;
     const seg = (action, items) => `
       <div class="segmented">${items.map(([id, label]) => `<button class="seg" data-focus data-action="${action}" data-id="${id}">${label}</button>`).join('')}</div>`;
     return `
@@ -428,11 +454,11 @@
           </div>
           <div class="sheet-label">Icons</div>
           <div class="opts">
-            ${[['default', 'Default'], ['dark', 'Dark'], ['clear', 'Clear'], ['tinted', 'Tinted']]
-              .map(([id, label]) => opt('icon-style', id, label, appIcon(sample, 76, id))).join('')}
+            ${[['default', 'Default', 'Brand colours'], ['dark', 'Dark', 'Dark glass'], ['clear', 'Clear', 'Frosted glass'], ['tinted', 'Tinted', 'Your light colour']]
+              .map(([id, label, desc]) => opt('icon-style', id, label, desc, appIcon(sample, 76, id))).join('')}
           </div>
           <div class="sheet-row">
-            <span class="sheet-label">Appearance</span>
+            <span class="sheet-label">Appearance<span class="sheet-help">Auto follows the TV</span></span>
             ${seg('appearance', [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto']])}
           </div>
           <div class="sheet-row">
@@ -456,9 +482,9 @@
         </nav>
         <div class="tools">
           <span class="status-wifi" title="Wi-Fi connected">${icon('wifi', 18)}</span>
-          <button class="tool" data-focus data-action="match-lights" aria-label="Match wallpaper to backlights">${icon('drop', 20)}</button>
-          <button class="tool" data-focus data-action="customize" aria-label="Customize">${icon('sun', 20)}</button>
-          <button class="tool" data-focus data-nav="settings" aria-label="Settings">${icon('gear', 20)}</button>
+          <button class="tool" data-focus data-action="match-lights" data-tip="Match lights" aria-label="Match wallpaper to backlights">${icon('drop', 20)}</button>
+          <button class="tool" data-focus data-action="customize" data-tip="Customize" aria-label="Customize">${icon('sun', 20)}</button>
+          <button class="tool" data-focus data-nav="settings" data-tip="Settings" aria-label="Settings">${icon('gear', 20)}</button>
         </div>
       </header>
 
@@ -548,11 +574,20 @@
       countdown: g.countdownSec ? `${g.countdownSec} s` : 'None',
       wifi: 'Connected',
       match: state.matchLights ? 'On' : 'Off',
+      sample: state.sampleData ? 'On' : 'Off',
     };
     all('[data-val]').forEach((el) => { el.textContent = values[el.dataset.val]; });
     all('[data-town]').forEach((el) => { el.textContent = state.town || 'Set your town in Settings'; });
 
     renderRoom();
+
+    // Empty states: what Home shows when there's no data to fill a widget.
+    const sample = state.sampleData;
+    stage.querySelector('.w-music').classList.toggle('is-empty', !sample);
+    stage.querySelector('.w-hero').classList.toggle('is-empty', !sample);
+    stage.querySelector('.w-weather').classList.toggle('is-empty', !state.town);
+    all('[data-cw]').forEach((el) => { el.hidden = !sample; });
+    all('[data-recent]').forEach((el) => { el.hidden = sample; });
 
     stage.querySelector('[data-games-sub]').textContent = g.autoSwitch
       ? `Opening Games switches the TV to HDMI ${g.hdmiPort}${g.countdownSec ? ` after a ${g.countdownSec} second countdown` : ' straight away'}.`
@@ -592,16 +627,24 @@
     press('[data-action="backlight"]', (id) => id === h.backlight);
     press('[data-action="room-scene"]', (id) => id === h.scene);
     press('[data-action="light"]', (id) => h.lights[id]);
-    all('[data-light-state]').forEach((el) => { el.textContent = h.lights[el.dataset.lightState] ? 'On' : 'Off'; });
+
+    const lightsOn = Object.values(h.lights).filter(Boolean).length;
+    const swatch = stage.querySelector('[data-room-swatch]');
+    swatch.style.background = h.backlight === 'off' ? 'var(--track)' : `linear-gradient(135deg, ${colors.join(',')})`;
+    stage.querySelector('[data-room-scene]').textContent = h.backlight === 'off'
+      ? 'Backlight off' : h.backlight === 'sync' ? 'Synced to TV' : BACKLIGHT[h.backlight].name;
+    stage.querySelector('[data-room-lights]').textContent = `${lightsOn} of ${H.lights.length} lights on`;
+    stage.querySelector('[data-room-sound]').textContent = !h.sound.on ? 'Soundbar off'
+      : h.sound.muted ? 'Soundbar muted' : `Volume ${h.sound.volume}`;
 
     stage.querySelector('[data-backlight-status]').textContent = h.backlight === 'sync'
-      ? 'Matching the picture'
+      ? 'Synced to the TV picture'
       : h.backlight === 'off' ? 'Off' : BACKLIGHT[h.backlight].name;
 
     const sb = h.sound;
     stage.querySelector('[data-vol-fill]').style.width = `${sb.muted ? 0 : (sb.volume / H.soundbar.volumeMax) * 100}%`;
     stage.querySelector('[data-vol]').textContent = sb.muted ? 'Muted' : sb.volume;
-    stage.querySelector('[data-sound-status]').textContent = sb.on ? 'On' : 'Standby';
+    stage.querySelector('[data-sound-status]').textContent = sb.on ? 'On · HDMI ARC' : 'Standby';
     stage.querySelector('.soundbar').classList.toggle('standby', !sb.on);
   }
 
@@ -620,7 +663,7 @@
     all('[data-duration]').forEach((el) => { el.textContent = fmt(t.durationSec); });
 
     const tracks = D.music.tracks;
-    stage.querySelector('[data-np-next]').innerHTML = [1, 2].map((k) => {
+    stage.querySelector('[data-np-next]').innerHTML = [1].map((k) => {
       const q = tracks[(state.track + k) % tracks.length];
       return `
         <div class="np-next-row">
@@ -688,15 +731,8 @@
 
   function updateClock() {
     const n = new Date();
-    const sec = n.getSeconds();
-    const min = n.getMinutes() + sec / 60;
-    const hr = (n.getHours() % 12) + min / 60;
-    const turn = (k, deg) => stage.querySelector(`[data-hand="${k}"]`)?.setAttribute('transform', `rotate(${deg} 100 100)`);
-    turn('h', hr * 30);
-    turn('m', min * 6);
-    turn('s', sec * 6);
     refs.clock.textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}`;
-    refs.date.textContent = n.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    refs.date.textContent = n.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
   }
 
   function hm(d) {
@@ -831,11 +867,13 @@
     const act = b.dataset.action;
 
     if (b.dataset.nav) openView(b.dataset.nav);
+    else if (b.dataset.navTo) openView(b.dataset.navTo);
     else if (b.dataset.app) toast(`Opening ${APP[b.dataset.app].name}`);
     else if (b.dataset.track) setTrack(Number(b.dataset.track));
     else if (b.dataset.toast) toast(b.dataset.toast);
     else if (act === 'theme') state.appearance = { auto: 'light', light: 'dark', dark: 'auto' }[state.appearance];
     else if (act === 'customize') openSheet();
+    else if (act === 'toggle-sample') state.sampleData = !state.sampleData;
     else if (act === 'close-sheet') closeSheet();
     else if (act === 'icon-style') state.iconStyle = b.dataset.id;
     else if (act === 'appearance') state.appearance = b.dataset.id;
@@ -998,7 +1036,8 @@
     // Top bar → content: resume where you were in this view.
     if (inNav && dir === 'down' && scope === stage) {
       const remembered = lastFocus[state.view];
-      const target = remembered && visible(remembered) ? remembered : focusables(view)[0];
+      const fallback = state.view === 'home' ? stage.querySelector('.dock-app') : focusables(view)[0];
+      const target = remembered && visible(remembered) ? remembered : fallback;
       target?.focus();
       return;
     }
@@ -1019,7 +1058,7 @@
       closeOverlay();
     } else if (state.view !== 'home') {
       openView('home');
-      stage.querySelector('[data-nav="home"]').focus();
+      stage.querySelector('.dock-app').focus();
     }
   }
 
@@ -1068,5 +1107,5 @@
   build();
   animateView('home');
   fit();
-  stage.querySelector('[data-nav="home"]').focus();
+  stage.querySelector('.dock-app').focus();
 })();

@@ -1680,64 +1680,6 @@ button.info {
   color: var(--ink);
 }
 
-.w-clock {
-  grid-area: 1 / 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-}
-
-.clock-face {
-  width: 100%;
-  height: 100%;
-}
-
-.clock-face .tick {
-  stroke: var(--sub);
-  stroke-width: 1;
-}
-
-.clock-face .tick-major {
-  stroke: var(--ink);
-  stroke-width: 2.4;
-  stroke-linecap: round;
-}
-
-.clock-face .num {
-  fill: var(--ink);
-  font-size: 20px;
-  font-weight: 500;
-  text-anchor: middle;
-  dominant-baseline: central;
-}
-
-.clock-face .hand {
-  stroke: var(--ink);
-  stroke-linecap: round;
-}
-
-.clock-face .hand-h {
-  stroke-width: 6;
-}
-
-.clock-face .hand-m {
-  stroke-width: 4;
-}
-
-.clock-face .hand-s {
-  stroke: #ff9f0a;
-  stroke-width: 1.6;
-}
-
-.clock-face .hand-s-dot {
-  fill: #ff9f0a;
-}
-
-.clock-face .hand-pin {
-  fill: var(--playink);
-}
-
 .w-weather {
   grid-area: 2 / 1;
   padding: 20px 22px;
@@ -2184,4 +2126,390 @@ button.info {
 .np-next-title {
   font-size: 15px;
   font-weight: 600;
+}
+
+/* =====================================================================
+   v3: council review changes
+   Focus visible from the sofa, 24px-at-1080p minimum text, 5% TV-safe
+   margins, room status on Home, empty states and plain labels.
+   ===================================================================== */
+
+#stage {
+  --focus: rgba(255, 255, 255, 0.96);
+  --focus-glow: rgba(255, 255, 255, 0.3);
+  --lift: 0 18px 36px -14px rgba(0, 0, 0, 0.6);
+}
+
+#stage.light {
+  --focus: #15151d;
+  --focus-glow: rgba(21, 21, 29, 0.18);
+  --lift: 0 18px 36px -14px rgba(40, 40, 80, 0.35);
+}
+
+/* ---------- Focus: a bright ring, a soft glow and a lift ----------
+   Focused = ring + glow. Selected (current tab, chosen option) stays a
+   quieter fill or weight, so the two never look the same. */
+#stage [data-focus]:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  box-shadow: 0 0 26px 2px var(--focus-glow), var(--lift);
+}
+
+/* Focus goes on the icon itself where a label sits under it */
+#stage :is(.dock-app, .opt, .swatch):focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+#stage .dock-app:focus-visible .app-ic,
+#stage .opt:focus-visible .app-ic,
+#stage .swatch:focus-visible .swatch-dot {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
+  box-shadow: 0 0 26px 2px var(--focus-glow), var(--lift);
+}
+
+#stage .search-bar:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  box-shadow: 0 0 26px 2px var(--focus-glow);
+}
+
+#stage #search-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Selected swatch: a small dot under the label, not a ring */
+.swatch.on .swatch-dot {
+  outline-color: transparent;
+}
+
+.swatch.on .small {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.swatch.on .small::after {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  margin: 5px auto 0;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+/* ---------- 5% TV-safe margins (64px x 36px on the 1280x720 canvas) ---------- */
+
+.topbar {
+  left: 64px;
+  right: 64px;
+  top: 36px;
+}
+
+.views {
+  left: 64px;
+  right: 64px;
+  top: 108px;
+  bottom: 36px;
+}
+
+/* ---------- Text: at least 16px here, 24px on a 1080p TV ---------- */
+
+.small,
+.sub {
+  font-size: 16px;
+}
+
+.sub {
+  font-size: 17px;
+}
+
+.eyebrow {
+  font-size: 15px;
+}
+
+.status-date {
+  font-size: 18px;
+}
+
+.tab {
+  font-size: 17px;
+  padding: 0 14px;
+}
+
+.hero-label {
+  font-size: 16px;
+}
+
+.hero-app,
+.hero-sub {
+  font-size: 17px;
+}
+
+.resume,
+.btn,
+.pillbtn,
+.seg,
+.opt-label,
+.vol-num {
+  font-size: 16px;
+}
+
+.w-label,
+.w-weather-foot,
+.np-next-title,
+.queue-title,
+.mix-title,
+.light-name,
+.set-val,
+.channel-next-prog {
+  font-size: 17px;
+}
+
+.show-title,
+.set-label,
+.channel-prog {
+  font-size: 18px;
+}
+
+.room-title,
+.channel-title {
+  font-size: 19px;
+}
+
+.price {
+  font-size: 16px;
+}
+
+.price-kind {
+  font-size: 12px;
+}
+
+.toast {
+  font-size: 17px;
+}
+
+.sheet-label {
+  font-size: 14px;
+}
+
+.dock-label {
+  font-size: 16px;
+}
+
+/* Section headings sit on the wallpaper: full-contrast text with a soft halo */
+:is(.search-section, .music-mixes, .view-apps, .live-head, .view-games) > .eyebrow,
+.live-head .small {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.55);
+}
+
+#stage.light :is(.search-section, .music-mixes, .view-apps, .live-head, .view-games) > .eyebrow,
+#stage.light .live-head .small {
+  text-shadow: 0 0 14px rgba(255, 255, 255, 0.9);
+}
+
+/* A steadier scrim, so text holds up on any photo you add */
+#stage {
+  --photo-scrim: linear-gradient(rgba(5, 5, 8, 0.3), rgba(5, 5, 8, 0.5));
+}
+
+#stage.light {
+  --photo-scrim: linear-gradient(rgba(239, 240, 245, 0.62), rgba(239, 240, 245, 0.7));
+}
+
+/* ---------- Home: rows fit the new margins, bigger dock ---------- */
+
+.widgets {
+  height: 416px;
+}
+
+.dock {
+  height: 132px;
+  padding-top: 14px;
+  gap: 20px;
+}
+
+.dock-divider {
+  height: 70px;
+}
+
+/* Room status widget (replaces the clock) */
+.w-room {
+  grid-area: 1 / 1;
+  border: 0;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.w-room-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.w-room-row svg {
+  color: var(--sub);
+  flex: none;
+}
+
+.w-room-swatch {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 7px;
+  box-shadow: 0 0 12px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* Recently used apps stand in for Continue watching when there's no data */
+.w-recent {
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.w-recent .app-ic {
+  margin-bottom: auto;
+}
+
+/* ---------- Empty states ---------- */
+
+.w-empty {
+  display: none;
+}
+
+.widget.is-empty > :not(.w-empty) {
+  display: none !important;
+}
+
+.widget.is-empty > .w-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 22px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: center;
+  font: inherit;
+}
+
+button.w-empty {
+  cursor: pointer;
+  border-radius: inherit;
+}
+
+.w-empty svg {
+  color: var(--sub);
+  margin-bottom: 4px;
+}
+
+.w-empty-title {
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.w-empty .btn {
+  margin-top: 10px;
+}
+
+.w-hero.is-empty {
+  background: var(--glass-sheen), var(--glass);
+  box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 0 0 1px var(--glass-rim), var(--shadow);
+}
+
+/* ---------- Plain controls ---------- */
+
+/* Light rows: an on/off switch you can see is pressable */
+.switch {
+  width: 46px;
+  height: 28px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--track);
+  position: relative;
+  transition: background 0.3s;
+}
+
+.switch > span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.35s var(--gentle);
+}
+
+.light-row.on .switch {
+  background: #34c759;
+}
+
+.light-row.on .switch > span {
+  transform: translateX(18px);
+}
+
+/* Top-right tools show their name when focused, as the dock does */
+.tool {
+  position: relative;
+}
+
+.tool::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translate(-50%, -4px);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--playink);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.4s var(--gentle);
+}
+
+.tool:is(:focus-visible, :hover)::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.opt-desc {
+  font-size: 14px;
+  color: var(--sub);
+  margin-top: -6px;
+}
+
+.sheet-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sheet-help {
+  font-size: 14px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
 }

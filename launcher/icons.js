@@ -59,27 +59,6 @@ function appIcon(app, size = 52, style = iconStyle) {
   return `<span class="lg chip app-ic s-${style}" style="--brand:${app.color};width:${size}px;height:${size}px;border-radius:${Math.round(size * 0.27)}px">${inner}</span>`;
 }
 
-// Analog clock face for the clock widget (200x200 viewBox). Hands are rotated
-// by app.js.
-function clockFace() {
-  const ticks = Array.from({ length: 60 }, (_, i) => {
-    const major = i % 5 === 0;
-    return `<line x1="100" y1="${major ? 10 : 11}" x2="100" y2="${major ? 20 : 15}" class="${major ? 'tick-major' : 'tick'}" transform="rotate(${i * 6} 100 100)"/>`;
-  }).join('');
-  const nums = Array.from({ length: 12 }, (_, i) => {
-    const n = i + 1;
-    const a = (n * 30 - 90) * Math.PI / 180;
-    return `<text x="${(100 + Math.cos(a) * 66).toFixed(1)}" y="${(100 + Math.sin(a) * 66).toFixed(1)}" class="num">${n}</text>`;
-  }).join('');
-  return `<svg viewBox="0 0 200 200" class="clock-face" aria-hidden="true">
-    ${ticks}${nums}
-    <line x1="100" y1="100" x2="100" y2="52" class="hand hand-h" data-hand="h"/>
-    <line x1="100" y1="100" x2="100" y2="28" class="hand hand-m" data-hand="m"/>
-    <g data-hand="s"><line x1="100" y1="118" x2="100" y2="22" class="hand-s"/><circle cx="100" cy="100" r="4" class="hand-s-dot"/></g>
-    <circle cx="100" cy="100" r="2" class="hand-pin"/>
-  </svg>`;
-}
-
 // Filled glyphs for the play/pause control.
 const ICON_FILLED = {
   pause: '<rect x="7" y="5.5" width="3.2" height="13" rx="1"/><rect x="13.8" y="5.5" width="3.2" height="13" rx="1"/>',

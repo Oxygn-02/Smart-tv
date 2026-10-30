@@ -60,7 +60,7 @@ const LAUNCHER_DATA = {
   wallpaperCycleMin: 10,
 
   weather: {
-    town: '[Your town]',
+    town: '', // set in Settings; the widget shows how to add it until then
     tempC: 12,
     condition: 'Partly cloudy',
     high: 14,
@@ -78,6 +78,10 @@ const LAUNCHER_DATA = {
     progress: 62,
     art: 'linear-gradient(130deg,#1e6a7a 0%,#24315e 50%,#4a1f4e 100%)',
   },
+
+  // Fallback for Continue watching when apps don't share Watch Next data:
+  // the most recently used apps (UsageStatsManager on device).
+  recentApps: ['iplayer', 'prime'],
 
   continueWatching: [
     { app: 'Prime Video', appId: 'prime', title: 'Northbound', meta: '1h 12m left', progress: 38, art: 'linear-gradient(150deg,#3b5f8a,#121a2c)' },
@@ -138,7 +142,7 @@ const LAUNCHER_DATA = {
   //   Its Bluetooth is for playing audio into it, not for control.
   smartHome: {
     backlights: {
-      name: 'TV backlights',
+      name: 'TV backlight',
       model: 'H6097',
       start: 'aurora',
       scenes: [
