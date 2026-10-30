@@ -4,7 +4,6 @@
 // - continueWatching: TvContractCompat.WatchNextPrograms (fallback: UsageStatsManager)
 // - search: each installed app's Android TV global-search provider, plus a
 //   price lookup for titles that are only available to rent or buy
-// - liveTv: TvContract channels/programs from the broadcaster apps' live inputs
 // - weather: Open-Meteo (location set in Settings)
 // Show titles, tracks and programmes are made up; channel names are real.
 const LAUNCHER_DATA = {
@@ -12,7 +11,6 @@ const LAUNCHER_DATA = {
     { id: 'home', label: 'Home' },
     { id: 'search', label: 'Search' },
     { id: 'music', label: 'Music' },
-    { id: 'live', label: 'Live TV' },
     { id: 'apps', label: 'Apps' },
     { id: 'games', label: 'Games' },
     { id: 'room', label: 'Room' },
@@ -90,6 +88,10 @@ const LAUNCHER_DATA = {
   ],
 
   // Search catalogue. Only titles on installed apps are shown.
+  // On device: TMDB search + its "watch providers" data (from JustWatch, per
+  // country: free, subscription, rent, buy; credit JustWatch), with prices
+  // from a pricing source such as Watchmode once its UK rent/buy prices are
+  // confirmed. Anything not found hands over to Google TV's own search.
   // offer.kind: 'free' (free on the app), 'subscription' (included in a
   // subscription you already have), 'rent' or 'buy' (price shown on the card).
   catalogue: [
@@ -105,17 +107,6 @@ const LAUNCHER_DATA = {
     { title: 'Iron Tide', app: 'playmovies', meta: 'War film, 2025', offer: { kind: 'rent', price: '£2.49' }, art: 'linear-gradient(150deg,#a3584a,#2a1210)' },
     // Not installed, so filtered out of search.
     { title: 'Moonfall Street', app: 'netflix', meta: 'Drama', offer: { kind: 'subscription' }, art: 'linear-gradient(150deg,#555,#111)' },
-  ],
-
-  // Live TV. Real Freeview channels; programmes are placeholders.
-  // Opening a channel hands off to the broadcaster's app (app id).
-  liveTv: [
-    { number: '001', name: 'BBC One', app: 'iplayer', slotMin: 30, now: 'Coastal Kitchens', next: 'The Coastline' },
-    { number: '002', name: 'BBC Two', app: 'iplayer', slotMin: 60, now: 'Wild Islands', next: 'Gardeners’ Hour' },
-    { number: '003', name: 'ITV1', app: 'itvx', slotMin: 30, now: 'Afternoon Quiz', next: 'Regional News' },
-    { number: '004', name: 'Channel 4', app: 'c4', slotMin: 60, now: 'Harbour Lights', next: 'House Hunters UK' },
-    { number: '005', name: 'Channel 5', app: 'my5', slotMin: 30, now: 'Fen Country', next: 'Roads Patrol' },
-    { number: '006', name: 'ITV2', app: 'itvx', slotMin: 30, now: 'Kitchen Nights', next: 'Sun Seekers' },
   ],
 
   // Room: lights, TV backlights and soundbar. All state here is simulated.

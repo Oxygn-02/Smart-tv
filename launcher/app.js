@@ -185,6 +185,7 @@
           <input id="search-input" data-focus type="search" autocomplete="off" spellcheck="false"
             placeholder="Search shows and films (press OK to type)" aria-label="Search">
           <span class="small" data-search-count></span>
+          <button class="btn lg google-search" data-focus data-toast="Opens Google TV search">Search with Google TV</button>
         </label>
         <div class="search-section">
           <div class="eyebrow">Free on your apps</div>
@@ -247,36 +248,6 @@
                 <div class="small">${m.sub}</div>
               </button>`).join('')}
           </div>
-        </div>
-      </section>`;
-  }
-
-  function liveView() {
-    return `
-      <section class="view view-live" data-view="live" hidden>
-        <div class="live-head">
-          <div class="eyebrow">On now</div>
-          <div class="small">Opens live in the channel's app</div>
-        </div>
-        <div class="channels">
-          ${D.liveTv.map((c, i) => `
-            <button class="channel glass" data-focus data-channel="${i}"
-              data-toast="Opening ${c.name} live in ${APP[c.app].name}" aria-label="${c.name}, now ${c.now}">
-              <span class="lg chip channel-num tnum">${Number(c.number)}</span>
-              <span class="channel-name">
-                <span class="channel-title">${c.name}</span>
-                <span class="small">${APP[c.app].name}</span>
-              </span>
-              <span class="channel-now">
-                <span class="channel-prog">${c.now}</span>
-                <span class="small tnum" data-live-time="${i}"></span>
-                <span class="track"><span class="fill" data-live-progress="${i}"></span></span>
-              </span>
-              <span class="channel-next">
-                <span class="small">Next at <span class="tnum" data-live-next="${i}"></span></span>
-                <span class="channel-next-prog">${c.next}</span>
-              </span>
-            </button>`).join('')}
         </div>
       </section>`;
   }
@@ -479,7 +450,7 @@
         </div>
         <nav class="tabbar glass" aria-label="Main">
           ${D.nav.map((n) => `
-            <button class="tab" data-focus data-nav="${n.id}">${icon(n.id, 18)}<span>${n.label}</span></button>`).join('')}
+            <button class="tab" data-focus data-nav="${n.id}" data-tip="${n.label}" aria-label="${n.label}">${icon(n.id, 22)}</button>`).join('')}
         </nav>
         <div class="tools">
           <span class="status-wifi" title="Wi-Fi connected">${icon('wifi', 18)}</span>
@@ -490,7 +461,7 @@
       </header>
 
       <div class="views">
-        ${homeView()}${searchView()}${musicView()}${liveView()}${appsView()}${gamesView()}${roomView()}${settingsView()}
+        ${homeView()}${searchView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}
       </div>
 
       ${overlay()}
@@ -519,7 +490,6 @@
     renderTrack();
     renderSearch();
     updateClock();
-    updateLive();
   }
 
   let refs = {};
@@ -740,23 +710,6 @@
     refs.date.textContent = n.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
   }
 
-  function hm(d) {
-    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
-
-  // Programmes run in fixed slots so the guide always shows something on now.
-  function updateLive() {
-    const now = Date.now();
-    D.liveTv.forEach((c, i) => {
-      const slot = c.slotMin * 60000;
-      const start = Math.floor(now / slot) * slot;
-      const end = start + slot;
-      stage.querySelector(`[data-live-time="${i}"]`).textContent = `${hm(new Date(start))} – ${hm(new Date(end))}`;
-      stage.querySelector(`[data-live-next="${i}"]`).textContent = hm(new Date(end));
-      stage.querySelector(`[data-live-progress="${i}"]`).style.width = `${((now - start) / slot) * 100}%`;
-    });
-  }
-
   function showPhoto() {
     const file = D.wallpapers[state.photoIndex];
     if (file) stage.style.setProperty('--photo', `url("${D.wallpaperBase}${file}")`);
@@ -796,7 +749,7 @@
 
   // Blocks that animate in when a view opens, staggered in reading order.
   const ANIM_SELECTOR = ':is(.widgets > *, .dock, .search-bar, .search-section, '
-    + '.music-grid > *, .music-mixes, .live-head, .channel, .view-apps > .eyebrow, .app-card, '
+    + '.music-grid > *, .music-mixes, .app-card, '
     + '.games-hero, .info, .settings, .room-grid > *, .soundbar)';
 
   function animateView(id) {
@@ -948,7 +901,7 @@
   // "Sync to TV": like the backlight's camera, take the colour of what's on
   // screen, here the artwork or brand colour of the focused item.
   function syncGlow(target) {
-    const host = target.closest('.w-hero, .w-mini, .show, .mix, .now-playing, .music-now, .dock-app, .app-card, .channel') || target;
+    const host = target.closest('.w-hero, .w-mini, .show, .mix, .now-playing, .music-now, .dock-app, .app-card') || target;
     const styled = [host, ...host.querySelectorAll('[style]')].find((el) => /#[0-9a-f]{6}|rgb\(/i.test(el.getAttribute('style') || ''));
     const tone = styled && (styled.getAttribute('style').match(/#[0-9a-f]{6}|rgb\([^)]*\)/i) || [])[0];
     if (tone) stage.style.setProperty('--glowc', tone);
@@ -1027,7 +980,8 @@
       // Targets must lie beyond the current control's edge.
       // Prefer targets straight ahead; penalise sideways drift. Centre distance
       // breaks ties between targets that are equally close.
-      const score = primary + secondary * 2 + Math.hypot(dx, dy) * 0.01;
+      // Anything in the same row or column beats reaching into the next one.
+      const score = primary + secondary * 2 + (secondary > 0 ? 600 : 0) + Math.hypot(dx, dy) * 0.01;
       if (score < bestScore) {
         bestScore = score;
         best = el;
@@ -1102,7 +1056,6 @@
 
   setInterval(() => {
     updateClock();
-    updateLive();
     if (state.playing) {
       if (state.pos >= track().durationSec) setTrack(state.track + 1);
       else {

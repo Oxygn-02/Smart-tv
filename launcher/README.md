@@ -4,6 +4,8 @@
 
 **Council review changes (v3).** Bright focus ring with a soft glow, distinct from "selected"; text at least 16px on the canvas (24px on a 1080p TV); 5% TV-safe margins; the clock widget is replaced by a Room status widget; Home starts focused on the dock; every Home widget has an empty state (turn off Settings › Sample content to preview them); plain labels in Room; top-right tools show their name on focus.
 
+**Top bar and tabs.** Icons only; each shows its name when focused. Live TV was removed: no programme guide data is available to a third-party launcher, and opening a channel only duplicated the dock.
+
 **Design pass (v4).** One idea carries the look: the backlight bleed. The screen edges glow in the room's light colour, like the Govee strip spilling onto the wall, and the focus ring is lit the same colour. In "Sync to TV" mode the glow follows whatever is focused. Everything else is quieter: Geist type on a 1.25 scale, sentence case, no dot-joined text, posters straight on the wallpaper, and one power-on moment instead of entrance animations on every section.
 
 ## Notes for the Android port
@@ -35,9 +37,8 @@ cd launcher && python3 -m http.server 8080
 ## Tabs
 
 - **Home**: now playing, weather, continue watching, pinned apps.
-- **Search**: suggestions from installed apps only. Free titles first; rent or buy titles show the price in the card's bottom corner.
+- **Search**: suggestions from installed apps only (on device: TMDB with JustWatch "where to watch" data, prices from a pricing source; "Search with Google TV" covers the rest). Free titles first; rent or buy titles show the price in the card's bottom corner.
 - **Music**: now playing, a working up-next queue, and mixes.
-- **Live TV**: Freeview channels with now and next. Each opens in the broadcaster's app.
 - **All apps**: every installed app.
 - **Games**: opening it switches the TV to the Xbox's HDMI input (HDMI 2) after a short countdown you can cancel. Input, countdown and auto-switch are set in Settings.
 - **Settings**: weather town, appearance, wallpaper, Games input, Wi-Fi.

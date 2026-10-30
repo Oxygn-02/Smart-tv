@@ -774,74 +774,6 @@ button {
 
 /* ---------- Live TV ---------- */
 
-.view-live {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.live-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-.channels {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.channel {
-  height: 76px;
-  box-sizing: border-box;
-  border-radius: 22px;
-  padding: 0 22px 0 12px;
-  cursor: pointer;
-  display: grid;
-  grid-template-columns: 52px 170px minmax(0, 1fr) 240px;
-  align-items: center;
-  gap: 18px;
-  text-align: left;
-}
-
-.channel-num {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
-  font-size: 17px;
-  font-weight: 400;
-}
-
-.channel-name,
-.channel-now,
-.channel-next {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.channel-title {
-  font-size: 17px;
-  font-weight: 400;
-}
-
-.channel-prog {
-  font-size: 16px;
-  font-weight: 400;
-}
-
-.channel-now .track {
-  margin-top: 4px;
-  max-width: 360px;
-}
-
-.channel-next-prog {
-  font-size: 15px;
-  color: var(--sub);
-}
-
 /* ---------- All apps ---------- */
 
 .view-apps {
@@ -2264,21 +2196,9 @@ button.info {
 .mix-title,
 .light-name,
 .set-val,
-.channel-next-prog {
-  font-size: 17px;
-}
-
 .show-title,
 .set-label,
-.channel-prog {
-  font-size: 18px;
-}
-
 .room-title,
-.channel-title {
-  font-size: 19px;
-}
-
 .price {
   font-size: 16px;
 }
@@ -2797,4 +2717,76 @@ button.w-empty {
 
 .music-grid {
   grid-template-rows: 336px;
+}
+
+/* ---------- Top bar: icons only ----------
+   No capsule or ring behind the icons. Focus brightens and lifts the icon,
+   lights it in the room colour and shows its name underneath. */
+.tabbar {
+  gap: 4px;
+  padding: 6px 10px;
+}
+
+.tab {
+  width: 52px;
+  height: 46px;
+  padding: 0;
+  justify-content: center;
+}
+
+#stage :is(.tab, .tool):is(:focus-visible, :hover) {
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+  color: var(--ink);
+  transform: scale(1.12);
+}
+
+#stage :is(.tab, .tool):focus-visible svg {
+  filter: drop-shadow(0 0 8px var(--focus-glow)) drop-shadow(0 0 2px var(--focus));
+}
+
+.tab::before {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 50%;
+  transform: translate(-50%, -4px);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--playink);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.4s var(--gentle);
+}
+
+.tab:is(:focus-visible, :hover)::before {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.tab.on::after {
+  bottom: 2px;
+}
+
+/* Search hands anything else to Google TV */
+.google-search {
+  height: 40px;
+  flex: none;
+}
+
+/* The search bar rings only when the text field itself is focused */
+#stage .search-bar:focus-within {
+  outline: none;
+  box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 0 0 1px var(--glass-rim), var(--shadow);
+}
+
+#stage .search-bar:has(#search-input:focus) {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  box-shadow: 0 0 26px 2px var(--focus-glow);
 }
