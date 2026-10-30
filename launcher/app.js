@@ -2,8 +2,15 @@
   const D = LAUNCHER_DATA;
   const stage = document.getElementById('stage');
 
+  // Start in the host's theme (an explicit data-theme, else the OS setting). Dark when unknown.
+  function initialTheme() {
+    const explicit = document.documentElement.dataset.theme;
+    if (explicit === 'light' || explicit === 'dark') return explicit;
+    return matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  }
+
   const state = {
-    theme: 'dark', // 'dark' | 'light'
+    theme: initialTheme(), // 'dark' | 'light'
     wallpaper: 'gradient', // 'gradient' | 'photo'
     nav: 'home',
     playing: true,

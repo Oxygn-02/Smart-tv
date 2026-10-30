@@ -12,6 +12,12 @@ body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  transition: background 0.4s;
+}
+
+/* Letterbox around the 16:9 stage follows the theme */
+body:has(#stage.light) {
+  background: #dcdde3;
 }
 
 button {
