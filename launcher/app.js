@@ -296,7 +296,7 @@
           <section class="card glass room-card" aria-label="${H.backlights.name}">
             <div class="room-head">
               <span class="lg chip room-chip">${icon('room')}</span>
-              <span class="room-title">${H.backlights.name}<span class="small" data-backlight-status></span></span>
+              <span class="room-title">${H.backlights.name}<span class="small">Govee ${H.backlights.model} · <span data-backlight-status></span></span></span>
               <button class="btn lg" data-focus data-action="match-lights">Match wallpaper: <span data-val="match"></span></button>
             </div>
             <div class="swatches">

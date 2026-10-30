@@ -127,6 +127,11 @@ const LAUNCHER_DATA = {
   //     switching DreamView (picture sync) on or off. Not every model supports
   //     every capability: check each device's capability list.
   //   "Match picture" turns DreamView back on.
+  //   TV backlights: Govee TV Backlight 3 Lite, H6097 (40-50", RGBICW strip with
+  //   a camera for picture sync; also supports Matter). Not yet confirmed on
+  //   Govee's LAN API model list: check for "LAN Control" in its settings in the
+  //   Govee Home app. If it isn't there, use the cloud API, or Matter through
+  //   Google Home, for colours and on/off.
   // - Soundbar on HDMI ARC: power and volume go over HDMI-CEC. On Android TV the
   //   launcher adjusts system volume (AudioManager) and the TV forwards it to the
   //   soundbar. Sound modes have no CEC command, so they stay on the D50 remote.
@@ -134,6 +139,7 @@ const LAUNCHER_DATA = {
   smartHome: {
     backlights: {
       name: 'TV backlights',
+      model: 'H6097',
       start: 'aurora',
       scenes: [
         { id: 'aurora', name: 'Aurora', colors: ['#2bd47d', '#14b8a6', '#0e5f8a'] },
