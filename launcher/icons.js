@@ -104,11 +104,21 @@ const glyphCache = new Map(); // icon url -> Promise of a PNG data url, or null
 
 function deriveGlyph(url) {
   if (glyphCache.has(url)) return glyphCache.get(url);
+  // Traced once, then kept on the TV so later launches draw it at once.
+  let saved = null;
+  try { saved = localStorage.getItem('glyph:' + url); } catch {}
+  if (saved) {
+    const hit = Promise.resolve(saved);
+    glyphCache.set(url, hit);
+    return hit;
+  }
   const result = new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       try {
-        resolve(traceGlyph(img));
+        const png = traceGlyph(img);
+        if (png) { try { localStorage.setItem('glyph:' + url, png); } catch {} }
+        resolve(png);
       } catch {
         resolve(null);
       }

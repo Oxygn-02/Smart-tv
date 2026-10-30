@@ -805,6 +805,7 @@
       };
       state.weatherNote = '';
       weatherAt = Date.now();
+      try { localStorage.setItem('weather', JSON.stringify({ at: weatherAt, w: state.weather })); } catch {}
     } catch {
       if (!state.weather) state.weatherNote = 'offline';
     }
@@ -1819,6 +1820,7 @@
   });
 
   setInterval(() => {
+    if (document.hidden) return; // another app is on screen: do nothing
     updateClock();
     if (NATIVE) {
       if (++pollTick % 4 === 0) pollNowPlaying();
@@ -1935,6 +1937,13 @@
   loadSaved();
   fit(); // first, so nothing below can leave the screen unscaled
   state.weather = NATIVE ? null : { ...D.weather, label: D.weather.condition, temp: D.weather.tempC };
+  if (NATIVE || state.town) {
+    // Show the last reading straight away; it is refreshed in the background.
+    try {
+      const c = JSON.parse(localStorage.getItem('weather') || 'null');
+      if (c && c.w && Array.isArray(c.w.palette) && Date.now() - c.at < 6 * 3600 * 1000) { state.weather = c.w; weatherAt = c.at; }
+    } catch {}
+  }
   build();
   ensureGlyphs();
   let glyphTimer = 0;
@@ -1943,7 +1952,7 @@
   }).observe(document.getElementById('stage'), { childList: true, subtree: true });
   if (NATIVE || state.town) {
     setTimeout(loadWeather, 1200); // after the first screen is up
-    setInterval(loadWeather, 30 * 60 * 1000);
+    setInterval(() => { if (!document.hidden) loadWeather(); }, 30 * 60 * 1000);
   }
   animateView('home');
   fit();

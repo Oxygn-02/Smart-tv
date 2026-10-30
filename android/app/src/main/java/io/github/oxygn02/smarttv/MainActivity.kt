@@ -102,6 +102,24 @@ class MainActivity : ComponentActivity(), BridgeHost {
         }
     }
 
+    // While another app is in front, stop the page's timers and drawing so it
+    // takes none of the TV's processor from that app.
+    override fun onStop() {
+        super.onStop()
+        if (::web.isInitialized) {
+            web.onPause()
+            web.pauseTimers()
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (::web.isInitialized) {
+            web.onResume()
+            web.resumeTimers()
+        }
+    }
+
     // Back from an app: refresh what's playing and the recent apps.
     override fun onResume() {
         super.onResume()
