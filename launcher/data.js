@@ -21,14 +21,14 @@ const LAUNCHER_DATA = {
   // the device supplies the real icon.
   apps: [
     { id: 'youtube', name: 'YouTube', color: '#ff3b3b', logo: 'youtube', pinned: true },
-    { id: 'iplayer', name: 'BBC iPlayer', short: 'iPlayer', color: '#ff4fa3', mark: 'iP', pinned: true },
+    { id: 'iplayer', name: 'BBC iPlayer', short: 'iPlayer', color: '#ff4fa3', glyph: 'iplayer', mark: 'iP', pinned: true },
     { id: 'itvx', name: 'ITVX', color: '#e6c341', logo: 'itvx', pinned: true },
     { id: 'c4', name: 'Channel 4', color: '#47c98f', logo: 'channel4', pinned: true },
-    { id: 'my5', name: 'My5', color: '#4f8fff', mark: '5', pinned: true },
+    { id: 'my5', name: 'My5', color: '#4f8fff', glyph: 'my5', mark: '5', pinned: true },
     { id: 'prime', name: 'Prime Video', color: '#38b6f0', logo: 'primevideo', pinned: true },
     { id: 'ytmusic', name: 'YouTube Music', short: 'YT Music', color: '#ff5a5a', logo: 'youtubemusic', pinned: true },
     { id: 'playstore', name: 'Google Play Store', short: 'Play Store', color: '#5bb974', logo: 'googleplay' },
-    { id: 'playmovies', name: 'Google TV', color: '#8ab4f8', mark: 'TV' },
+    { id: 'playmovies', name: 'Google TV', color: '#8ab4f8', glyph: 'googletv', mark: 'TV' },
   ],
 
   music: {
@@ -51,19 +51,31 @@ const LAUNCHER_DATA = {
     ],
   },
 
-  // Photos for the photo wallpaper, cycled in order. Files live in the repo's
-  // wallpapers/ folder; the artifact page sets WALLPAPER_BASE for its own layout.
+  // Wallpapers that ship with the launcher (files in the repo's wallpapers/
+  // folder; the artifact page sets WALLPAPER_BASE for its own layout). Photos
+  // added from a phone are appended at start-up by bridge.js.
   wallpaperBase: window.WALLPAPER_BASE || '../wallpapers/',
-  wallpapers: ['sydney-harbour-bridge.png'],
-  wallpaperCycleMin: 10,
+  wallpaperFiles: [
+    ['sydney-harbour-bridge.png', 'Harbour bridge'],
+    ['basic-aurora.jpg', 'Aurora'],
+    ['basic-dusk.jpg', 'Dusk'],
+    ['basic-ocean.jpg', 'Ocean'],
+    ['basic-ember.jpg', 'Ember'],
+    ['basic-forest.jpg', 'Forest'],
+    ['basic-mist.jpg', 'Mist'],
+  ],
+  wallpapers: [], // filled in just below the object: {name, label, url, custom}
 
+  // Sample weather for the browser preview. On the TV the real weather comes
+  // from Open-Meteo for the TV's location (or the town set in Settings), see
+  // loadWeather() in app.js.
   weather: {
-    town: '', // set in Settings; the widget shows how to add it until then
+    town: 'Cardiff',
     tempC: 12,
     condition: 'Partly cloudy',
     high: 14,
     low: 8,
-    // Card colours for the current condition (sky blue for partly cloudy).
+    icon: 'wPartly',
     palette: ['#9fd3ff', '#3f86d9', '#1d4c9c'],
   },
 
@@ -152,13 +164,13 @@ const LAUNCHER_DATA = {
       { id: 'floor', name: 'Floor lamp', on: true },
       { id: 'desk', name: 'Desk lamp', on: true },
     ],
-    // One-press room scenes: which lights are on and the backlight scene.
+    // One-press room scenes: what every room light does, and the backlight scene.
     scenes: [
-      { id: 'movie', name: 'Movie', lights: { ceiling: false, floor: true, desk: false }, backlight: 'ocean' },
-      { id: 'gaming', name: 'Gaming', lights: { ceiling: false, floor: false, desk: true }, backlight: 'neon' },
-      { id: 'relax', name: 'Relax', lights: { ceiling: false, floor: true, desk: true }, backlight: 'ember' },
-      { id: 'bright', name: 'Bright', lights: { ceiling: true, floor: true, desk: true }, backlight: 'warm' },
-      { id: 'off', name: 'All off', lights: { ceiling: false, floor: false, desk: false }, backlight: 'off' },
+      { id: 'movie', name: 'Movie', lights: { on: false }, backlight: 'ocean' },
+      { id: 'gaming', name: 'Gaming', lights: { on: true, brightness: 25, kelvin: 3000 }, backlight: 'neon' },
+      { id: 'relax', name: 'Relax', lights: { on: true, brightness: 55, kelvin: 2400 }, backlight: 'ember' },
+      { id: 'bright', name: 'Bright', lights: { on: true, brightness: 100, kelvin: 4000 }, backlight: 'warm' },
+      { id: 'off', name: 'All off', lights: { on: false }, backlight: 'off' },
     ],
     soundbar: {
       name: 'Ultimea Poseidon D50',
@@ -167,6 +179,12 @@ const LAUNCHER_DATA = {
       volumeMax: 40,
     },
   },
+
+  // Apps to switch off, agreed one by one (see debloat/README.md). Each entry
+  // is {pkg, reason}. Settings > Clean up apps lists them and opens each app's
+  // page in the TV's Settings, where you press Disable (Enable undoes it).
+  // Left empty until the list has been reviewed.
+  cleanup: [],
 
   // Games tab switches the TV to the Xbox's HDMI input.
   // On device: find the input via TvInputManager.getTvInputList() (TYPE_HDMI,
@@ -180,3 +198,10 @@ const LAUNCHER_DATA = {
     countdownSec: 3,
   },
 };
+
+LAUNCHER_DATA.wallpapers = LAUNCHER_DATA.wallpaperFiles.map(([file, label]) => ({
+  name: file,
+  label,
+  url: `${LAUNCHER_DATA.wallpaperBase}${file}`,
+  custom: false,
+}));

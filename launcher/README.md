@@ -2,6 +2,8 @@
 
 **Design v2 (iPadOS-inspired, sized for a TV).** Floating glass tab bar along the top, a Home widget grid (analog clock, weather, now playing, continue watching) above a glass dock of apps, and a Customize panel for icon style (Default, Dark, Clear, Tinted), appearance (Light, Dark, Auto) and wallpaper (Photo, Gradient, Lights). Earlier designs are backed up in `designs/`.
 
+**v0.3.** Tint sliders for icons (Customize), a dock that fits its icons, one type voice (Geist at medium weight, like the date), weather from the TV's location, seven wallpapers plus photos sent from a phone, a Room tab wired to the Govee account, Now playing from any source (apps and casts), a phone setup page, a Home-button setting and a Clean up apps screen. Colours are computed in `color.js` and `applyColors()` rather than with newer CSS, so an older TV browser can't drop the focus ring.
+
 **Council review changes (v3).** Bright focus ring with a soft glow, distinct from "selected"; text at least 16px on the canvas (24px on a 1080p TV); 5% TV-safe margins; the clock widget is replaced by a Room status widget; Home starts focused on the dock; every Home widget has an empty state (turn off Settings › Sample content to preview them); plain labels in Room; top-right tools show their name on focus.
 
 **Top bar and tabs.** Icons only; each shows its name when focused. Live TV was removed: no programme guide data is available to a third-party launcher, and opening a channel only duplicated the dock.
@@ -10,7 +12,7 @@
 
 ## Notes for the Android port
 
-- Blur the wallpaper once when it's set and draw the panels as translucent fills over that image. Live blur behind every panel will stutter on a budget TV chip.
+- Done: panels no longer blur live (that halved the frame rate on a slow processor). The wallpaper is blurred once into a small "frost" image that the panels show (`makeFrost` in `app.js`).
 - Watch memory: on a 1.5–2 GB TV, Android may close the launcher while an app is open. Keep startup fast and remember focus.
 - Prove each data source on the TV before relying on it: media session (Now playing), Watch Next (Continue watching), HDMI input switching, Govee LAN control. The empty states cover the ones that fail.
 - Disable the stock launcher only after this one is installed, set as default and working (see `HANDOFF.md`), and keep a way back. Re-check after firmware updates.
@@ -59,3 +61,9 @@ Real logos come from Simple Icons (CC0) where available. BBC iPlayer, My5 and Go
 - Photo wallpapers: the photo mode shows the placeholder label. Real photos go in `wallpapers/`.
 - Launching and input switching: the prototype shows a toast or a stand-in HDMI screen.
 - Data: all content is static placeholder data. Show titles, tracks and prices are made up.
+
+## App icons and real data (v0.3.1)
+
+- Every app has a one-colour glyph for the Dark, Clear and Tinted icon styles: a logo, a hand-drawn glyph (BBC iPlayer, My5, Google TV), or one traced on the TV from the app's own icon (flat background removed). If tracing finds nothing clear, the app's letters are used. Default style shows the app's real icon.
+- The top bar shows no hover text. Dock names remain.
+- On the TV, only real data is shown: Search lists the installed apps (titles and prices come from Search with Google TV), the backlight reads "Not chosen yet" until you pick one, and volume is the TV's real volume.

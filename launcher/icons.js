@@ -26,6 +26,15 @@ const ICON_PATHS = {
   minus: '<path d="M5 12h14"/>',
   sync: '<rect x="4" y="6" width="16" height="10" rx="1.5"/><path d="M9 19.5h6"/><path d="M1.5 8.5v5M22.5 8.5v5"/>',
   drop: '<path d="M12 3.5s6 6.2 6 10.5a6 6 0 0 1-12 0c0-4.3 6-10.5 6-10.5z"/>',
+  // Weather (24x24 line icons) and a few more for the new screens
+  wPartly: '<circle cx="8" cy="8" r="2.8"/><path d="M8 2.3v1.4M2.3 8h1.4M4 4l1 1M12 4l-1 1"/><path d="M8.5 20h9a3.7 3.7 0 0 0 .3-7.4 5.2 5.2 0 0 0-9.9 1.5A3 3 0 0 0 8.5 20z"/>',
+  wCloud: '<path d="M7 19h10.5a4 4 0 0 0 .3-8 6 6 0 0 0-11.5 1.6A3.3 3.3 0 0 0 7 19z"/>',
+  wRain: '<path d="M7 15h10.5a4 4 0 0 0 .3-8 6 6 0 0 0-11.5 1.6A3.3 3.3 0 0 0 7 15z"/><path d="M8.5 18.5l-1 2.2M12.5 18.5l-1 2.2M16.5 18.5l-1 2.2"/>',
+  wSnow: '<path d="M7 15h10.5a4 4 0 0 0 .3-8 6 6 0 0 0-11.5 1.6A3.3 3.3 0 0 0 7 15z"/><path d="M8 18.5h.01M12 19.5h.01M16 18.5h.01M10 21.5h.01M14 21.5h.01"/>',
+  wStorm: '<path d="M7 15h10.5a4 4 0 0 0 .3-8 6 6 0 0 0-11.5 1.6A3.3 3.3 0 0 0 7 15z"/><path d="M13 15.5l-2.5 3.5h3L11 22.5"/>',
+  wFog: '<path d="M5 8h14M3 12h18M5 16h14M8 20h8"/>',
+  phone: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   power: '<path d="M12 3v8"/><path d="M6.6 6.6a7.5 7.5 0 1 0 10.8 0"/>',
 };
 
@@ -44,24 +53,157 @@ const LOGO_PATHS = {
 // Wide logos (wordmarks) are drawn larger so they stay legible.
 const LOGO_SCALE = { primevideo: 1.5, itvx: 1.25 };
 
+// Drawn here for apps that have no logo in Simple Icons. 24x24 grid, filled in
+// the current glyph colour.
+const APP_GLYPHS = {
+  // BBC iPlayer: an "i" and a play triangle
+  iplayer: '<circle cx="6" cy="6.6" r="1.5"/><rect x="4.9" y="9.6" width="2.2" height="8.9" rx="1"/><path d="M10.6 5.8L19.6 12l-9 6.2z"/>',
+  // Google TV: a screen with a play triangle
+  googletv: '<path fill-rule="evenodd" d="M6 5h12a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3zm0 2a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H6z"/><path d="M10.2 9.4l4.6 2.6-4.6 2.6z"/>',
+  // My5: a bold 5, set in the page font
+  my5: '<text x="12" y="18.6" text-anchor="middle" font-size="19" font-weight="800" style="font-family:inherit">5</text>',
+};
+
 // Icon style, as in the iPadOS Customize panel: 'default' (brand colour fill),
 // 'dark' (dark glass, brand-colour logo), 'clear' (clear glass, plain logo) or
 // 'tinted' (glass tinted with the room's light colour). Set by app.js.
 let iconStyle = 'default';
 
-// App icon on a liquid-glass chip: the real logo where we have one, otherwise
-// the app's lettermark. The logo is drawn in --glyph, which each style sets.
+/**
+ * The one-colour picture of an app, drawn in --glyph (which each icon style
+ * sets). In order of preference: its logo, a glyph drawn here, a glyph traced
+ * from the app's own icon on the TV (see deriveGlyph), then a letter.
+ */
+function glyphMarkup(app, size) {
+  const px = Math.round(size * 0.54 * (LOGO_SCALE[app.logo] || 1));
+  const svg = (inner) => `<svg width="${px}" height="${px}" viewBox="0 0 24 24" style="fill:var(--glyph)" aria-hidden="true">${inner}</svg>`;
+  if (app.logo) return svg(`<path d="${LOGO_PATHS[app.logo]}"/>`);
+  if (APP_GLYPHS[app.glyph]) return svg(APP_GLYPHS[app.glyph]);
+  const letters = (app.mark || app.name || '?').slice(0, 2);
+  if (app.iconUrl) return `<span class="ic-mask" data-glyph="${app.iconUrl}" data-mark="${letters}"></span>`;
+  return `<span class="mark">${letters}</span>`;
+}
+
+// App icon on a liquid-glass chip. It carries both the app's real icon (shown
+// by the Default style) and a one-colour glyph (shown by Dark, Clear and
+// Tinted), so changing the style needs no redraw.
 function appIcon(app, size = 52, style = iconStyle) {
-  const glyph = Math.round(size * 0.54 * (LOGO_SCALE[app.logo] || 1));
-  // On the TV, the installed app's own icon is used for the Default style,
-  // and for any app we have no logo for.
-  if (app.iconUrl && (style === 'default' || !app.logo)) {
-    return `<span class="lg chip app-ic s-${style} has-img" style="--brand:${app.color};width:${size}px;height:${size}px;border-radius:${Math.round(size * 0.27)}px"><img src="${app.iconUrl}" alt=""></span>`;
+  const c = toHex(app.color);
+  const b1 = c ? mixHex(c, '#ffffff', 0.86) : '#8e8e9a';
+  const b2 = c ? mixHex(c, '#000000', 0.8) : '#4a4a55';
+  const img = app.iconUrl ? `<img class="ic-img" src="${app.iconUrl}" alt="">` : '';
+  return `<span class="lg chip app-ic s-${style}${img ? ' has-img' : ''}" style="--brand:${app.color};--b1:${b1};--b2:${b2};width:${size}px;height:${size}px;border-radius:${Math.round(size * 0.27)}px">${img}<span class="ic-glyph" style="font-size:${Math.round(size * 0.36)}px">${glyphMarkup(app, size)}</span></span>`;
+}
+
+// ---------- Glyphs traced from the TV's own app icons ----------
+// Most app icons are a flat colour with a shape on it. Taking away the
+// background colour leaves the shape, which is then drawn as a one-colour
+// glyph like the others. Done once per icon, on the TV, and kept in memory.
+
+const glyphCache = new Map(); // icon url -> Promise of a PNG data url, or null
+
+function deriveGlyph(url) {
+  if (glyphCache.has(url)) return glyphCache.get(url);
+  // Traced once, then kept on the TV so later launches draw it at once.
+  let saved = null;
+  try { saved = localStorage.getItem('glyph:' + url); } catch {}
+  if (saved) {
+    const hit = Promise.resolve(saved);
+    glyphCache.set(url, hit);
+    return hit;
   }
-  const inner = app.logo
-    ? `<svg width="${glyph}" height="${glyph}" viewBox="0 0 24 24" style="fill:var(--glyph)" aria-hidden="true"><path d="${LOGO_PATHS[app.logo]}"/></svg>`
-    : `<span class="mark" style="color:var(--glyph);font-size:${Math.round(size * 0.36)}px">${app.mark}</span>`;
-  return `<span class="lg chip app-ic s-${style}" style="--brand:${app.color};width:${size}px;height:${size}px;border-radius:${Math.round(size * 0.27)}px">${inner}</span>`;
+  const result = new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const png = traceGlyph(img);
+        if (png) { try { localStorage.setItem('glyph:' + url, png); } catch {} }
+        resolve(png);
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+  glyphCache.set(url, result);
+  return result;
+}
+
+function traceGlyph(img) {
+  const N = 96;
+  const canvas = document.createElement('canvas');
+  canvas.width = N;
+  canvas.height = N;
+  const g = canvas.getContext('2d', { willReadFrequently: true });
+  g.drawImage(img, 0, 0, N, N);
+  const d = g.getImageData(0, 0, N, N).data;
+
+  // The background: the middle colour of the picture's border. A border that
+  // is mostly see-through means the glyph is already cut out, so use its outline.
+  const border = [];
+  let clear = 0;
+  for (let i = 0; i < N; i++) {
+    for (const [x, y] of [[i, 0], [i, N - 1], [0, i], [N - 1, i]]) {
+      const k = (y * N + x) * 4;
+      if (d[k + 3] < 40) clear++;
+      else border.push([d[k], d[k + 1], d[k + 2]]);
+    }
+  }
+  const outlineOnly = clear > (clear + border.length) * 0.6 || border.length === 0;
+  const mid = (ch) => border.map((p) => p[ch]).sort((a, b) => a - b)[Math.floor(border.length / 2)] || 0;
+  const bg = outlineOnly ? [0, 0, 0] : [mid(0), mid(1), mid(2)];
+
+  const out = new Uint8ClampedArray(N * N * 4);
+  let sum = 0;
+  let x0 = N, y0 = N, x1 = -1, y1 = -1;
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const k = (y * N + x) * 4;
+      const own = d[k + 3] / 255;
+      const off = outlineOnly ? 1 : Math.min(1, Math.max(0, (Math.max(Math.abs(d[k] - bg[0]), Math.abs(d[k + 1] - bg[1]), Math.abs(d[k + 2] - bg[2])) - 38) / 60));
+      const a = own * off;
+      out[k] = out[k + 1] = out[k + 2] = 255;
+      out[k + 3] = Math.round(a * 255);
+      sum += a;
+      if (a > 0.25) {
+        x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+        y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+      }
+    }
+  }
+  const cover = sum / (N * N);
+  if (x1 < 0 || cover < 0.02 || cover > 0.6) return null; // nothing clear to trace
+
+  // Centre the shape on a square canvas with a little room around it.
+  const src = document.createElement('canvas');
+  src.width = N;
+  src.height = N;
+  src.getContext('2d').putImageData(new ImageData(out, N, N), 0, 0);
+  const w = x1 - x0 + 1;
+  const h = y1 - y0 + 1;
+  const room = N - 12;
+  const k = Math.min(room / w, room / h);
+  const dest = document.createElement('canvas');
+  dest.width = N;
+  dest.height = N;
+  dest.getContext('2d').drawImage(src, x0, y0, w, h, (N - w * k) / 2, (N - h * k) / 2, w * k, h * k);
+  return dest.toDataURL('image/png');
+}
+
+/** Gives every traced-glyph placeholder on the page its picture. */
+function ensureGlyphs() {
+  document.querySelectorAll('.ic-mask:not(.ready)').forEach((el) => {
+    deriveGlyph(el.dataset.glyph).then((png) => {
+      if (png) {
+        el.style.setProperty('--mask', `url(${png})`);
+        el.classList.add('ready');
+      } else {
+        el.className = 'mark ready'; // couldn't trace it: show its letters
+        el.textContent = el.dataset.mark;
+      }
+    });
+  });
 }
 
 // Filled glyphs for the play/pause control.

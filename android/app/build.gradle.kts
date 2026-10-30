@@ -12,8 +12,8 @@ android {
         // Android TV 8.0+. Google TV sets are Android 10 or later.
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 4
+        versionName = "0.3.1"
     }
 
     buildTypes {
@@ -39,7 +39,7 @@ android {
 // single source of the design.
 val copyWebUi by tasks.registering(Sync::class) {
     from(rootProject.file("../launcher")) {
-        include("index.html", "styles.css", "*.js")
+        include("index.html", "styles.css", "*.js", "fonts/*")
         into("web")
     }
     from(rootProject.file("../wallpapers")) {
@@ -55,4 +55,6 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.9.1")
     implementation("androidx.webkit:webkit:1.11.0")
     implementation("androidx.palette:palette-ktx:1.0.0")
+    // Tiny web server for "Set up from your phone" (Govee key, wallpapers).
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
 }
