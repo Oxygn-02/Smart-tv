@@ -21,7 +21,6 @@ The UI is copied into the app on every build (`copyWebUi` in `app/build.gradle.k
 - Room lights other than the backlight aren't sent to Govee yet (their models are unknown).
 - Search results still use the sample catalogue. Real data: TMDB search and "where to watch" (JustWatch data) plus a pricing source.
 - The weather card still uses sample numbers; Open-Meteo goes here.
-- The glass blur is live CSS. If it stutters on the TV, pre-blur the wallpaper (see `launcher/README.md`).
 
 ## Build
 
@@ -36,13 +35,13 @@ Or open `android/` in Android Studio and run it on an Android TV emulator (Googl
 
 ## Install without a computer
 
-The latest test build is `tv.apk` at the top of the repo.
+The latest test build is `tv.apk` at the top of the repo. To update, download it again the same way and choose Install; your settings are kept.
 
 1. On the TV, install **Downloader** (by AFTVnews) from the Play Store.
 2. Open Downloader, allow it to install apps when asked (or Settings › Apps › Security & restrictions › Unknown sources › Downloader), and enter:
    `raw.githubusercontent.com/Oxygn-02/Smart-tv/main/tv.apk`
    (capital O; it's case-sensitive). Choose Install.
-3. Open **Smart TV Launcher** from your apps. In its Settings tab, press OK on **Now playing access** and **Recent apps access** and switch the launcher on in the screen that opens.
+3. Open **Smart TV Launcher** from your apps. The first time, it asks you to fit the screen: press Up or Down until the white border sits just inside the TV's edges, then OK (change it later in Settings › Screen size). In its Settings tab, press OK on **Now playing access** and **Recent apps access** and switch the launcher on in the screen that opens.
 
 This installs it as a normal app; uninstalling it removes it completely. Making it the home screen (below) still needs adb.
 

@@ -20,13 +20,13 @@ import android.media.tv.TvInputManager
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
-import android.util.Base64
 import android.webkit.JavascriptInterface
 import androidx.core.app.NotificationManagerCompat
 import androidx.palette.graphics.Palette
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.File
 
 /**
  * `window.Android` in the launcher UI (see launcher/bridge.js). Each method is
@@ -42,7 +42,11 @@ class LauncherBridge(private val activity: Activity) {
 
     // ---------- Apps ----------
 
-    /** Installed TV apps: [{pkg, label, icon}] with the banner or icon as a PNG data URL. */
+    /**
+     * Installed TV apps: [{pkg, label, icon}]. The icon is a URL the page loads
+     * on demand (served by [iconPng] through MainActivity), so this call stays
+     * small and fast at start-up.
+     */
     @JavascriptInterface
     fun apps(): String {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
@@ -53,12 +57,11 @@ class LauncherBridge(private val activity: Activity) {
             .sortedBy { it.loadLabel(pm).toString().lowercase() }
             .forEach { ri ->
                 val info = ri.activityInfo
-                val drawable = info.loadIcon(pm)
                 out.put(
                     JSONObject()
                         .put("pkg", info.packageName)
                         .put("label", ri.loadLabel(pm).toString())
-                        .put("icon", dataUrl(drawable, 192)),
+                        .put("icon", "$ORIGIN/icons/${info.packageName}.png"),
                 )
             }
         return out.toString()
@@ -97,27 +100,35 @@ class LauncherBridge(private val activity: Activity) {
 
     /**
      * The active media session (YouTube Music or any player):
-     * {title, artist, durationMs, positionMs, playing, art, colors}. "null"
+     * {key, title, artist, durationMs, positionMs, playing, art, colors}.
+     * The cover (a URL served by [artJpeg]) and its colours are only included
+     * when the song differs from [knownKey], so repeat polls stay tiny. "null"
      * if nothing is playing or notification access hasn't been granted.
      */
     @JavascriptInterface
-    fun nowPlaying(): String {
+    fun nowPlaying(knownKey: String): String {
         val c = controller() ?: return "null"
         val md = c.metadata ?: return "null"
         val title = md.getString(MediaMetadata.METADATA_KEY_TITLE) ?: return "null"
         val state = c.playbackState
+        val artist = md.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
+        val key = "${c.packageName}|$title|$artist"
         val json = JSONObject()
+            .put("key", key)
             .put("title", title)
-            .put("artist", md.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: "")
+            .put("artist", artist)
             .put("durationMs", md.getLong(MediaMetadata.METADATA_KEY_DURATION))
             .put("positionMs", state?.position ?: 0)
             .put("playing", state?.state == PlaybackState.STATE_PLAYING)
             .put("pkg", c.packageName)
 
+        if (key == knownKey) return json.toString()
+
         val art = md.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
             ?: md.getBitmap(MediaMetadata.METADATA_KEY_ART)
+        nowArt = art?.let { jpeg(it, 320) }
         if (art != null) {
-            json.put("art", dataUrl(art, 320, Bitmap.CompressFormat.JPEG))
+            json.put("art", "$ORIGIN/art/now.jpg?k=${key.hashCode()}")
             // Card tint, as in the prototype: light, mid and dark tones of the cover.
             val p = Palette.from(art).generate()
             val fallback = p.getDominantColor(0xFF3A3A48.toInt())
@@ -261,34 +272,57 @@ class LauncherBridge(private val activity: Activity) {
 
     fun close() = govee.close()
 
+    // ---------- Images served to the page (see MainActivity) ----------
+
+    @Volatile private var nowArt: ByteArray? = null
+
+    /** The current song's cover as JPEG, or null. */
+    fun artJpeg(): ByteArray? = nowArt
+
+    /** An app's icon as a 128px PNG, cached on disk per app version. */
+    fun iconPng(pkg: String): ByteArray? {
+        val info = runCatching { pm.getPackageInfo(pkg, 0) }.getOrNull() ?: return null
+        @Suppress("DEPRECATION")
+        val version = info.longVersionCodeCompat()
+        val file = File(activity.cacheDir, "icons/$pkg-$version.png")
+        if (file.exists()) return file.readBytes()
+        val drawable = runCatching { pm.getApplicationIcon(pkg) }.getOrNull() ?: return null
+        val bytes = png(drawable, 128)
+        file.parentFile?.mkdirs()
+        runCatching { file.writeBytes(bytes) }
+        return bytes
+    }
+
+    private fun android.content.pm.PackageInfo.longVersionCodeCompat(): Long =
+        if (android.os.Build.VERSION.SDK_INT >= 28) longVersionCode else @Suppress("DEPRECATION") versionCode.toLong()
+
     // ---------- Helpers ----------
 
-    private fun dataUrl(drawable: Drawable, size: Int): String {
+    private fun png(drawable: Drawable, size: Int): ByteArray {
         val w = drawable.intrinsicWidth.takeIf { it > 0 } ?: size
         val h = drawable.intrinsicHeight.takeIf { it > 0 } ?: size
         val scale = size.toFloat() / maxOf(w, h)
         val bmp = Bitmap.createBitmap((w * scale).toInt().coerceAtLeast(1), (h * scale).toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         drawable.setBounds(0, 0, bmp.width, bmp.height)
         drawable.draw(Canvas(bmp))
-        return dataUrl(bmp, size)
+        return ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
     }
 
-    private fun dataUrl(bitmap: Bitmap, size: Int, format: Bitmap.CompressFormat = Bitmap.CompressFormat.PNG): String {
-        val scaled = if (maxOf(bitmap.width, bitmap.height) > size) {
-            val s = size.toFloat() / maxOf(bitmap.width, bitmap.height)
+    private fun jpeg(bitmap: Bitmap, size: Int): ByteArray {
+        val s = size.toFloat() / maxOf(bitmap.width, bitmap.height)
+        val scaled = if (s < 1f) {
             Bitmap.createScaledBitmap(bitmap, (bitmap.width * s).toInt(), (bitmap.height * s).toInt(), true)
         } else {
             bitmap
         }
-        val out = ByteArrayOutputStream()
-        scaled.compress(format, 85, out)
-        val mime = if (format == Bitmap.CompressFormat.PNG) "image/png" else "image/jpeg"
-        return "data:$mime;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+        return ByteArrayOutputStream().also { scaled.compress(Bitmap.CompressFormat.JPEG, 85, it) }.toByteArray()
     }
 
     private fun hex(color: Int) = String.format("#%06x", color and 0xFFFFFF)
 
-    private companion object {
-        const val WEEK_MS = 7L * 24 * 60 * 60 * 1000
+    companion object {
+        /** Where the page and its images are served from inside the app. */
+        const val ORIGIN = "https://appassets.androidplatform.net"
+        private const val WEEK_MS = 7L * 24 * 60 * 60 * 1000
     }
 }

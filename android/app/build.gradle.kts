@@ -12,8 +12,8 @@ android {
         // Android TV 8.0+. Google TV sets are Android 10 or later.
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 2
+        versionName = "0.2"
     }
 
     buildTypes {
@@ -39,7 +39,7 @@ android {
 // single source of the design.
 val copyWebUi by tasks.registering(Sync::class) {
     from(rootProject.file("../launcher")) {
-        include("index.html", "styles.css", "*.js")
+        include("index.html", "styles.css", "*.js", "fonts/*")
         into("web")
     }
     from(rootProject.file("../wallpapers")) {

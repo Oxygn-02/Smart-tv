@@ -373,6 +373,7 @@
           </label>
           ${row('theme', '<span data-theme-icon></span>', 'Appearance', 'Light, dark, or follow the TV', 'theme')}
           ${row('wallpaper', icon('image'), 'Wallpaper', 'Your photos, the gradient, or your light colours', 'wallpaper')}
+          ${row('screen-fit', icon('live'), 'Screen size', 'Resize if the edges are cropped', 'fit')}
           ${row('cycle-hdmi', icon('hdmi'), 'Games input', `Where the ${state.games.device} is plugged in`, 'hdmi')}
           ${row('toggle-auto', icon('games'), 'Switch input when Games opens', 'Turn off to stay on the launcher', 'auto')}
           ${row('cycle-countdown', icon('timer'), 'Switch countdown', 'Time to cancel before switching', 'countdown')}
@@ -407,6 +408,24 @@
             <div>The TV is showing your ${state.games.device}.</div>
             <button class="btn lg" data-focus data-action="close-overlay">Back to launcher</button>
           </div>
+        </div>
+      </div>`;
+  }
+
+  // Screen fit: TVs crop or stretch app windows a little, so the size is set
+  // once by eye. The border is the edge of the launcher; the dashed line is the
+  // 5% safe margin all content stays inside.
+  function fitOverlay() {
+    return `
+      <div class="fit" hidden>
+        <div class="fit-frame"></div>
+        <div class="fit-safe"></div>
+        <div class="fit-card">
+          <div class="fit-title">Fit the screen</div>
+          <div class="fit-text">Press Up or Down until the white border sits just inside the edges of your TV, with all four sides visible.</div>
+          <div class="fit-size tnum" data-fit-val></div>
+          <div class="fit-diag small" data-fit-diag></div>
+          <button class="btn btn-primary" data-focus data-action="fit-done">Done</button>
         </div>
       </div>`;
   }
@@ -466,12 +485,18 @@
   }
 
   // What's playing on the TV (YouTube Music or any app with a media session).
+  // The Android side sends the cover and its colours only when the song
+  // changes, so a repeat poll is a few bytes and the page isn't rebuilt.
   let pollTick = 0;
+  let npKey = null;
   function pollNowPlaying() {
-    const np = nativeJson('nowPlaying');
+    const np = nativeJson('nowPlaying', npKey || '');
     const was = state.live;
     state.live = !!np;
-    if (np) {
+    if (!np) {
+      npKey = null;
+    } else if (np.key !== npKey) {
+      npKey = np.key;
       D.music.tracks = [{
         title: np.title,
         artist: np.artist || '',
@@ -483,8 +508,15 @@
       state.pos = Math.round((np.positionMs || 0) / 1000);
       state.playing = !!np.playing;
       renderTrack();
+      applyState();
+      return;
+    } else {
+      state.pos = Math.round((np.positionMs || 0) / 1000);
+      state.playing = !!np.playing;
+      updatePlayback();
+      renderPlayButtons();
     }
-    if (np || was !== state.live) applyState();
+    if (was !== state.live) applyState();
   }
 
   function build() {
@@ -514,6 +546,7 @@
 
       ${overlay()}
       ${customizeSheet()}
+      ${fitOverlay()}
       <div class="toast glass" role="status" hidden></div>
     `;
 
@@ -521,6 +554,7 @@
       clock: stage.querySelector('[data-clock]'),
       date: stage.querySelector('[data-date]'),
       sheet: stage.querySelector('.sheet-scrim'),
+      fit: stage.querySelector('.fit'),
       searchInput: stage.querySelector('#search-input'),
       townInput: stage.querySelector('#town-input'),
       overlay: stage.querySelector('.overlay'),
@@ -571,10 +605,7 @@
     pressed('[data-action="appearance"]', (id) => id === state.appearance);
     pressed('[data-action="wallpaper-set"]', (id) => id === wp);
 
-    all('[data-action="play"]').forEach((b) => {
-      b.innerHTML = state.playing ? filledIcon('pause') : filledIcon('play');
-      b.setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
-    });
+    renderPlayButtons();
 
     all('[data-np-card]').forEach((c) => c.classList.toggle('paused', !state.playing));
 
@@ -595,6 +626,7 @@
       wifi: 'Connected',
       match: state.matchLights ? 'On' : 'Off',
       sample: state.sampleData ? 'On' : 'Off',
+      fit: `${Math.round((userFit || 1) * 100)}%`,
       'np-access': access.nowPlaying ? 'Allowed' : 'Off. Press OK to allow',
       'usage-access': access.recentApps ? 'Allowed' : 'Off. Press OK to allow',
     };
@@ -721,6 +753,15 @@
     updatePlayback();
   }
 
+  function renderPlayButtons() {
+    all('[data-action="play"]').forEach((b) => {
+      if (b.dataset.playing === String(state.playing)) return;
+      b.dataset.playing = String(state.playing);
+      b.innerHTML = state.playing ? filledIcon('pause') : filledIcon('play');
+      b.setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
+    });
+  }
+
   function updatePlayback() {
     const dur = track().durationSec;
     all('[data-progress]').forEach((el) => { el.style.width = `${(state.pos / dur) * 100}%`; });
@@ -763,13 +804,45 @@
 
   function updateClock() {
     const n = new Date();
-    refs.clock.textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}`;
+    const time = `${pad(n.getHours())}:${pad(n.getMinutes())}`;
+    if (refs.clock.textContent === time) return;
+    refs.clock.textContent = time;
     refs.date.textContent = n.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
   }
 
   function showPhoto() {
     const file = D.wallpapers[state.photoIndex];
-    if (file) stage.style.setProperty('--photo', `url("${D.wallpaperBase}${file}")`);
+    if (!file) return;
+    const url = `${D.wallpaperBase}${file}`;
+    stage.style.setProperty('--photo', `url("${url}")`);
+    makeFrost(url);
+  }
+
+  // The glass panels show a pre-blurred copy of the wallpaper instead of
+  // blurring what's behind them every frame (that was the slow part). A tiny
+  // canvas does the blur once per photo. Panels pin it to the screen, see
+  // "v5" in styles.css.
+  function makeFrost(url) {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const margin = 8; // keeps the blur from fading out at the edges
+        const c = document.createElement('canvas');
+        c.width = 192;
+        c.height = 108;
+        const g = c.getContext('2d');
+        const tw = c.width + margin * 2;
+        const th = c.height + margin * 2;
+        const k = Math.max(tw / img.width, th / img.height);
+        if ('filter' in g) g.filter = 'blur(2px)';
+        g.drawImage(img, (tw - img.width * k) / 2 - margin, (th - img.height * k) / 2 - margin, img.width * k, img.height * k);
+        stage.style.setProperty('--frost', `url(${c.toDataURL('image/jpeg', 0.85)})`);
+      } catch {
+        // Canvas blocked (previewing from a local file): use the photo as it is.
+        stage.style.setProperty('--frost', `url("${url}")`);
+      }
+    };
+    img.src = url;
   }
 
   if (D.wallpapers.length > 1) {
@@ -896,6 +969,8 @@
     else if (act === 'theme') state.appearance = { auto: 'light', light: 'dark', dark: 'auto' }[state.appearance];
     else if (act === 'customize') openSheet();
     else if (act === 'toggle-sample') state.sampleData = !state.sampleData;
+    else if (act === 'screen-fit') openFit();
+    else if (act === 'fit-done') closeFit();
     else if (act === 'grant-np') nativeCall('openSettings', 'notification-access');
     else if (act === 'grant-usage') nativeCall('openSettings', 'usage-access');
     else if (act === 'close-sheet') closeSheet();
@@ -1099,7 +1174,9 @@
   }
 
   function goBack() {
-    if (!refs.sheet.hidden) {
+    if (!refs.fit.hidden) {
+      closeFit();
+    } else if (!refs.sheet.hidden) {
       closeSheet();
     } else if (!refs.overlay.hidden) {
       closeOverlay();
@@ -1110,6 +1187,12 @@
   }
 
   document.addEventListener('keydown', (e) => {
+    if (!refs.fit.hidden) {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') nudgeFit(e.key === 'ArrowUp' ? 1 : -1);
+      if (BACK_KEYS.has(e.key)) closeFit();
+      if (e.key.startsWith('Arrow') || BACK_KEYS.has(e.key)) e.preventDefault();
+      return;
+    }
     const inText = e.target.tagName === 'INPUT';
 
     if (BACK_KEYS.has(e.key) && !(inText && e.key === 'Backspace')) {
@@ -1135,7 +1218,7 @@
   setInterval(() => {
     updateClock();
     if (NATIVE) {
-      if (++pollTick % 3 === 0) pollNowPlaying();
+      if (++pollTick % 4 === 0) pollNowPlaying();
       if (state.playing && state.live) {
         state.pos = Math.min(state.pos + 1, track().durationSec);
         updatePlayback();
@@ -1149,11 +1232,66 @@
     }
   }, 1000);
 
-  function fit() {
-    const s = Math.min(innerWidth / 1280, innerHeight / 720);
-    stage.style.transform = `scale(${s})`;
+  // Screen size. The launcher is drawn on a 1280x720 canvas and scaled to fit
+  // the window, times the size chosen in "Fit the screen" (saved on the TV).
+  const FIT_MIN = 0.6;
+  const FIT_MAX = 1.1;
+  const FIT_STEP = 0.02;
+
+  function readFit() {
+    try {
+      const v = parseFloat(localStorage.getItem('fit'));
+      return v >= FIT_MIN && v <= FIT_MAX ? v : null;
+    } catch {
+      return null;
+    }
   }
+
+  let userFit = readFit();
+
+  function fit() {
+    const root = document.documentElement;
+    const w = innerWidth || root.clientWidth;
+    const h = innerHeight || root.clientHeight;
+    if (!w || !h) return; // not laid out yet; the timers below try again
+    stage.style.transform = `scale(${Math.min(w / 1280, h / 720) * (userFit || 1)})`;
+    const diag = stage.querySelector('[data-fit-diag]');
+    if (diag) diag.textContent = `Screen ${w} x ${h} at ${devicePixelRatio}x`;
+  }
+
+  function fitText() {
+    const val = stage.querySelector('[data-fit-val]');
+    if (val) val.textContent = `${Math.round((userFit || 1) * 100)}%`;
+  }
+
+  function openFit() {
+    refs.fit.hidden = false;
+    fit();
+    fitText();
+    refs.fit.querySelector('[data-action="fit-done"]').focus();
+  }
+
+  function nudgeFit(dir) {
+    userFit = Math.min(FIT_MAX, Math.max(FIT_MIN, Math.round(((userFit || 1) + dir * FIT_STEP) * 100) / 100));
+    fit();
+    fitText();
+  }
+
+  function closeFit() {
+    try {
+      localStorage.setItem('fit', String(userFit || 1));
+    } catch {
+      // Storage unavailable: the size just isn't remembered.
+    }
+    userFit = userFit || 1;
+    refs.fit.hidden = true;
+    applyState();
+    (stage.querySelector('.dock-app') || stage).focus();
+  }
+
   addEventListener('resize', fit);
+  addEventListener('load', fit);
+  window.visualViewport?.addEventListener('resize', fit);
   matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyState);
 
   // The Android shell forwards the remote's Back and Home buttons here.
@@ -1171,9 +1309,18 @@
     applyState();
   };
 
+  fit(); // first, so nothing below can leave the screen unscaled
   build();
-  if (NATIVE) pollNowPlaying();
   animateView('home');
   fit();
   stage.querySelector('.dock-app').focus();
+  if (NATIVE) {
+    try {
+      pollNowPlaying();
+    } catch (e) {
+      console.warn('now playing failed', e);
+    }
+    if (userFit === null) openFit(); // first run: set the screen size
+  }
+  [100, 500, 1500].forEach((ms) => setTimeout(fit, ms));
 })();

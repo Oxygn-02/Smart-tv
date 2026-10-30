@@ -10,7 +10,7 @@
 
 ## Notes for the Android port
 
-- Blur the wallpaper once when it's set and draw the panels as translucent fills over that image. Live blur behind every panel will stutter on a budget TV chip.
+- Done: panels no longer blur live (that halved the frame rate on a slow processor). The wallpaper is blurred once into a small "frost" image that the panels show (`makeFrost` in `app.js`).
 - Watch memory: on a 1.5–2 GB TV, Android may close the launcher while an app is open. Keep startup fast and remember focus.
 - Prove each data source on the TV before relying on it: media session (Now playing), Watch Next (Continue watching), HDMI input switching, Govee LAN control. The empty states cover the ones that fail.
 - Disable the stock launcher only after this one is installed, set as default and working (see `HANDOFF.md`), and keep a way back. Re-check after firmware updates.

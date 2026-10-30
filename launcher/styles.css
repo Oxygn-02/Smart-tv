@@ -1,3 +1,13 @@
+/* Geist (SIL Open Font License, see fonts/OFL.txt), bundled so the launcher
+   never waits on the network for its type. Named "Geist Local" so the hosted
+   copy on the preview page can still take precedence. */
+@font-face {
+  font-family: "Geist Local";
+  src: url("fonts/geist-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 /* Tokens from HANDOFF.md "Design spec" and mockup/index.html */
 
 html,
@@ -39,7 +49,7 @@ input {
   --shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
   --onbtn: rgba(255, 255, 255, 0.12);
   --playink: #050508;
-  --scrim: rgba(3, 3, 6, 0.6);
+  --scrim: rgba(3, 3, 6, 0.74);
 
   /* Liquid glass behind icons */
   --lg-top: rgba(255, 255, 255, 0.11);
@@ -69,7 +79,7 @@ input {
   --shadow: 0 14px 40px rgba(40, 40, 80, 0.08);
   --onbtn: rgba(21, 21, 29, 0.08);
   --playink: #fff;
-  --scrim: rgba(225, 226, 235, 0.55);
+  --scrim: rgba(225, 226, 235, 0.72);
 
   --lg-top: rgba(255, 255, 255, 0.9);
   --lg-bottom: rgba(255, 255, 255, 0.4);
@@ -121,8 +131,6 @@ input {
 .glass {
   background: var(--glass);
   border: 1px solid var(--border);
-  backdrop-filter: blur(30px) saturate(160%);
-  -webkit-backdrop-filter: blur(30px) saturate(160%);
 }
 
 /* Liquid glass: a thicker, lit lens for the back of every icon.
@@ -131,8 +139,6 @@ input {
   position: relative;
   isolation: isolate;
   background: linear-gradient(165deg, var(--lg-top), var(--lg-bottom));
-  backdrop-filter: blur(18px) saturate(180%) brightness(1.05);
-  -webkit-backdrop-filter: blur(18px) saturate(180%) brightness(1.05);
   box-shadow:
     inset 0 1px 0.5px var(--lg-hi),
     inset 0 -1px 1px var(--lg-lo),
@@ -457,8 +463,6 @@ button {
   color: #fff;
   font-size: 14px;
   cursor: pointer;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
 }
 
 .resume:focus-visible {
@@ -959,8 +963,6 @@ button.info {
   align-items: center;
   justify-content: center;
   background: var(--scrim);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 }
 
 .switch-card {
@@ -1462,8 +1464,6 @@ button.info {
   background: var(--glass-sheen), var(--glass);
   border: 0;
   box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 0 0 1px var(--glass-rim), var(--shadow);
-  backdrop-filter: blur(36px) saturate(180%);
-  -webkit-backdrop-filter: blur(36px) saturate(180%);
 }
 
 .card {
@@ -2453,7 +2453,7 @@ button.w-empty {
 @property --glowc { syntax: '<color>'; inherits: true; initial-value: #2bd47d; }
 
 #stage {
-  font-family: Geist, "Helvetica Neue", Arial, sans-serif;
+  font-family: Geist, "Geist Local", "Helvetica Neue", Arial, sans-serif;
   letter-spacing: 0;
   transition: background 0.4s, --l0 1.2s, --l1 1.2s, --l2 1.2s, --glowc 1s;
 
@@ -2637,8 +2637,6 @@ button.w-empty {
 .mix.glass {
   background: none;
   box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
   padding: 0;
   gap: 10px;
 }
@@ -2807,4 +2805,113 @@ button.w-empty {
 .app-ic.has-img.s-tinted img {
   filter: grayscale(1) brightness(1.3);
   opacity: 0.85;
+}
+
+
+/* =====================================================================
+   v5: smooth on a TV chip
+
+   Live backdrop blur behind a dozen panels is what made the launcher slow
+   (about 29 frames a second on a 6x slower processor, against about 56
+   without it). Panels now use a frost image instead: the wallpaper is blurred
+   once, when it loads (see makeFrost in app.js), and painted as the panel's
+   background. Same frosted look; almost no per-frame cost.
+   ===================================================================== */
+
+#stage {
+  --frost: none;
+}
+
+/* Photo wallpaper: tint and scrim over the pre-blurred photo, which is pinned
+   to the screen so every panel shows the part of the photo behind it. */
+#stage.photo .glass {
+  background:
+    var(--glass-sheen),
+    linear-gradient(var(--glass), var(--glass)),
+    var(--photo-scrim),
+    var(--frost) 0 0 / 1280px 720px fixed;
+}
+
+/* Cheaper glass chips behind icons: no blur, same lit edge */
+.lg {
+  background: linear-gradient(165deg, var(--lg-top), var(--lg-bottom));
+}
+
+/* The Home hero's Resume button is over artwork, so a plain translucent fill */
+.resume {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ---------- Fit the screen ---------- */
+
+.fit {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+
+/* The launcher's edge: should sit just inside the TV's edges */
+.fit-frame {
+  position: absolute;
+  inset: 0;
+  border: 6px solid #fff;
+  pointer-events: none;
+}
+
+/* The 5% safe margin all content stays inside */
+.fit-safe {
+  position: absolute;
+  inset: 36px 64px;
+  border: 2px dashed rgba(255, 255, 255, 0.45);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.fit-card {
+  width: 560px;
+  box-sizing: border-box;
+  padding: 32px 36px;
+  border-radius: 32px;
+  background: rgba(20, 22, 28, 0.94);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.fit-title {
+  font-size: 31px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.fit-text {
+  font-size: 20px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.fit-size {
+  font-size: 49px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.fit-diag {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.fit .btn {
+  margin-top: 10px;
+}
+
+#stage .fit [data-focus]:focus-visible {
+  outline-color: #fff;
 }

@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.view.View
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -29,16 +30,35 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Serve the bundled UI from a https:// origin rather than file://.
+        bridge = LauncherBridge(this)
+
+        // Serve the bundled UI from a https:// origin rather than file://, plus
+        // app icons and the current album cover, loaded by the page on demand.
         val assets = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .addPathHandler("/icons/") { path ->
+                bridge.iconPng(path.removeSuffix(".png"))?.let { image("image/png", it, cache = true) }
+            }
+            .addPathHandler("/art/") { _ ->
+                bridge.artJpeg()?.let { image("image/jpeg", it, cache = false) }
+            }
             .build()
 
-        bridge = LauncherBridge(this)
         web = WebView(this).apply {
             setBackgroundColor(Color.BLACK)
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
+            // Lay the page out at the real screen size, without zoom or the
+            // TV's font scaling; the page scales itself to fit (launcher/app.js).
+            settings.useWideViewPort = false
+            settings.loadWithOverviewMode = false
+            settings.textZoom = 100
+            settings.setSupportZoom(false)
+            settings.builtInZoomControls = false
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
             isFocusable = true
             isFocusableInTouchMode = true
             webViewClient = object : WebViewClient() {
@@ -73,6 +93,11 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         web.evaluateJavascript("window.launcherResume && window.launcherResume()", null)
     }
+
+    private fun image(mime: String, bytes: ByteArray, cache: Boolean) =
+        WebResourceResponse(mime, null, bytes.inputStream()).apply {
+            responseHeaders = mapOf("Cache-Control" to if (cache) "max-age=86400" else "no-store")
+        }
 
     override fun onDestroy() {
         bridge.close()
