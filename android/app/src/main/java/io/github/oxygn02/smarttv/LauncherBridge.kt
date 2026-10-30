@@ -1,6 +1,7 @@
 package io.github.oxygn02.smarttv
 
 import android.app.Activity
+import android.app.AppOpsManager
 import android.app.SearchManager
 import android.app.usage.UsageStatsManager
 import android.content.ComponentName
@@ -16,9 +17,12 @@ import android.media.session.PlaybackState
 import android.media.tv.TvContract
 import android.media.tv.TvInputInfo
 import android.media.tv.TvInputManager
+import android.os.Build
+import android.os.Process
 import android.provider.Settings
 import android.util.Base64
 import android.webkit.JavascriptInterface
+import androidx.core.app.NotificationManagerCompat
 import androidx.palette.graphics.Palette
 import org.json.JSONArray
 import org.json.JSONObject
@@ -214,12 +218,45 @@ class LauncherBridge(private val activity: Activity) {
         }
     }
 
+    /**
+     * Opens a system settings screen: "wifi", "notification-access" (for Now
+     * playing) or "usage-access" (for recent apps). Falls back to the main
+     * settings if the TV hides that screen.
+     */
     @JavascriptInterface
     fun openSettings(which: String) {
-        val action = if (which == "wifi") Settings.ACTION_WIFI_SETTINGS else Settings.ACTION_SETTINGS
+        val action = when (which) {
+            "wifi" -> Settings.ACTION_WIFI_SETTINGS
+            "notification-access" -> Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
+            "usage-access" -> Settings.ACTION_USAGE_ACCESS_SETTINGS
+            else -> Settings.ACTION_SETTINGS
+        }
         activity.runOnUiThread {
             runCatching { activity.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                .onFailure {
+                    runCatching {
+                        activity.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }
+                }
         }
+    }
+
+    /** Which permissions are granted: {"nowPlaying": bool, "recentApps": bool}. */
+    @JavascriptInterface
+    fun access(): String {
+        val pkg = activity.packageName
+        val listener = NotificationManagerCompat.getEnabledListenerPackages(activity).contains(pkg)
+        val ops = activity.getSystemService(AppOpsManager::class.java)
+        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ops.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), pkg)
+        } else {
+            @Suppress("DEPRECATION")
+            ops.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), pkg)
+        }
+        return JSONObject()
+            .put("nowPlaying", listener)
+            .put("recentApps", mode == AppOpsManager.MODE_ALLOWED)
+            .toString()
     }
 
     fun close() = govee.close()

@@ -34,6 +34,18 @@ Needs Android Studio (or JDK 17 and the Android SDK; set `sdk.dir` in `local.pro
 
 Or open `android/` in Android Studio and run it on an Android TV emulator (Google TV image) first.
 
+## Install without a computer
+
+The latest test build is `tv.apk` at the top of the repo.
+
+1. On the TV, install **Downloader** (by AFTVnews) from the Play Store.
+2. Open Downloader, allow it to install apps when asked (or Settings › Apps › Security & restrictions › Unknown sources › Downloader), and enter:
+   `raw.githubusercontent.com/Oxygn-02/Smart-tv/main/tv.apk`
+   (capital O; it's case-sensitive). Choose Install.
+3. Open **Smart TV Launcher** from your apps. In its Settings tab, press OK on **Now playing access** and **Recent apps access** and switch the launcher on in the screen that opens.
+
+This installs it as a normal app; uninstalling it removes it completely. Making it the home screen (below) still needs adb.
+
 ## Install on the TV
 
 Ask before each step that changes the TV (see `../CLAUDE.md`).
