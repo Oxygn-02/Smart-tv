@@ -11,7 +11,9 @@
   }
 
   const state = {
-    theme: initialTheme(), // 'dark' | 'light'
+    appearance: 'auto', // 'auto' (follow the TV/host) | 'light' | 'dark'
+    theme: initialTheme(), // resolved 'dark' | 'light'
+    iconStyle: 'default', // 'default' | 'dark' | 'clear' | 'tinted'
     wallpaper: D.wallpapers.length ? 'photo' : 'gradient', // 'gradient' | 'photo'
     photoIndex: 0,
     view: 'home',
@@ -61,75 +63,79 @@
       </div>`;
   }
 
+  // Home: an iPad-style widget grid and a glass dock of apps, sized for a TV.
   function homeView() {
     const w = D.weather;
     const h = D.hero;
     return `
       <section class="view view-home" data-view="home">
-        <div class="grid">
-          <div class="col">
-            <section class="card glass now-playing tinted" data-np-card aria-label="Now playing">
-              <div class="tint"></div>
-              <div class="np-left">
-                <div class="eyebrow">${icon('playCircle', 14)}<span>${D.music.source}</span></div>
-                <div class="np-meta">
-                  <div class="np-title" data-np-title></div>
-                  <div class="sub" data-np-artist></div>
-                </div>
-                ${nowPlayingControls()}
+        <div class="widgets">
+          <section class="widget glass w-clock" aria-label="Clock">${clockFace()}</section>
+
+          <section class="widget glass tinted w-weather" data-weather-card aria-label="Weather">
+            <div class="tint"></div>
+            <div class="w-weather-top">
+              <span class="w-label" data-town></span>
+              <svg class="w-weather-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${WEATHER_ICON}</svg>
+            </div>
+            <div class="temp">${w.tempC}°</div>
+            <div class="w-weather-foot">
+              <span>${w.condition}</span>
+              <span class="small">H:${w.high}° L:${w.low}°</span>
+            </div>
+          </section>
+
+          <section class="widget glass now-playing tinted w-music" data-np-card aria-label="Now playing">
+            <div class="tint"></div>
+            <div class="np-top">
+              <div class="np-meta">
+                <div class="eyebrow">${icon('playCircle', 15)}<span>${D.music.source}</span></div>
+                <div class="np-title" data-np-title></div>
+                <div class="sub" data-np-artist></div>
               </div>
               <div class="np-art" data-np-art></div>
-            </section>
-
-            <section class="card glass weather tinted" data-weather-card aria-label="Weather">
-              <div class="tint"></div>
-              <div class="weather-text">
-                <div class="eyebrow"><span data-town></span></div>
-                <div class="temp">${w.tempC}°</div>
-                <div class="small">${w.condition} · H ${w.high}° L ${w.low}°</div>
-              </div>
-              <span class="lg chip weather-chip">
-                <svg width="72" height="72" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${WEATHER_ICON}</svg>
-              </span>
-            </section>
-          </div>
-
-          <div class="col">
-            <section class="card hero" aria-label="Continue watching">
-              <div class="hero-art" style="background:${h.art}"></div>
-              <div class="hero-shade"></div>
-              <div class="hero-label">Continue watching</div>
-              <div class="hero-body">
-                <div class="hero-app"><span class="dot" style="background:${h.appColor}"></span>${h.app}</div>
-                <div class="hero-row">
-                  <div>
-                    <div class="hero-title">${h.title}</div>
-                    <div class="hero-sub">${h.subtitle}</div>
-                  </div>
-                  <button class="resume" data-focus data-toast="Resuming ${h.title} on ${h.app}">▶ Resume</button>
-                </div>
-                <div class="hero-track"><div style="width:${h.progress}%"></div></div>
-              </div>
-            </section>
-
-            <div class="also">
-              ${D.continueWatching.map((c) => `
-                <button class="mini glass" data-focus data-toast="Resuming ${c.title} on ${c.app}" aria-label="Continue ${c.title} on ${c.app}">
-                  <div class="mini-art" style="background:${c.art}"></div>
-                  <div class="mini-body">
-                    <div class="small">${c.app}</div>
-                    <div class="mini-title">${c.title}</div>
-                    <div class="small">${c.meta}</div>
-                    <div class="track" style="margin-top:6px"><div class="fill" style="width:${c.progress}%"></div></div>
-                  </div>
-                </button>`).join('')}
             </div>
-          </div>
+            <div class="np-next">
+              <div class="eyebrow">Up next</div>
+              <div data-np-next></div>
+            </div>
+            ${nowPlayingControls()}
+          </section>
+
+          <section class="widget hero w-hero" aria-label="Continue watching">
+            <div class="hero-art" style="background:${h.art}"></div>
+            <div class="hero-shade"></div>
+            <div class="hero-label">Continue watching</div>
+            <div class="hero-body">
+              <div class="hero-app"><span class="dot" style="background:${h.appColor}"></span>${h.app}</div>
+              <div class="hero-row">
+                <div>
+                  <div class="hero-title">${h.title}</div>
+                  <div class="hero-sub">${h.subtitle}</div>
+                </div>
+                <button class="resume" data-focus data-toast="Resuming ${h.title} on ${h.app}">${filledIcon('play', 14)} Resume</button>
+              </div>
+              <div class="hero-track"><div style="width:${h.progress}%"></div></div>
+            </div>
+          </section>
+
+          ${D.continueWatching.map((c) => `
+            <button class="widget glass w-mini" data-focus data-toast="Resuming ${c.title} on ${c.app}" aria-label="Continue ${c.title} on ${c.app}">
+              <span class="w-mini-art" style="background:${c.art}">${appIcon(APP[c.appId], 30)}</span>
+              <span class="w-mini-title">${c.title}</span>
+              <span class="small">${c.meta}</span>
+              <span class="track"><span class="fill" style="width:${c.progress}%"></span></span>
+            </button>`).join('')}
         </div>
 
-        <div class="apps">
-          ${D.apps.filter((a) => a.pinned).map((a) => appTile(a, 'app glass', 46)).join('')}
-        </div>
+        <nav class="dock glass" aria-label="Apps">
+          ${D.apps.map((a, i) => `
+            ${!a.pinned && D.apps[i - 1]?.pinned ? '<span class="dock-divider"></span>' : ''}
+            <button class="dock-app" data-focus data-app="${a.id}" aria-label="${a.name}" style="--accent:${a.color}">
+              ${appIcon(a, 64)}
+              <span class="dock-label">${a.short || a.name}</span>
+            </button>`).join('')}
+        </nav>
       </section>`;
   }
 
@@ -370,8 +376,8 @@
           <label class="set-row">
             ${settingsRow(icon('location'), 'Weather location', 'Town for the weather card', '<input id="town-input" class="set-input" data-focus autocomplete="off" spellcheck="false">')}
           </label>
-          ${row('theme', '<span data-theme-icon></span>', 'Appearance', 'Light or dark', 'theme')}
-          ${row('wallpaper', icon('image'), 'Wallpaper', 'Gradient, or your photos from wallpapers/', 'wallpaper')}
+          ${row('theme', '<span data-theme-icon></span>', 'Appearance', 'Light, dark, or follow the TV', 'theme')}
+          ${row('wallpaper', icon('image'), 'Wallpaper', 'Your photos, the gradient, or your light colours', 'wallpaper')}
           ${row('cycle-hdmi', icon('hdmi'), 'Games input', `Where the ${state.games.device} is plugged in`, 'hdmi')}
           ${row('toggle-auto', icon('games'), 'Switch input when Games opens', 'Turn off to stay on the launcher', 'auto')}
           ${row('cycle-countdown', icon('timer'), 'Switch countdown', 'Time to cancel before switching', 'countdown')}
@@ -406,27 +412,54 @@
       </div>`;
   }
 
+  // Customize panel, after the iPadOS one: icon style, appearance, wallpaper.
+  function customizeSheet() {
+    const sample = APP.youtube;
+    const opt = (action, id, label, inner) => `
+      <button class="opt" data-focus data-action="${action}" data-id="${id}">${inner}<span class="opt-label">${label}</span></button>`;
+    const seg = (action, items) => `
+      <div class="segmented">${items.map(([id, label]) => `<button class="seg" data-focus data-action="${action}" data-id="${id}">${label}</button>`).join('')}</div>`;
+    return `
+      <div class="sheet-scrim" hidden>
+        <section class="sheet glass" role="dialog" aria-label="Customize">
+          <div class="sheet-head">
+            <span class="sheet-title">Customize</span>
+            <button class="btn btn-primary" data-focus data-action="close-sheet">Done</button>
+          </div>
+          <div class="sheet-label">Icons</div>
+          <div class="opts">
+            ${[['default', 'Default'], ['dark', 'Dark'], ['clear', 'Clear'], ['tinted', 'Tinted']]
+              .map(([id, label]) => opt('icon-style', id, label, appIcon(sample, 76, id))).join('')}
+          </div>
+          <div class="sheet-row">
+            <span class="sheet-label">Appearance</span>
+            ${seg('appearance', [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto']])}
+          </div>
+          <div class="sheet-row">
+            <span class="sheet-label">Wallpaper</span>
+            ${seg('wallpaper-set', [['photo', 'Photo'], ['gradient', 'Gradient'], ['lights', 'Lights']])}
+          </div>
+        </section>
+      </div>`;
+  }
+
   function build() {
     stage.innerHTML = `
-      <div class="photolabel" hidden>[ Your photo wallpaper here ]</div>
-
-      <nav class="pill glass" aria-label="Main">
-        ${D.nav.map((n) => `
-          <button class="ib" data-focus data-nav="${n.id}" aria-label="${n.label}">${icon(n.id)}</button>`).join('')}
-        <div class="div"></div>
-        <button class="ib" data-focus data-action="wifi" aria-label="Wi-Fi">${icon('wifi')}</button>
-        <button class="ib" data-focus data-action="theme" data-theme-icon></button>
-        <button class="ib" data-focus data-action="wallpaper"></button>
-        <button class="ib" data-focus data-action="match-lights" aria-label="Match wallpaper to backlights">${icon('drop')}</button>
-        <button class="ib" data-focus data-nav="settings" aria-label="Settings">${icon('gear')}</button>
-      </nav>
-
-      <header class="header">
-        <div class="clock-row">
-          <div class="clock tnum" data-clock></div>
-          <div class="sub" data-date></div>
+      <header class="topbar">
+        <div class="status">
+          <span class="status-time tnum" data-clock></span>
+          <span class="status-date" data-date></span>
         </div>
-        <div class="sub">${D.weather.tempC}° · ${D.weather.condition}</div>
+        <nav class="tabbar glass" aria-label="Main">
+          ${D.nav.map((n) => `
+            <button class="tab" data-focus data-nav="${n.id}">${icon(n.id, 18)}<span>${n.label}</span></button>`).join('')}
+        </nav>
+        <div class="tools">
+          <span class="status-wifi" title="Wi-Fi connected">${icon('wifi', 18)}</span>
+          <button class="tool" data-focus data-action="match-lights" aria-label="Match wallpaper to backlights">${icon('drop', 20)}</button>
+          <button class="tool" data-focus data-action="customize" aria-label="Customize">${icon('sun', 20)}</button>
+          <button class="tool" data-focus data-nav="settings" aria-label="Settings">${icon('gear', 20)}</button>
+        </div>
       </header>
 
       <div class="views">
@@ -434,15 +467,14 @@
       </div>
 
       ${overlay()}
+      ${customizeSheet()}
       <div class="toast glass" role="status" hidden></div>
     `;
 
     refs = {
       clock: stage.querySelector('[data-clock]'),
       date: stage.querySelector('[data-date]'),
-      themeBtn: stage.querySelector('.ib[data-action="theme"]'),
-      wallpaperBtn: stage.querySelector('.ib[data-action="wallpaper"]'),
-      photoLabel: stage.querySelector('.photolabel'),
+      sheet: stage.querySelector('.sheet-scrim'),
       searchInput: stage.querySelector('#search-input'),
       townInput: stage.querySelector('#town-input'),
       overlay: stage.querySelector('.overlay'),
@@ -469,18 +501,30 @@
   // ---------- State to DOM ----------
 
   function applyState() {
+    state.theme = state.appearance === 'auto' ? initialTheme() : state.appearance;
     const dark = state.theme === 'dark';
     const photo = state.wallpaper === 'photo';
     const g = state.games;
 
     stage.classList.toggle('light', !dark);
     stage.classList.toggle('photo', photo);
-    refs.photoLabel.hidden = !photo || D.wallpapers.length > 0;
+    all('[data-theme-icon]').forEach((el) => { el.innerHTML = icon(dark ? 'moon' : 'sun'); });
 
-    all('[data-theme-icon]').forEach((el) => { el.innerHTML = icon(dark ? 'sun' : 'moon'); });
-    refs.themeBtn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
-    refs.wallpaperBtn.innerHTML = icon('image');
-    refs.wallpaperBtn.setAttribute('aria-label', photo ? 'Use gradient wallpaper' : 'Use photo wallpaper');
+    // Icon style: restyle every app icon except the fixed samples in Customize.
+    iconStyle = state.iconStyle;
+    all('.app-ic').forEach((el) => {
+      if (el.closest('.opts')) return;
+      el.className = el.className.replace(/\bs-\w+/, `s-${state.iconStyle}`);
+    });
+    const pressed = (sel, on) => all(sel).forEach((b) => {
+      const isOn = on(b.dataset.id);
+      b.classList.toggle('on', isOn);
+      b.setAttribute('aria-pressed', String(isOn));
+    });
+    const wp = state.matchLights ? 'lights' : state.wallpaper;
+    pressed('[data-action="icon-style"]', (id) => id === state.iconStyle);
+    pressed('[data-action="appearance"]', (id) => id === state.appearance);
+    pressed('[data-action="wallpaper-set"]', (id) => id === wp);
 
     all('[data-action="play"]').forEach((b) => {
       b.innerHTML = state.playing ? filledIcon('pause') : filledIcon('play');
@@ -497,8 +541,8 @@
     all('[data-view]').forEach((v) => { v.hidden = v.dataset.view !== state.view; });
 
     const values = {
-      theme: dark ? 'Dark' : 'Light',
-      wallpaper: photo ? 'Photos' : 'Gradient',
+      theme: { auto: `Auto (${dark ? 'dark' : 'light'})`, light: 'Light', dark: 'Dark' }[state.appearance],
+      wallpaper: { lights: 'Matches lights', photo: 'Photo', gradient: 'Gradient' }[wp],
       hdmi: `HDMI ${g.hdmiPort}`,
       auto: g.autoSwitch ? 'On' : 'Off',
       countdown: g.countdownSec ? `${g.countdownSec} s` : 'None',
@@ -541,7 +585,7 @@
     // Wallpaper gradient follows the backlights (fades between scenes).
     ['--l0', '--l1', '--l2'].forEach((v, i) => stage.style.setProperty(v, colors[i]));
     stage.classList.toggle('lights', state.matchLights && h.backlight !== 'off');
-    const matchBtn = stage.querySelector('.ib[data-action="match-lights"]');
+    const matchBtn = stage.querySelector('.tool[data-action="match-lights"]');
     matchBtn.classList.toggle('on', state.matchLights);
     matchBtn.style.color = state.matchLights ? colors[0] : '';
 
@@ -576,6 +620,15 @@
     all('[data-duration]').forEach((el) => { el.textContent = fmt(t.durationSec); });
 
     const tracks = D.music.tracks;
+    stage.querySelector('[data-np-next]').innerHTML = [1, 2].map((k) => {
+      const q = tracks[(state.track + k) % tracks.length];
+      return `
+        <div class="np-next-row">
+          <span class="np-next-art" style="background:${q.art}"></span>
+          <span class="np-next-text"><span class="np-next-title">${q.title}</span><span class="small">${q.artist}</span></span>
+        </div>`;
+    }).join('');
+
     const queue = stage.querySelector('[data-queue]');
     const hadFocus = queue.contains(document.activeElement);
     queue.innerHTML = [1, 2, 3, 4, 5].map((k) => {
@@ -635,6 +688,13 @@
 
   function updateClock() {
     const n = new Date();
+    const sec = n.getSeconds();
+    const min = n.getMinutes() + sec / 60;
+    const hr = (n.getHours() % 12) + min / 60;
+    const turn = (k, deg) => stage.querySelector(`[data-hand="${k}"]`)?.setAttribute('transform', `rotate(${deg} 100 100)`);
+    turn('h', hr * 30);
+    turn('m', min * 6);
+    turn('s', sec * 6);
     refs.clock.textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}`;
     refs.date.textContent = n.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   }
@@ -678,8 +738,23 @@
 
   // ---------- Views and Games switching ----------
 
+  function setWallpaper(id) {
+    state.matchLights = id === 'lights';
+    if (id !== 'lights') state.wallpaper = id;
+  }
+
+  function openSheet() {
+    refs.sheet.hidden = false;
+    (refs.sheet.querySelector('.opt.on') || refs.sheet.querySelector('[data-focus]')).focus();
+  }
+
+  function closeSheet() {
+    refs.sheet.hidden = true;
+    stage.querySelector('.tool[data-action="customize"]').focus();
+  }
+
   // Blocks that animate in when a view opens, staggered in reading order.
-  const ANIM_SELECTOR = ':is(.grid > .col > *, .also > *, .apps > *, .search-bar, .search-section, '
+  const ANIM_SELECTOR = ':is(.widgets > *, .dock, .search-bar, .search-section, '
     + '.music-grid > *, .music-mixes, .live-head, .channel, .view-apps > .eyebrow, .app-card, '
     + '.games-hero, .info, .settings, .room-grid > *, .soundbar)';
 
@@ -759,10 +834,15 @@
     else if (b.dataset.app) toast(`Opening ${APP[b.dataset.app].name}`);
     else if (b.dataset.track) setTrack(Number(b.dataset.track));
     else if (b.dataset.toast) toast(b.dataset.toast);
-    else if (act === 'theme') state.theme = state.theme === 'dark' ? 'light' : 'dark';
+    else if (act === 'theme') state.appearance = { auto: 'light', light: 'dark', dark: 'auto' }[state.appearance];
+    else if (act === 'customize') openSheet();
+    else if (act === 'close-sheet') closeSheet();
+    else if (act === 'icon-style') state.iconStyle = b.dataset.id;
+    else if (act === 'appearance') state.appearance = b.dataset.id;
+    else if (act === 'wallpaper-set') setWallpaper(b.dataset.id);
     else if (act === 'wallpaper') {
-      state.wallpaper = state.wallpaper === 'photo' ? 'gradient' : 'photo';
-      state.matchLights = false;
+      const cur = state.matchLights ? 'lights' : state.wallpaper;
+      setWallpaper({ photo: 'gradient', gradient: 'lights', lights: 'photo' }[cur]);
     } else if (act === 'match-lights') {
       state.matchLights = !state.matchLights;
       toast(state.matchLights ? 'Wallpaper now matches your backlights' : 'Wallpaper back to your own');
@@ -904,7 +984,7 @@
   }
 
   function moveFocus(dir) {
-    const scope = refs.overlay.hidden ? stage : refs.overlay;
+    const scope = !refs.sheet.hidden ? refs.sheet : refs.overlay.hidden ? stage : refs.overlay;
     const candidates = focusables(scope);
     const cur = document.activeElement;
     if (!candidates.includes(cur)) {
@@ -912,11 +992,11 @@
       return;
     }
 
-    const inNav = !!cur.closest('.pill');
+    const inNav = !!cur.closest('.topbar');
     const view = stage.querySelector(`[data-view="${state.view}"]`);
 
-    // Sidebar → content: resume where you were in this view.
-    if (inNav && dir === 'right' && scope === stage) {
+    // Top bar → content: resume where you were in this view.
+    if (inNav && dir === 'down' && scope === stage) {
       const remembered = lastFocus[state.view];
       const target = remembered && visible(remembered) ? remembered : focusables(view)[0];
       target?.focus();
@@ -924,16 +1004,18 @@
     }
 
     const next = nearest(cur, dir, candidates);
-    // Content → sidebar: land on the current tab.
-    if (next && !inNav && next.closest('.pill')) {
-      (stage.querySelector(`.pill [data-nav="${state.view}"]`) || next).focus();
+    // Content → top bar: land on the current tab.
+    if (next && !inNav && next.closest('.topbar')) {
+      (stage.querySelector(`.topbar [data-nav="${state.view}"]`) || next).focus();
       return;
     }
     next?.focus();
   }
 
   function goBack() {
-    if (!refs.overlay.hidden) {
+    if (!refs.sheet.hidden) {
+      closeSheet();
+    } else if (!refs.overlay.hidden) {
       closeOverlay();
     } else if (state.view !== 'home') {
       openView('home');
@@ -981,6 +1063,7 @@
     stage.style.transform = `scale(${s})`;
   }
   addEventListener('resize', fit);
+  matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyState);
 
   build();
   animateView('home');

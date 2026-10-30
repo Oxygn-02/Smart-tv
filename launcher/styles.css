@@ -100,14 +100,6 @@ input {
 }
 
 /* Header text sits straight on the photo: a soft halo keeps it readable */
-#stage.light.photo .header {
-  text-shadow: 0 0 18px rgba(255, 255, 255, 0.85);
-}
-
-#stage.photo:not(.light) .header {
-  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.5);
-}
-
 #stage.photo {
   --bg: var(--photo-scrim), var(--photo) center / cover no-repeat, #050508;
 }
@@ -216,18 +208,6 @@ input {
   background: var(--ink);
 }
 
-.photolabel {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--sub);
-}
-
 /* Focus: thin ring for D-pad. Cards and tiles also lift slightly. */
 [data-focus] {
   outline: none;
@@ -281,84 +261,8 @@ button {
 
 /* ---------- Sidebar: vertical glass oval ---------- */
 
-.pill {
-  position: absolute;
-  left: 32px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 60px;
-  box-sizing: border-box;
-  padding: 10px 8px;
-  border-radius: 999px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 7px;
-  box-shadow: var(--shadow);
-  z-index: 2;
-}
-
-.ib {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  color: var(--sub);
-  transition: color 0.2s, background 0.2s;
-}
-
-.ib.on {
-  color: var(--ink);
-}
-
 /* Sidebar focus: no ring, the icon brightens, glows softly and grows */
-.ib:focus-visible {
-  outline: none;
-  color: var(--ink);
-  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35));
-}
-
-#stage.light .ib:focus-visible {
-  filter: drop-shadow(0 0 6px rgba(21, 21, 29, 0.25));
-}
-
-.div {
-  width: 22px;
-  height: 1px;
-  margin: 4px 0;
-  background: var(--track);
-}
-
 /* ---------- Header ---------- */
-
-.header {
-  position: absolute;
-  left: 128px;
-  right: 48px;
-  top: 36px;
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-.clock-row {
-  display: flex;
-  align-items: baseline;
-  gap: 18px;
-}
-
-.clock {
-  font-size: 52px;
-  font-weight: 200;
-  letter-spacing: -1px;
-  line-height: 1;
-}
 
 /* ---------- Views ---------- */
 
@@ -376,24 +280,6 @@ button {
 }
 
 /* ---------- Home ---------- */
-
-.grid {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 432px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  gap: 16px;
-}
-
-.col {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-}
 
 /* Album art on the right at full card height; text and controls on the left */
 .now-playing {
@@ -486,31 +372,11 @@ button {
   box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.6), 0 6px 16px -6px var(--lg-drop);
 }
 
-.weather {
-  flex: 1 1 0;
-  padding: 22px;
-  display: flex;
-  justify-content: space-between;
-}
-
-.weather-text {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
 .temp {
   font-size: 64px;
   font-weight: 200;
   line-height: 1;
   letter-spacing: -2px;
-}
-
-.weather-chip {
-  width: 108px;
-  height: 108px;
-  border-radius: 50%;
-  align-self: center;
 }
 
 .hero {
@@ -611,81 +477,12 @@ button {
   background: #fff;
 }
 
-.also {
-  flex: 1 1 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.mini {
-  border-radius: 24px;
-  cursor: pointer;
-  padding: 16px;
-  color: var(--ink);
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  min-width: 0;
-  text-align: left;
-}
-
-.mini-art {
-  width: 72px;
-  height: 100px;
-  flex: none;
-  border-radius: 12px;
-}
-
-.mini-body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  flex: 1;
-}
-
-.mini-title {
-  font-size: 16px;
-  font-weight: 400;
-}
-
-.apps {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 112px;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.app {
-  --accent: transparent;
-  --glow: transparent;
-  border-radius: 22px;
-  cursor: pointer;
-  padding: 0;
-  color: var(--ink);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  transition: box-shadow 0.4s, transform 0.5s var(--gentle, ease-out);
-}
-
 /* Focused app: thin ring and soft glow in the app's brand colour */
 .app:focus-visible,
 .app-card:focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: 0;
   box-shadow: 0 0 24px var(--glow);
-}
-
-.app:focus-visible {
-  transform: scale(1.02);
 }
 
 .app-name {
@@ -1678,14 +1475,6 @@ button.info {
   animation-delay: var(--d, 0ms);
 }
 
-.header {
-  animation: fade-in 0.6s var(--ease-out) backwards;
-}
-
-.pill {
-  animation: fade-in 0.6s var(--ease-out) 0.1s backwards;
-}
-
 .overlay:not([hidden]) {
   animation: fade-in 0.3s var(--ease-out);
 }
@@ -1708,4 +1497,691 @@ button.info {
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* =====================================================================
+   v2: iPadOS-inspired layout, sized for a TV
+   Top tab bar (as on tvOS and iPadOS apps), a widget grid, a glass dock,
+   heavier Liquid Glass and SF-style type (Inter with optical sizing; Apple's
+   SF Pro is only licensed for Apple platforms).
+   ===================================================================== */
+
+#stage {
+  font-family: Inter, system-ui, sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  --glass: rgba(255, 255, 255, 0.075);
+  --glass-hi: rgba(255, 255, 255, 0.3);
+  --glass-rim: rgba(255, 255, 255, 0.1);
+  --glass-sheen: linear-gradient(165deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0) 45%);
+  --radius-widget: 34px;
+}
+
+#stage.light {
+  --glass: rgba(255, 255, 255, 0.45);
+  --glass-hi: rgba(255, 255, 255, 0.95);
+  --glass-rim: rgba(255, 255, 255, 0.55);
+  --glass-sheen: linear-gradient(165deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 50%);
+}
+
+/* Liquid Glass panels: lit top edge, soft rim, sheen */
+.glass {
+  background: var(--glass-sheen), var(--glass);
+  border: 0;
+  box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 0 0 1px var(--glass-rim), var(--shadow);
+  backdrop-filter: blur(36px) saturate(180%);
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
+}
+
+.card {
+  border-radius: 32px;
+}
+
+/* ---------- Top bar ---------- */
+
+.topbar {
+  position: absolute;
+  left: 48px;
+  right: 48px;
+  top: 26px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 3;
+  animation: fade-in 0.6s var(--ease-out) backwards;
+}
+
+.status {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.status-time {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.status-date {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--sub);
+}
+
+#stage.photo .status {
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.45);
+}
+
+#stage.light.photo .status {
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.85);
+}
+
+.tabbar {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 999px;
+}
+
+.tab {
+  height: 44px;
+  padding: 0 15px;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--sub);
+  cursor: pointer;
+  transition: color 0.3s, background 0.3s, transform 0.5s var(--gentle);
+}
+
+.tab.on {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Focus lens: a glass capsule appears only under the focused tab */
+.tab:is(:focus-visible, :hover),
+.tool:is(:focus-visible, :hover) {
+  background: var(--onbtn);
+  color: var(--ink);
+  outline: none;
+  transform: scale(1.04);
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-wifi {
+  display: flex;
+  margin-right: 8px;
+  color: var(--sub);
+}
+
+.tool {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sub);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.3s, background 0.3s, transform 0.5s var(--gentle);
+}
+
+.tool.on {
+  color: var(--ink);
+}
+
+.views {
+  left: 48px;
+  right: 48px;
+  top: 100px;
+  bottom: 28px;
+}
+
+/* ---------- Home widgets ---------- */
+
+.widgets {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 452px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.widget {
+  position: relative;
+  box-sizing: border-box;
+  border-radius: var(--radius-widget);
+  overflow: hidden;
+  min-width: 0;
+  color: var(--ink);
+}
+
+.w-clock {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.clock-face {
+  width: 100%;
+  height: 100%;
+}
+
+.clock-face .tick {
+  stroke: var(--sub);
+  stroke-width: 1;
+}
+
+.clock-face .tick-major {
+  stroke: var(--ink);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.clock-face .num {
+  fill: var(--ink);
+  font-size: 20px;
+  font-weight: 500;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.clock-face .hand {
+  stroke: var(--ink);
+  stroke-linecap: round;
+}
+
+.clock-face .hand-h {
+  stroke-width: 6;
+}
+
+.clock-face .hand-m {
+  stroke-width: 4;
+}
+
+.clock-face .hand-s {
+  stroke: #ff9f0a;
+  stroke-width: 1.6;
+}
+
+.clock-face .hand-s-dot {
+  fill: #ff9f0a;
+}
+
+.clock-face .hand-pin {
+  fill: var(--playink);
+}
+
+.w-weather {
+  grid-area: 2 / 1;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.w-weather-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.w-label {
+  font-size: 15px;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.w-weather-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+
+.w-weather .temp {
+  font-size: 60px;
+  font-weight: 400;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.w-weather-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.w-music.now-playing {
+  grid-area: 1 / 2 / 3 / 4;
+  height: auto;
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0;
+}
+
+.w-music .np-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.w-music .np-meta {
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.w-music .np-meta > * {
+  white-space: normal;
+}
+
+.w-music .np-title {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  margin-top: 6px;
+}
+
+.w-music .np-art {
+  width: 196px;
+  height: 196px;
+  border-radius: 24px;
+  align-self: auto;
+}
+
+.w-music .play {
+  width: 58px;
+  height: 58px;
+}
+
+.w-music .ctrl {
+  width: 48px;
+  height: 48px;
+}
+
+.w-music .np-row .small {
+  font-size: 14px;
+}
+
+.w-hero.hero {
+  grid-area: 1 / 4 / 2 / 6;
+  height: auto;
+  box-shadow: var(--shadow);
+}
+
+.hero-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hero-title {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.resume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.w-mini {
+  padding: 14px 16px 18px;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: transform 0.5s var(--gentle), box-shadow 0.3s;
+}
+
+.w-mini:focus-visible {
+  transform: scale(1.015);
+  outline-offset: 2px;
+}
+
+.w-mini-art {
+  height: 98px;
+  flex: none;
+  border-radius: 22px;
+  margin-bottom: 9px;
+  padding: 8px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+}
+
+.w-mini-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.w-mini .track {
+  margin-top: auto;
+}
+
+/* ---------- Dock ---------- */
+
+.dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: fit-content;
+  margin: 0 auto;
+  height: 116px;
+  box-sizing: border-box;
+  padding: 16px 22px 0;
+  border-radius: 38px;
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.dock-app {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.dock-app:focus-visible {
+  outline: none;
+}
+
+.dock-app:is(:focus-visible, :hover) .app-ic {
+  transform: scale(1.06) translateY(-3px);
+}
+
+.dock-app:focus-visible .app-ic {
+  box-shadow: 0 0 0 2px var(--ink), 0 12px 26px -8px var(--accent);
+}
+
+/* The label shows only for the focused app, as tvOS does */
+.dock-label {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.3s, transform 0.5s var(--gentle);
+}
+
+.dock-app:is(:focus-visible, :hover) .dock-label {
+  opacity: 1;
+  transform: none;
+}
+
+.dock-divider {
+  width: 1px;
+  height: 58px;
+  margin: 3px 2px 0;
+  background: var(--track);
+}
+
+/* ---------- App icon styles (Default / Dark / Clear / Tinted) ---------- */
+
+.app-ic {
+  --glyph: var(--brand);
+  transition: transform 0.5s var(--gentle), box-shadow 0.3s, background 0.4s;
+}
+
+.app-ic.s-default {
+  background: linear-gradient(165deg, color-mix(in srgb, var(--brand) 86%, #fff), color-mix(in srgb, var(--brand) 80%, #000));
+  --glyph: #fff;
+}
+
+.app-ic.s-dark {
+  background: linear-gradient(165deg, #3a3a44, #121218);
+  --glyph: var(--brand);
+}
+
+.app-ic.s-clear {
+  --glyph: var(--ink);
+}
+
+.app-ic.s-tinted {
+  background: linear-gradient(165deg, color-mix(in srgb, var(--l0) 58%, rgba(255, 255, 255, 0.12)), color-mix(in srgb, var(--l0) 24%, rgba(0, 0, 0, 0.2)));
+  --glyph: color-mix(in srgb, var(--l0) 28%, #fff);
+}
+
+/* ---------- Customize panel ---------- */
+
+.sheet-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+  animation: fade-in 0.3s var(--ease-out);
+}
+
+.sheet {
+  width: 580px;
+  box-sizing: border-box;
+  padding: 26px 30px 30px;
+  border-radius: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: pop-in 0.45s var(--gentle);
+}
+
+.sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sheet-title {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.sheet-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sub);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.opts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.opt {
+  border: 0;
+  background: transparent;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.opt:focus-visible {
+  outline: none;
+}
+
+.opt:is(:focus-visible, :hover) .app-ic {
+  transform: scale(1.06);
+}
+
+.opt:focus-visible .app-ic {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+.opt-label {
+  font-size: 14px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 999px;
+}
+
+.opt.on .opt-label {
+  background: var(--onbtn);
+  font-weight: 600;
+}
+
+.sheet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--onbtn);
+}
+
+.seg {
+  height: 38px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sub);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.3s, color 0.3s;
+}
+
+.seg.on {
+  background: var(--ink);
+  color: var(--playink);
+  font-weight: 600;
+}
+
+.seg:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ---------- Type: heavier, SF-style weights across the other views ---------- */
+
+.eyebrow {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.music-title,
+.games-title {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.np-title,
+.show-title,
+.mix-title,
+.queue-title,
+.channel-title,
+.channel-prog,
+.light-name,
+.set-label,
+.room-title,
+.info-val,
+.app-name,
+.switch-title {
+  font-weight: 500;
+}
+
+.btn,
+.pillbtn {
+  font-weight: 600;
+}
+
+/* Up next, in the gap between the song and the controls */
+.np-next {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.np-next > div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.np-next-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.np-next-art {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 10px;
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.4);
+}
+
+.np-next-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.np-next-title {
+  font-size: 15px;
+  font-weight: 600;
 }

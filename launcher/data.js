@@ -13,7 +13,7 @@ const LAUNCHER_DATA = {
     { id: 'search', label: 'Search' },
     { id: 'music', label: 'Music' },
     { id: 'live', label: 'Live TV' },
-    { id: 'apps', label: 'All apps' },
+    { id: 'apps', label: 'Apps' },
     { id: 'games', label: 'Games' },
     { id: 'room', label: 'Room' },
   ],
