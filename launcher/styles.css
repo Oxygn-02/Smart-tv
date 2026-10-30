@@ -1307,3 +1307,63 @@ button.info {
     transition: none !important;
   }
 }
+
+/* ---------- Tinted cards (colours from album art / weather) ---------- */
+
+@property --t0 { syntax: '<color>'; inherits: true; initial-value: #3a3a48; }
+@property --t1 { syntax: '<color>'; inherits: true; initial-value: #24242e; }
+@property --t2 { syntax: '<color>'; inherits: true; initial-value: #121218; }
+
+.tinted {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  /* White type and lighter glass over the colour, in both themes */
+  --ink: #fff;
+  --sub: rgba(255, 255, 255, 0.74);
+  --track: rgba(255, 255, 255, 0.24);
+  --playink: #15151d;
+  --lg-top: rgba(255, 255, 255, 0.3);
+  --lg-bottom: rgba(255, 255, 255, 0.08);
+  --lg-hi: rgba(255, 255, 255, 0.65);
+  --lg-lo: rgba(0, 0, 0, 0.08);
+  --lg-rim: rgba(255, 255, 255, 0.2);
+  --lg-drop: rgba(0, 0, 0, 0.25);
+  --lg-sheen: rgba(255, 255, 255, 0.3);
+  transition: --t0 0.9s, --t1 0.9s, --t2 0.9s, transform 0.2s;
+}
+
+.tinted > :not(.tint) {
+  position: relative;
+}
+
+.tint {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(80% 110% at 88% 10%, color-mix(in srgb, var(--t0) 75%, transparent), transparent 65%),
+    linear-gradient(135deg, var(--t1), var(--t2));
+  transition: opacity 0.6s, filter 0.6s;
+}
+
+/* Soft darkening at the bottom keeps text and controls legible on light art */
+.tint::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.32));
+}
+
+/* Paused: the colour fades back toward plain glass */
+.tinted.paused .tint {
+  opacity: 0.4;
+  filter: saturate(0.5);
+}
+
+.tinted .np-art,
+.tinted .music-art {
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+}

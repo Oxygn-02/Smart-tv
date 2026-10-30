@@ -55,7 +55,8 @@
       <section class="view view-home" data-view="home">
         <div class="grid">
           <div class="col">
-            <section class="card glass now-playing" aria-label="Now playing">
+            <section class="card glass now-playing tinted" data-np-card aria-label="Now playing">
+              <div class="tint"></div>
               <div class="eyebrow">${icon('playCircle', 14)}<span>Now playing · ${D.music.source}</span></div>
               <div class="np-body">
                 <div class="np-art" data-np-art></div>
@@ -67,7 +68,8 @@
               ${nowPlayingControls()}
             </section>
 
-            <section class="card glass weather" aria-label="Weather">
+            <section class="card glass weather tinted" data-weather-card aria-label="Weather">
+              <div class="tint"></div>
               <div class="weather-text">
                 <div class="eyebrow"><span data-town></span></div>
                 <div class="temp">${w.tempC}°</div>
@@ -170,7 +172,8 @@
     return `
       <section class="view view-music" data-view="music" hidden>
         <div class="music-grid">
-          <section class="card glass music-now" aria-label="Now playing">
+          <section class="card glass music-now tinted" data-np-card aria-label="Now playing">
+            <div class="tint"></div>
             <div class="music-art" data-np-art></div>
             <div class="music-meta">
               <div class="eyebrow">${icon('playCircle', 14)}<span>Now playing · ${D.music.source}</span></div>
@@ -373,6 +376,7 @@
     };
 
     refs.townInput.value = state.town;
+    setTint(stage.querySelector('[data-weather-card]'), D.weather.palette);
     applyState();
     renderTrack();
     renderSearch();
@@ -404,6 +408,8 @@
       b.setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
     });
 
+    all('[data-np-card]').forEach((c) => c.classList.toggle('paused', !state.playing));
+
     all('[data-nav]').forEach((b) => {
       const on = b.dataset.nav === state.view;
       b.classList.toggle('on', on);
@@ -427,9 +433,24 @@
       : 'Auto-switch is off. Opening Games stays on the launcher.';
   }
 
+  // Card colours from the album art. The prototype's art is a CSS gradient, so
+  // its colour stops are the palette. On device: androidx.palette Palette.from(bitmap)
+  // (vibrant, muted and dark-muted swatches).
+  function artPalette(art) {
+    const stops = art.match(/#[0-9a-f]{6}/gi) || ['#3a3a48', '#24242e', '#121218'];
+    return [stops[0], stops[Math.floor(stops.length / 2)], stops[stops.length - 1]];
+  }
+
+  function setTint(el, [light, mid, dark]) {
+    el.style.setProperty('--t0', light);
+    el.style.setProperty('--t1', mid);
+    el.style.setProperty('--t2', dark);
+  }
+
   function renderTrack() {
     const t = track();
     all('[data-np-art]').forEach((el) => { el.style.background = t.art; });
+    all('[data-np-card]').forEach((el) => setTint(el, artPalette(t.art)));
     all('[data-np-title]').forEach((el) => { el.textContent = t.title; });
     all('[data-np-artist]').forEach((el) => { el.textContent = t.artist; });
     all('[data-duration]').forEach((el) => { el.textContent = fmt(t.durationSec); });

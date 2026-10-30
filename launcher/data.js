@@ -58,6 +58,8 @@ const LAUNCHER_DATA = {
     condition: 'Partly cloudy',
     high: 14,
     low: 8,
+    // Card colours for the current condition (sky blue for partly cloudy).
+    palette: ['#9fd3ff', '#3f86d9', '#1d4c9c'],
   },
 
   hero: {
