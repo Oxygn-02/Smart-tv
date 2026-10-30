@@ -67,3 +67,10 @@ Real logos come from Simple Icons (CC0) where available. BBC iPlayer, My5 and Go
 - Every app has a one-colour glyph for the Dark, Clear and Tinted icon styles: a logo, a hand-drawn glyph (BBC iPlayer, My5, Google TV), or one traced on the TV from the app's own icon (flat background removed). If tracing finds nothing clear, the app's letters are used. Default style shows the app's real icon.
 - The top bar shows no hover text. Dock names remain.
 - On the TV, only real data is shown: Search lists the installed apps (titles and prices come from Search with Google TV), the backlight reads "Not chosen yet" until you pick one, and volume is the TV's real volume.
+
+## Room features (v0.5)
+- **Light roles** (Room tab): give each light a place (ceiling, lamp, TV cabinet, monitor). Picking a backlight scene then colours the cabinet, monitor and lamp lights from the scene's palette (Spread to room). Lights with no place are left alone.
+- **Gaming mode:** when Games switches the TV to the console, the Gaming scene runs (ceiling lights off, others dimmed, backlight on picture sync) and the lights return to how they were when you come back to the launcher. The console wakes through HDMI-CEC when the TV switches to its input, if both have CEC on.
+- **Good night** scene and a **sleep timer** (15, 30 or 60 minutes) that turns every light off, even while another app is open.
+- **Ambient screen:** after 5, 10 or 20 idle minutes (Settings), photos, the clock and weather; the ceiling lights go off and come back on the first key press.
+- **Guest Wi-Fi:** save the network name and password on the phone setup page; Settings > Guest Wi-Fi shows a QR code guests scan. The password is stored in the launcher's private app storage and is only in the code.

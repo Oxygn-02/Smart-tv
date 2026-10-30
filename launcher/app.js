@@ -34,6 +34,10 @@
     weather: null, // {town, temp, high, low, label, icon, palette}; sample in the preview
     weatherNote: 'loading', // 'loading' | 'permission' | 'offline' | 'notfound' | ''
     games: { ...D.games },
+    roles: {}, // light id -> role (see ROLES)
+    spread: true, // a backlight scene also colours the lights that have a role
+    ambient: 10, // minutes idle before the ambient screen; 0 = off
+    sleepAt: 0, // when the sleep timer turns the lights off (ms), or 0
     matchLights: false, // wallpaper gradient follows the backlight colours
     home: {
       backlight: NATIVE ? 'none' : D.smartHome.backlights.start, // scene id, 'none' (not chosen yet), 'sync' or 'off'
@@ -58,7 +62,7 @@
 
   // ---------- Saved settings ----------
   // Remembered on the TV between launches (browser storage inside the app).
-  const SAVED = ['appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
+  const SAVED = ['roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
 
   function loadSaved() {
     try {
@@ -417,6 +421,8 @@
             <div class="room-head">
               <span class="lg chip room-chip">${icon('room')}</span>
               <span class="room-title">${H.backlights.name}<span class="small" data-backlight-status></span></span>
+              <button class="btn lg" data-focus data-action="open-roles">Light roles</button>
+              <button class="btn lg" data-focus data-action="spread">Spread to room: <span data-val="spread"></span></button>
               <button class="btn lg" data-focus data-action="drift">Animate: <span data-val="drift"></span></button>
               <button class="btn lg" data-focus data-action="match-lights">Wallpaper follows lights: <span data-val="match"></span></button>
             </div>
@@ -442,12 +448,100 @@
             </div>
             <div class="pill-row">
               ${H.scenes.map((sc) => `<button class="pillbtn" data-focus data-action="room-scene" data-id="${sc.id}">${sc.name}</button>`).join('')}
+              <button class="pillbtn" data-focus data-action="sleep"><span data-sleep-label>Sleep timer: Off</span></button>
             </div>
             <div class="light-list" data-light-list></div>
           </section>
         </div>
 
       </section>`;
+  }
+
+  // ---------- Light roles ----------
+  // Each light can be given a place in the room. A backlight scene then colours
+  // the cabinet, lamp and monitor lights from its palette, and the ceiling
+  // lights go off for Movie, Gaming and the ambient screen.
+  const ROLES = [
+    { id: '', label: 'Not set' },
+    { id: 'ceiling', label: 'Ceiling (main)' },
+    { id: 'lamp', label: 'Lamp' },
+    { id: 'cabinet', label: 'TV cabinet' },
+    { id: 'monitor', label: 'Monitor' },
+  ];
+
+  function rolesView() {
+    return `
+      <section class="view view-roles" data-view="roles" hidden>
+        <section class="card glass cleanup" data-roles-list aria-label="Light roles"></section>
+      </section>`;
+  }
+
+  function renderRoles() {
+    const list = stage.querySelector('[data-roles-list]');
+    const lights = roomLights();
+    list.innerHTML = '<p class="small cleanup-note">Press OK on a light to choose where it is. Lights with no place are left alone by scenes.</p>'
+      + (lights.length ? lights.map((l) => `
+        <button class="set-row" data-focus data-action="cycle-role" data-id="${l.id}">
+          <span class="lg chip set-chip">${icon('lamp')}</span>
+          <span class="set-label">${l.name}</span>
+          <span class="set-val">${ROLES.find((r) => r.id === (state.roles[l.id] || '')).label}</span>
+        </button>`).join('') : '<div class="cleanup-empty"><span class="w-empty-title">No lights yet</span><span class="small">Connect your Govee account first.</span></div>');
+  }
+
+  const lightsWithRole = (role) => roomLights().filter((l) => state.roles[l.id] === role);
+
+  // Colours a backlight scene's palette across the lights that have a place.
+  function spreadColors(colors) {
+    if (!state.spread) return;
+    const plan = { cabinet: colors[0], monitor: colors[1], lamp: colors[2] };
+    Object.entries(plan).forEach(([role, hex]) => {
+      lightsWithRole(role).forEach((l) => {
+        state.home.lights[l.id] = true;
+        if (!NATIVE) return;
+        if (l.color) {
+          const [r, g, b] = hexToRgb(hex);
+          nativeCall('goveeColor', l.id, r, g, b);
+        } else {
+          nativeCall('goveePower', l.id, true);
+        }
+      });
+    });
+  }
+
+  // ---------- Guest Wi-Fi ----------
+  function guestView() {
+    return `
+      <section class="view view-guest" data-view="guest" hidden>
+        <section class="card glass guest" data-guest aria-label="Guest Wi-Fi"></section>
+      </section>`;
+  }
+
+  function guestInfo() {
+    if (!NATIVE) return { ssid: 'Guest network', payload: 'WIFI:T:WPA;S:Guest network;P:sample-only;;' };
+    return nativeJson('guestWifi') || {};
+  }
+
+  function renderGuest() {
+    const box = stage.querySelector('[data-guest]');
+    const info = guestInfo();
+    if (!info.ssid) {
+      box.innerHTML = `<div class="cleanup-empty"><span class="w-empty-title">No guest network yet</span>
+        <span class="small">Open Set up from your phone, add the network name and password under Guest Wi-Fi, and it appears here as a code.</span></div>`;
+      return;
+    }
+    const q = qrcode(0, 'M');
+    q.addData(info.payload);
+    q.make();
+    const n = q.getModuleCount();
+    let rects = '';
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (q.isDark(y, x)) rects += `<rect x="${x + 4}" y="${y + 4}" width="1.02" height="1.02"/>`;
+    box.innerHTML = `
+      <div class="qr"><svg viewBox="0 0 ${n + 8} ${n + 8}" shape-rendering="crispEdges" aria-label="Wi-Fi code"><rect width="${n + 8}" height="${n + 8}" fill="#fff"/><g fill="#000">${rects}</g></svg></div>
+      <div class="guest-text">
+        <div class="w-empty-title">${info.ssid.replace(/</g, '&lt;')}</div>
+        <span class="small">Point a phone camera at the code to join. The password is in the code and is not shown here.</span>
+        ${NATIVE ? '' : '<span class="small">Sample code, not a real network.</span>'}
+      </div>`;
   }
 
   function settingsRow(chip, label, help, control) {
@@ -474,9 +568,11 @@
               ${settingsRow(icon('location'), 'Weather town', 'Leave empty to use the TV location', '<input id="town-input" class="set-input" data-focus autocomplete="off" spellcheck="false" placeholder="TV location">')}
             </label>
             ${row('wifi', icon('wifi'), 'Wi-Fi', 'Opens the TV network settings', 'wifi')}
+            ${row('cycle-ambient', icon('moon'), 'Ambient screen', 'Photos and clock when idle', 'ambient')}
             ${row('open-cleanup', icon('power'), 'Clean up apps', 'Switch off apps you don\'t want', 'cleanup')}
           </div>
           <div class="set-col">
+            ${row('open-guest', icon('wifi'), 'Guest Wi-Fi', 'A code guests scan to join', 'guest')}
             ${row('open-setup', icon('phone'), 'Set up from your phone', 'Govee key, wallpapers, town', 'setup')}
             ${row('open-setup', icon('lamp'), 'Govee account', 'Lights and backlight', 'govee')}
             ${row('home-role', icon('home'), 'Home button', 'Which app opens on Home', 'home')}
@@ -1043,6 +1139,8 @@
   // Sends the backlight choice to the TV backlight (the local network if the
   // light answers there, otherwise Govee's cloud).
   function sendBacklight() {
+    const sc = BACKLIGHT[state.home.backlight];
+    if (sc && !['none', 'live'].includes(sc.id)) spreadColors(sc.colors);
     if (!NATIVE) return;
     const bl = backlightDevice();
     if (!bl) {
@@ -1062,9 +1160,10 @@
   function applyScene(sc) {
     const rule = sc.lights;
     roomLights().forEach((l) => {
-      state.home.lights[l.id] = rule.on;
+      const on = rule.on && !(rule.ceiling === false && state.roles[l.id] === 'ceiling');
+      state.home.lights[l.id] = on;
       if (!NATIVE) return;
-      if (!rule.on) {
+      if (!on) {
         nativeCall('goveePower', l.id, false);
         return;
       }
@@ -1139,13 +1238,14 @@
       </header>
 
       <div class="views">
-        ${homeView()}${searchView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}${wallpapersView()}${cleanupView()}
+        ${homeView()}${searchView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}${wallpapersView()}${cleanupView()}${rolesView()}${guestView()}
       </div>
 
       ${overlay()}
       ${customizeSheet()}
       ${fitOverlay()}
       ${setupOverlay()}
+      <div class="ambient" hidden aria-hidden="true"><div class="amb-a"></div><div class="amb-b"></div><div class="amb-info"><div class="amb-clock" data-amb-clock></div><div class="amb-sub" data-amb-sub></div></div></div>
       <div class="toast glass" role="status" hidden></div>
     `;
 
@@ -1231,6 +1331,9 @@
       drift: state.home.drift ? 'On' : 'Off',
       sample: state.sampleData ? 'On' : 'Off',
       wp: wallpaperLabel(),
+      ambient: state.ambient ? `After ${state.ambient} min` : 'Off',
+      guest: NATIVE ? (guestInfo().ssid || 'Add from your phone') : 'Sample',
+      spread: state.spread ? 'On' : 'Off',
       setup: NATIVE ? 'Press OK' : 'On the TV',
       cleanup: D.cleanup.length ? `${D.cleanup.length} apps` : 'Nothing yet',
       govee: !NATIVE ? 'On the TV'
@@ -1318,6 +1421,9 @@
     swatch.style.background = h.backlight === 'off' ? 'var(--track)' : `linear-gradient(135deg, ${colors.join(',')})`;
     stage.querySelector('[data-room-scene]').textContent = h.backlight === 'off'
       ? 'Backlight off' : h.backlight === 'sync' ? 'Synced to TV' : BACKLIGHT[h.backlight].name;
+    if (NATIVE) state.sleepAt = Number(nativeCall('goveeSleepAt')) || 0;
+    const sl = stage.querySelector('[data-sleep-label]');
+    if (sl) sl.textContent = state.sleepAt > Date.now() ? `Lights off in ${Math.max(1, Math.round((state.sleepAt - Date.now()) / 60000))} min` : 'Sleep timer: Off';
     stage.querySelector('[data-room-lights]').textContent = roomList.length ? `${lightsOn} of ${roomList.length} lights on` : 'No lights yet';
     stage.querySelector('[data-room-sound]').textContent = !h.sound.on ? 'Soundbar off'
       : h.sound.muted ? 'Soundbar muted' : `Volume ${h.sound.volume}`;
@@ -1539,6 +1645,8 @@
     applyState();
     if (id === 'wallpapers') renderWallpapers();
     if (id === 'cleanup') renderCleanup();
+    if (id === 'roles') renderRoles();
+    if (id === 'guest') renderGuest();
     animateView(id);
     if (id === 'games' && state.games.autoSwitch) startSwitch();
   }
@@ -1579,7 +1687,33 @@
 
   // On the TV this switches input for real; in the browser a stand-in screen
   // shows what would happen.
+  // Gaming mode: the lights change when the TV switches to the console and
+  // come back, as they were, when you return to the launcher.
+  let gameSnap = null;
+  function enterGaming() {
+    if (gameSnap || !roomLights().length) return;
+    gameSnap = { lights: { ...state.home.lights }, backlight: state.home.backlight, scene: state.home.scene };
+    applyScene(ROOM_SCENE.gaming);
+    applyState();
+  }
+
+  function leaveGaming() {
+    if (!gameSnap) return;
+    const snap = gameSnap;
+    gameSnap = null;
+    roomLights().forEach((l) => {
+      state.home.lights[l.id] = !!snap.lights[l.id];
+      nativeCall('goveePower', l.id, !!snap.lights[l.id]);
+    });
+    setBacklight(snap.backlight);
+    state.home.scene = snap.scene;
+    sendBacklight();
+    applyState();
+    toast('Lights back to how they were');
+  }
+
   function showInputScreen() {
+    enterGaming();
     if (NATIVE) {
       const ok = nativeCall('switchToHdmi', state.games.hdmiPort);
       closeOverlay();
@@ -1664,6 +1798,31 @@
       const id = b.dataset.id;
       toast(`TV backlight: ${id === 'sync' ? 'matching the picture' : id === 'off' ? 'off' : BACKLIGHT[id].name}`);
       sendBacklight();
+    } else if (act === 'open-roles') {
+      openView('roles');
+    } else if (act === 'cycle-role') {
+      const cur = ROLES.findIndex((r) => r.id === (state.roles[b.dataset.id] || ''));
+      const next = ROLES[(cur + 1) % ROLES.length].id;
+      if (next) state.roles[b.dataset.id] = next;
+      else delete state.roles[b.dataset.id];
+      renderRoles();
+      stage.querySelector(`[data-action="cycle-role"][data-id="${b.dataset.id}"]`)?.focus();
+    } else if (act === 'spread') {
+      state.spread = !state.spread;
+      toast(state.spread ? 'Scenes now colour your other lights too' : 'Scenes colour only the backlight');
+    } else if (act === 'open-guest') {
+      openView('guest');
+    } else if (act === 'cycle-ambient') {
+      const steps = [0, 5, 10, 20];
+      state.ambient = steps[(steps.indexOf(state.ambient) + 1) % steps.length];
+    } else if (act === 'sleep') {
+      const steps = [0, 15, 30, 60];
+      const left = state.sleepAt ? Math.round((state.sleepAt - Date.now()) / 60000) : 0;
+      const cur = left > 45 ? 60 : left > 20 ? 30 : left > 0 ? 15 : 0;
+      const min = steps[(steps.indexOf(cur) + 1) % steps.length];
+      state.sleepAt = min ? Date.now() + min * 60000 : 0;
+      nativeCall('goveeSleep', min);
+      toast(min ? `Lights will go off in ${min} minutes` : 'Sleep timer off');
     } else if (act === 'room-scene') {
       const sc = ROOM_SCENE[b.dataset.id];
       applyScene(sc);
@@ -1877,7 +2036,9 @@
       closeSheet();
     } else if (!refs.overlay.hidden) {
       closeOverlay();
-    } else if (state.view === 'wallpapers' || state.view === 'cleanup') {
+    } else if (state.view === 'roles') {
+      openView('room');
+    } else if (state.view === 'wallpapers' || state.view === 'cleanup' || state.view === 'guest') {
       openView('settings');
     } else if (state.view !== 'home') {
       openView('home');
@@ -2010,6 +2171,66 @@
     stage.querySelector('.dock-app')?.focus();
   };
   // Back from an app or a settings screen: refresh what's playing and access.
+  // ---------- Ambient screen ----------
+  // After a while with no button pressed: photos drifting slowly, the clock
+  // and the weather. The ceiling lights go off and come back when you press a key.
+  let lastInput = Date.now();
+  let ambientOn = false;
+  let ambientOff = [];
+  let ambientPic = 0;
+  let ambientTimer = 0;
+
+  function ambientShow() {
+    const el = stage.querySelector('.ambient');
+    const urls = D.wallpapers.map((w) => w.url);
+    if (!urls.length) return;
+    const layers = [el.querySelector('.amb-a'), el.querySelector('.amb-b')];
+    const next = layers[ambientPic % 2];
+    const prev = layers[(ambientPic + 1) % 2];
+    next.style.backgroundImage = `url("${urls[ambientPic % urls.length]}")`;
+    next.classList.add('on');
+    prev.classList.remove('on');
+    ambientPic++;
+    const n = new Date();
+    el.querySelector('[data-amb-clock]').textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}`;
+    const w = state.weather;
+    el.querySelector('[data-amb-sub]').textContent = n.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + (w ? `  ·  ${w.temp}°  ${w.label}` : '');
+  }
+
+  function startAmbient() {
+    ambientOn = true;
+    stage.querySelector('.ambient').hidden = false;
+    ambientOff = lightsWithRole('ceiling').filter((l) => state.home.lights[l.id]).map((l) => l.id);
+    ambientOff.forEach((id) => { state.home.lights[id] = false; nativeCall('goveePower', id, false); });
+    ambientShow();
+    ambientTimer = setInterval(ambientShow, 25000);
+  }
+
+  function stopAmbient() {
+    ambientOn = false;
+    clearInterval(ambientTimer);
+    stage.querySelector('.ambient').hidden = true;
+    ambientOff.forEach((id) => { state.home.lights[id] = true; nativeCall('goveePower', id, true); });
+    ambientOff = [];
+    applyState();
+  }
+
+  const wake = (e) => {
+    lastInput = Date.now();
+    if (!ambientOn) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    stopAmbient();
+  };
+  document.addEventListener('keydown', wake, true);
+  document.addEventListener('click', wake, true);
+
+  setInterval(() => {
+    if (document.hidden || ambientOn || !state.ambient || !refs.overlay) return;
+    const busy = [refs.setup, refs.fit, refs.sheet, refs.overlay].some((o) => o && !o.hidden);
+    if (!busy && Date.now() - lastInput > state.ambient * 60000) startAmbient();
+  }, 5000);
+
   setInterval(driftStep, 1500);
   setInterval(() => { if (!document.hidden) readBacklight(); }, 20000);
 
@@ -2023,8 +2244,10 @@
 
   window.launcherResume = () => {
     if (!NATIVE) return;
+    lastInput = Date.now();
     syncVolume();
     readBacklight();
+    leaveGaming();
     pollNowPlaying();
     refreshNativeStatus();
     if (state.view === 'cleanup') renderCleanup(); // back from the TV's Settings

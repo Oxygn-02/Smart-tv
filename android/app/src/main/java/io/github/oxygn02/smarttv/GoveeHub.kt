@@ -57,6 +57,23 @@ class GoveeHub(context: Context, private val publish: (String) -> Unit) {
         }
     }
 
+    @Volatile var sleepAt = 0L
+    private var sleeper: java.util.concurrent.ScheduledFuture<*>? = null
+    private val clock = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
+
+    /** Every light off after [minutes] (0 cancels). */
+    fun sleepIn(minutes: Int) {
+        sleeper?.cancel(false)
+        sleeper = null
+        sleepAt = 0
+        if (minutes <= 0) return
+        sleepAt = System.currentTimeMillis() + minutes * 60_000L
+        sleeper = clock.schedule({
+            sleepAt = 0
+            devices.filter { it.isLight && it.has("powerSwitch") }.forEach { power(it.id, false) }
+        }, minutes.toLong(), java.util.concurrent.TimeUnit.MINUTES)
+    }
+
     fun forgetKey() {
         prefs.edit().remove("key").apply()
         devices = emptyList()
@@ -165,7 +182,11 @@ class GoveeHub(context: Context, private val publish: (String) -> Unit) {
         dreamOn[id] = enable
     }
 
-    fun close() = io.shutdownNow()
+    fun close() {
+        sleeper?.cancel(false)
+        clock.shutdownNow()
+        io.shutdownNow()
+    }
 
     // ---------- internals ----------
 

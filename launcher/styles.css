@@ -3527,3 +3527,106 @@ button.w-empty {
   -webkit-mask-image: linear-gradient(transparent, #000 22px, #000 calc(100% - 22px), transparent);
   mask-image: linear-gradient(transparent, #000 22px, #000 calc(100% - 22px), transparent);
 }
+
+/* ---------- Ambient screen ---------- */
+.ambient {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: #000;
+  overflow: hidden;
+  animation: fade-in 1.2s var(--ease-out);
+}
+
+.ambient .amb-a,
+.ambient .amb-b {
+  position: absolute;
+  inset: -4%;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 3s ease;
+  animation: amb-pan 50s ease-in-out infinite alternate;
+}
+
+.ambient .on {
+  opacity: 0.85;
+}
+
+@keyframes amb-pan {
+  to { transform: scale(1.08) translate(-1.5%, -1%); }
+}
+
+.amb-info {
+  position: absolute;
+  left: 64px;
+  bottom: 56px;
+  text-align: left;
+  color: #fff;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.6);
+}
+
+.amb-clock {
+  font-size: 96px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.amb-sub {
+  margin-top: 8px;
+  font-size: 22px;
+  opacity: 0.85;
+}
+
+/* ---------- Guest Wi-Fi ---------- */
+.guest {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+  height: 100%;
+  padding: 32px;
+}
+
+.guest .qr {
+  width: 360px;
+  height: 360px;
+  flex: none;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.guest .qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.guest-text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 340px;
+  text-align: left;
+}
+
+.view-roles .cleanup,
+.view-guest .guest {
+  max-height: 100%;
+  overflow: auto;
+}
+
+.pillbtn[data-action="sleep"] {
+  margin-left: auto;
+}
+
+/* Settings now holds nine rows a side: a little tighter so all fit */
+.settings .set-row {
+  height: 56px;
+}
+
+.settings .set-col {
+  gap: 0;
+}

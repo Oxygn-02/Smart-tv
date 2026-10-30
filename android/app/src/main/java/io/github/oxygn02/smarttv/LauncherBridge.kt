@@ -7,6 +7,7 @@ import android.app.SearchManager
 import android.app.role.RoleManager
 import android.app.usage.UsageStatsManager
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -381,9 +382,41 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         server = null
     }
 
+    private val guest = activity.getSharedPreferences("guest", Context.MODE_PRIVATE)
+
+    /**
+     * The guest Wi-Fi saved from the phone setup page, as {ssid, payload}. The
+     * payload is the text a phone camera reads from the QR code. Empty when
+     * nothing is saved.
+     */
+    @JavascriptInterface
+    fun guestWifi(): String {
+        val ssid = guest.getString("ssid", "").orEmpty()
+        if (ssid.isEmpty()) return "{}"
+        fun esc(v: String) = v.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace(":", "\\:").replace("\"", "\\\"")
+        val security = guest.getString("security", "WPA")
+        val pass = guest.getString("password", "").orEmpty()
+        val payload = if (security == "nopass" || pass.isEmpty()) "WIFI:T:nopass;S:${esc(ssid)};;"
+        else "WIFI:T:WPA;S:${esc(ssid)};P:${esc(pass)};;"
+        return JSONObject().put("ssid", ssid).put("payload", payload).toString()
+    }
+
+    /** Turns every light off after [minutes] (0 cancels). Works while another app is open. */
+    @JavascriptInterface
+    fun goveeSleep(minutes: Int) = govee.sleepIn(minutes)
+
+    /** When the sleep timer will fire (epoch milliseconds), or 0. */
+    @JavascriptInterface
+    fun goveeSleepAt(): Long = govee.sleepAt
+
     private val setupEvents = object : SetupServer.Events {
         override fun onGoveeKey(key: String) {
             if (key.isEmpty()) govee.forgetKey() else govee.connect(key)
+        }
+
+        override fun onWifi(ssid: String, password: String, security: String) {
+            guest.edit().putString("ssid", ssid).putString("password", password).putString("security", security).apply()
+            host.emit("setup", "{}")
         }
 
         override fun onTown(town: String) = host.emit("setup", JSONObject().put("town", town).toString())
@@ -393,6 +426,7 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         override fun stateJson(): JSONObject = JSONObject()
             .put("govee", JSONObject(govee.status()))
             .put("town", "")
+            .put("wifi", guest.getString("ssid", "").orEmpty())
             .put("wallpapers", JSONArray(wallpapers()))
 
         override fun packagesText(): String = packageList()

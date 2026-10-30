@@ -31,6 +31,7 @@ class SetupServer(
     interface Events {
         fun onGoveeKey(key: String)
         fun onTown(town: String)
+        fun onWifi(ssid: String, password: String, security: String)
         fun onWallpapersChanged()
         fun stateJson(): JSONObject
         fun packagesText(): String
@@ -72,6 +73,10 @@ class SetupServer(
             "/api/state" -> json(Response.Status.OK, events.stateJson())
             "/api/govee" -> {
                 events.onGoveeKey(param("key").trim())
+                ok()
+            }
+            "/api/wifi" -> {
+                events.onWifi(param("ssid").trim(), param("password"), if (param("security") == "nopass") "nopass" else "WPA")
                 ok()
             }
             "/api/town" -> {
