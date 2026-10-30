@@ -92,7 +92,7 @@
             <div class="temp">${w.tempC}°</div>
             <div class="w-weather-foot">
               <span>${w.condition}</span>
-              <span class="small">H:${w.high}° L:${w.low}°</span>
+              <span class="small">High ${w.high}°, low ${w.low}°</span>
             </div>
           </section>
 
@@ -106,14 +106,13 @@
             </div>
             <div class="np-top">
               <div class="np-meta">
-                <div class="eyebrow">${icon('playCircle', 15)}<span>${D.music.source}</span></div>
                 <div class="np-title" data-np-title></div>
                 <div class="sub" data-np-artist></div>
               </div>
-              <div class="np-art" data-np-art></div>
+              <div class="np-art" data-np-art><span class="art-app">${appIcon(APP.ytmusic, 34)}</span></div>
             </div>
             <div class="np-next">
-              <div class="eyebrow">Up next</div>
+              <div class="np-next-label">Up next</div>
               <div data-np-next></div>
             </div>
             ${nowPlayingControls()}
@@ -127,7 +126,6 @@
             </div>
             <div class="hero-art" style="background:${h.art}"></div>
             <div class="hero-shade"></div>
-            <div class="hero-label">Continue watching</div>
             <div class="hero-body">
               <div class="hero-app"><span class="dot" style="background:${h.appColor}"></span>${h.app}</div>
               <div class="hero-row">
@@ -137,7 +135,10 @@
                 </div>
                 <button class="resume" data-focus data-toast="Resuming ${h.title} on ${h.app}">${filledIcon('play', 14)} Resume</button>
               </div>
-              <div class="hero-track"><div style="width:${h.progress}%"></div></div>
+              <div class="hero-progress">
+                <div class="hero-track"><div style="width:${h.progress}%"></div></div>
+                <span class="hero-left">${h.left}</span>
+              </div>
             </div>
           </section>
 
@@ -182,7 +183,7 @@
         <label class="search-bar glass">
           <span class="lg chip" style="width:40px;height:40px;border-radius:50%">${icon('search', 18)}</span>
           <input id="search-input" data-focus type="search" autocomplete="off" spellcheck="false"
-            placeholder="Search shows and films · press OK to type" aria-label="Search">
+            placeholder="Search shows and films (press OK to type)" aria-label="Search">
           <span class="small" data-search-count></span>
         </label>
         <div class="search-section">
@@ -223,7 +224,7 @@
             <div class="tint"></div>
             <div class="music-art" data-np-art></div>
             <div class="music-meta">
-              <div class="eyebrow">${icon('playCircle', 14)}<span>Now playing · ${D.music.source}</span></div>
+              <div class="music-source">${appIcon(APP.ytmusic, 30)}<span>${D.music.source}</span></div>
               <div>
                 <div class="music-title" data-np-title></div>
                 <div class="sub" data-np-artist></div>
@@ -232,7 +233,7 @@
             </div>
           </section>
           <section class="card glass music-queue" aria-label="Up next">
-            <div class="eyebrow">${icon('queue', 14)}<span>Up next</span></div>
+            <div class="music-queue-title">Up next</div>
             <div class="queue" data-queue></div>
           </section>
         </div>
@@ -254,7 +255,7 @@
     return `
       <section class="view view-live" data-view="live" hidden>
         <div class="live-head">
-          <div class="eyebrow">Freeview · On now</div>
+          <div class="eyebrow">On now</div>
           <div class="small">Opens live in the channel's app</div>
         </div>
         <div class="channels">
@@ -272,7 +273,7 @@
                 <span class="track"><span class="fill" data-live-progress="${i}"></span></span>
               </span>
               <span class="channel-next">
-                <span class="small">Next · <span class="tnum" data-live-next="${i}"></span></span>
+                <span class="small">Next at <span class="tnum" data-live-next="${i}"></span></span>
                 <span class="channel-next-prog">${c.next}</span>
               </span>
             </button>`).join('')}
@@ -283,7 +284,6 @@
   function appsView() {
     return `
       <section class="view view-apps" data-view="apps" hidden>
-        <div class="eyebrow">${D.apps.length} apps installed</div>
         <div class="app-grid">
           ${D.apps.map((a) => appTile(a, 'app-card glass', 68)).join('')}
         </div>
@@ -296,7 +296,6 @@
         <section class="card glass games-hero">
           <span class="lg chip games-chip">${icon('games', 48)}</span>
           <div class="games-text">
-            <div class="eyebrow">Games</div>
             <div class="games-title">${state.games.device} on <span data-val="hdmi"></span></div>
             <div class="sub" data-games-sub></div>
             <div class="games-actions">
@@ -425,11 +424,11 @@
             <span class="ring-count tnum" data-switch-count></span>
           </div>
           <div class="switch-title">Switching to <span data-val="hdmi"></span></div>
-          <div class="sub">${state.games.device} · press Back to stay here</div>
+          <div class="sub">For your ${state.games.device}. Press Back to stay here.</div>
           <button class="btn lg" data-focus data-action="cancel-switch">Stay on launcher</button>
         </div>
         <div class="input-screen" data-input-screen hidden>
-          <div class="input-label"><span data-val="hdmi"></span> · ${state.games.device}</div>
+          <div class="input-label">${state.games.device} on <span data-val="hdmi"></span></div>
           <div class="input-hint">
             <div>The TV is showing your ${state.games.device}.</div>
             <button class="btn lg" data-focus data-action="close-overlay">Back to launcher</button>
@@ -471,6 +470,8 @@
 
   function build() {
     stage.innerHTML = `
+      <div class="edge" aria-hidden="true"></div>
+
       <header class="topbar">
         <div class="status">
           <span class="status-time tnum" data-clock></span>
@@ -619,6 +620,10 @@
 
     // Wallpaper gradient follows the backlights (fades between scenes).
     ['--l0', '--l1', '--l2'].forEach((v, i) => stage.style.setProperty(v, colors[i]));
+    // Backlight bleed: the screen edges glow in the light colour. In "Sync to
+    // TV" mode the focused item's colour takes over (see focusin below).
+    if (h.backlight !== 'sync') stage.style.setProperty('--glowc', colors[0]);
+    stage.querySelector('.edge').classList.toggle('off', h.backlight === 'off');
     stage.classList.toggle('lights', state.matchLights && h.backlight !== 'off');
     const matchBtn = stage.querySelector('.tool[data-action="match-lights"]');
     matchBtn.classList.toggle('on', state.matchLights);
@@ -644,7 +649,7 @@
     const sb = h.sound;
     stage.querySelector('[data-vol-fill]').style.width = `${sb.muted ? 0 : (sb.volume / H.soundbar.volumeMax) * 100}%`;
     stage.querySelector('[data-vol]').textContent = sb.muted ? 'Muted' : sb.volume;
-    stage.querySelector('[data-sound-status]').textContent = sb.on ? 'On · HDMI ARC' : 'Standby';
+    stage.querySelector('[data-sound-status]').textContent = sb.on ? 'On' : 'Standby';
     stage.querySelector('.soundbar').classList.toggle('standby', !sb.on);
   }
 
@@ -674,7 +679,7 @@
 
     const queue = stage.querySelector('[data-queue]');
     const hadFocus = queue.contains(document.activeElement);
-    queue.innerHTML = [1, 2, 3, 4, 5].map((k) => {
+    queue.innerHTML = [1, 2, 3, 4].map((k) => {
       const i = (state.track + k) % tracks.length;
       const q = tracks[i];
       return `
@@ -888,7 +893,7 @@
       setBacklight(b.dataset.id);
       state.home.scene = null;
       const id = b.dataset.id;
-      toast(`TV backlights: ${id === 'sync' ? 'matching the picture' : id === 'off' ? 'off' : BACKLIGHT[id].name}`);
+      toast(`TV backlight: ${id === 'sync' ? 'matching the picture' : id === 'off' ? 'off' : BACKLIGHT[id].name}`);
     } else if (act === 'room-scene') {
       const sc = ROOM_SCENE[b.dataset.id];
       Object.assign(state.home.lights, sc.lights);
@@ -940,12 +945,22 @@
     }
   });
 
+  // "Sync to TV": like the backlight's camera, take the colour of what's on
+  // screen, here the artwork or brand colour of the focused item.
+  function syncGlow(target) {
+    const host = target.closest('.w-hero, .w-mini, .show, .mix, .now-playing, .music-now, .dock-app, .app-card, .channel') || target;
+    const styled = [host, ...host.querySelectorAll('[style]')].find((el) => /#[0-9a-f]{6}|rgb\(/i.test(el.getAttribute('style') || ''));
+    const tone = styled && (styled.getAttribute('style').match(/#[0-9a-f]{6}|rgb\([^)]*\)/i) || [])[0];
+    if (tone) stage.style.setProperty('--glowc', tone);
+  }
+
   // Remember where focus was in each view, so coming back from the sidebar
   // lands where you left off.
   const lastFocus = {};
   stage.addEventListener('focusin', (e) => {
     const view = e.target.closest('[data-view]');
     if (view) lastFocus[view.dataset.view] = e.target;
+    if (state.home.backlight === 'sync') syncGlow(e.target);
   });
 
   const KEY_DIRECTION = {

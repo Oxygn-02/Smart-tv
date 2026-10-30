@@ -74,7 +74,8 @@ const LAUNCHER_DATA = {
     appId: 'iplayer',
     appColor: '#ff4fa3',
     title: 'The Coastline',
-    subtitle: 'Series 2 · Episode 4 · 23 min left',
+    subtitle: 'Series 2, episode 4',
+    left: '23 min left',
     progress: 62,
     art: 'linear-gradient(130deg,#1e6a7a 0%,#24315e 50%,#4a1f4e 100%)',
   },
@@ -85,23 +86,23 @@ const LAUNCHER_DATA = {
 
   continueWatching: [
     { app: 'Prime Video', appId: 'prime', title: 'Northbound', meta: '1h 12m left', progress: 38, art: 'linear-gradient(150deg,#3b5f8a,#121a2c)' },
-    { app: 'ITVX', appId: 'itvx', title: 'Kitchen Nights', meta: 'S1 · E2 · 8 min left', progress: 84, art: 'linear-gradient(150deg,#b0743a,#3a1f14)' },
+    { app: 'ITVX', appId: 'itvx', title: 'Kitchen Nights', meta: '8 min left', progress: 84, art: 'linear-gradient(150deg,#b0743a,#3a1f14)' },
   ],
 
   // Search catalogue. Only titles on installed apps are shown.
   // offer.kind: 'free' (free on the app), 'subscription' (included in a
   // subscription you already have), 'rent' or 'buy' (price shown on the card).
   catalogue: [
-    { title: 'The Coastline', app: 'iplayer', meta: 'Drama · 2 series', offer: { kind: 'free' }, art: 'linear-gradient(130deg,#1e6a7a,#24315e 55%,#4a1f4e)' },
-    { title: 'Kitchen Nights', app: 'itvx', meta: 'Reality · 1 series', offer: { kind: 'free' }, art: 'linear-gradient(150deg,#d08a45,#3a1f14)' },
-    { title: 'Harbour Lights', app: 'c4', meta: 'Documentary · 3 series', offer: { kind: 'free' }, art: 'linear-gradient(150deg,#3f8f7a,#0f2a2a)' },
-    { title: 'Fen Country', app: 'my5', meta: 'Crime · 1 series', offer: { kind: 'free' }, art: 'linear-gradient(150deg,#5a76b8,#1a1f3a)' },
-    { title: 'Northbound', app: 'prime', meta: 'Thriller · Included with Prime', offer: { kind: 'subscription' }, art: 'linear-gradient(150deg,#3b5f8a,#121a2c)' },
-    { title: 'Glass Meridian', app: 'prime', meta: 'Sci-fi · Film · 2026', offer: { kind: 'rent', price: '£3.49' }, art: 'linear-gradient(150deg,#7b6cf6,#1d1846)' },
-    { title: 'Cold Front', app: 'playmovies', meta: 'Action · Film · 2025', offer: { kind: 'buy', price: '£7.99' }, art: 'linear-gradient(150deg,#8fb3c9,#1c2a36)' },
-    { title: 'The Long Field', app: 'playmovies', meta: 'Drama · Film · 2026', offer: { kind: 'rent', price: '£4.99' }, art: 'linear-gradient(150deg,#c9a24f,#3a2a10)' },
-    { title: 'Saltwater', app: 'prime', meta: 'Drama · Film · 2024', offer: { kind: 'buy', price: '£9.99' }, art: 'linear-gradient(150deg,#4fa3c9,#0e2433)' },
-    { title: 'Iron Tide', app: 'playmovies', meta: 'War · Film · 2025', offer: { kind: 'rent', price: '£2.49' }, art: 'linear-gradient(150deg,#a3584a,#2a1210)' },
+    { title: 'The Coastline', app: 'iplayer', meta: 'Drama, 2 series', offer: { kind: 'free' }, art: 'linear-gradient(130deg,#1e6a7a,#24315e 55%,#4a1f4e)' },
+    { title: 'Kitchen Nights', app: 'itvx', meta: 'Reality, 1 series', offer: { kind: 'free' }, art: 'linear-gradient(150deg,#d08a45,#3a1f14)' },
+    { title: 'Harbour Lights', app: 'c4', meta: 'Documentary, 3 series', offer: { kind: 'free' }, art: 'linear-gradient(150deg,#3f8f7a,#0f2a2a)' },
+    { title: 'Fen Country', app: 'my5', meta: 'Crime, 1 series', offer: { kind: 'free' }, art: 'linear-gradient(150deg,#5a76b8,#1a1f3a)' },
+    { title: 'Northbound', app: 'prime', meta: 'Thriller, included with Prime', offer: { kind: 'subscription' }, art: 'linear-gradient(150deg,#3b5f8a,#121a2c)' },
+    { title: 'Glass Meridian', app: 'prime', meta: 'Sci-fi film, 2026', offer: { kind: 'rent', price: '£3.49' }, art: 'linear-gradient(150deg,#7b6cf6,#1d1846)' },
+    { title: 'Cold Front', app: 'playmovies', meta: 'Action film, 2025', offer: { kind: 'buy', price: '£7.99' }, art: 'linear-gradient(150deg,#8fb3c9,#1c2a36)' },
+    { title: 'The Long Field', app: 'playmovies', meta: 'Drama film, 2026', offer: { kind: 'rent', price: '£4.99' }, art: 'linear-gradient(150deg,#c9a24f,#3a2a10)' },
+    { title: 'Saltwater', app: 'prime', meta: 'Drama film, 2024', offer: { kind: 'buy', price: '£9.99' }, art: 'linear-gradient(150deg,#4fa3c9,#0e2433)' },
+    { title: 'Iron Tide', app: 'playmovies', meta: 'War film, 2025', offer: { kind: 'rent', price: '£2.49' }, art: 'linear-gradient(150deg,#a3584a,#2a1210)' },
     // Not installed, so filtered out of search.
     { title: 'Moonfall Street', app: 'netflix', meta: 'Drama', offer: { kind: 'subscription' }, art: 'linear-gradient(150deg,#555,#111)' },
   ],

@@ -2513,3 +2513,288 @@ button.w-empty {
   text-transform: none;
   letter-spacing: 0;
 }
+
+/* =====================================================================
+   v4: a point of view (frontend-design pass)
+
+   Subject: a UK living-room TV, used in the evening, in a room lit by a
+   Govee strip behind the screen. Job: get to a show in one or two presses,
+   and set the room.
+
+   The one bold idea: the backlight bleed. The screen edges glow in the
+   room's light colour, like the strip spilling onto the wall, and focus is
+   lit the same way. In "Sync to TV" mode the glow follows whatever you're
+   on. Everything else stays quiet: Geist on a 1.25 scale (16 / 20 / 25 /
+   31 / 39 / 49), sentence case, no dot-joined strings, posters straight on
+   the wallpaper, radius set by size, one power-on moment instead of
+   entrance effects everywhere.
+   ===================================================================== */
+
+@property --glowc { syntax: '<color>'; inherits: true; initial-value: #2bd47d; }
+
+#stage {
+  font-family: Geist, "Helvetica Neue", Arial, sans-serif;
+  letter-spacing: 0;
+  transition: background 0.4s, --l0 1.2s, --l1 1.2s, --l2 1.2s, --glowc 1s;
+
+  /* Focus is lit in the room's light colour */
+  --focus: color-mix(in srgb, var(--glowc) 45%, #fff);
+  --focus-glow: color-mix(in srgb, var(--glowc) 50%, transparent);
+}
+
+#stage.light {
+  --focus: color-mix(in srgb, var(--glowc) 55%, #15151d);
+  --focus-glow: color-mix(in srgb, var(--glowc) 35%, transparent);
+}
+
+/* ---------- The backlight bleed ---------- */
+
+.edge {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 160px -40px color-mix(in srgb, var(--glowc) 80%, transparent),
+    inset 0 0 46px -22px color-mix(in srgb, var(--glowc) 70%, transparent);
+  transition: opacity 0.9s;
+  animation: lights-on 2.4s var(--ease-out) 0.3s backwards;
+}
+
+#stage.light .edge {
+  box-shadow:
+    inset 0 0 160px -40px color-mix(in srgb, var(--glowc) 55%, transparent),
+    inset 0 0 46px -22px color-mix(in srgb, var(--glowc) 45%, transparent);
+}
+
+.edge.off {
+  opacity: 0;
+}
+
+/* The one orchestrated moment: the room lights come up when the TV turns on */
+@keyframes lights-on {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Views simply cross-fade; no staggered entrances */
+.view .anim {
+  animation: none;
+}
+
+.view:not([hidden]) {
+  animation: fade-in 0.35s var(--ease-out);
+}
+
+/* The current tab carries a short bar of the light colour */
+.tab {
+  position: relative;
+}
+
+.tab.on::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 18px;
+  height: 3px;
+  margin-left: -9px;
+  border-radius: 2px;
+  background: var(--glowc);
+}
+
+/* ---------- Type: Geist on a 1.25 scale ---------- */
+
+.small { font-size: 16px; }
+.sub { font-size: 20px; }
+
+.status-time { font-size: 25px; font-weight: 600; letter-spacing: -0.01em; }
+.status-date { font-size: 20px; }
+
+.w-music .np-title,
+.hero-title,
+.music-title {
+  font-size: 31px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.games-title { font-size: 49px; font-weight: 500; letter-spacing: -0.025em; }
+.w-weather .temp { font-size: 61px; font-weight: 400; letter-spacing: -0.03em; }
+.w-empty-title { font-size: 20px; }
+.w-mini-title,
+.show-title,
+.np-next-title,
+.mix-title,
+.room-title,
+.channel-title { font-size: 20px; font-weight: 500; letter-spacing: -0.005em; }
+
+/* Sentence case everywhere; labels say what they are, quietly */
+.sheet-label,
+.price-kind {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.sheet-label {
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.price-kind {
+  font-size: 14px;
+}
+
+.eyebrow {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.np-next-label,
+.music-queue-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--sub);
+}
+
+.music-queue-title {
+  padding: 0 8px;
+}
+
+.music-source {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--sub);
+}
+
+/* ---------- Home details ---------- */
+
+.np-art {
+  position: relative;
+}
+
+.art-app {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+}
+
+.hero-progress {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hero-progress .hero-track {
+  flex: 1;
+}
+
+.hero-left {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.8);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Radius follows size: large widgets 34, small 28, tiles 22, artwork 20 */
+.w-room,
+.w-weather,
+.w-mini {
+  border-radius: 28px;
+}
+
+.w-mini-art {
+  border-radius: 18px;
+}
+
+/* ---------- Posters sit on the wallpaper, not in cards ---------- */
+
+.show.glass,
+.mix.glass {
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0;
+  gap: 10px;
+}
+
+.show-art {
+  height: 136px;
+  border-radius: 20px;
+  box-shadow: 0 14px 30px -14px rgba(0, 0, 0, 0.6);
+}
+
+.mix-art {
+  height: 112px;
+  border-radius: 20px;
+  margin: 0;
+  box-shadow: 0 14px 30px -14px rgba(0, 0, 0, 0.6);
+}
+
+.show-body,
+.mix .small,
+.mix-title {
+  padding: 0 4px;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+}
+
+#stage.light :is(.show-body, .mix .small, .mix-title) {
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.85);
+}
+
+/* Focus lights the artwork itself */
+#stage :is(.show, .mix):focus-visible {
+  outline: none;
+  box-shadow: none;
+  transform: none;
+}
+
+#stage .show:focus-visible .show-art,
+#stage .mix:focus-visible .mix-art {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
+  box-shadow: 0 0 30px 4px var(--focus-glow), var(--lift);
+  transform: scale(1.03);
+}
+
+.show-art,
+.mix-art {
+  transition: transform 0.5s var(--gentle), box-shadow 0.3s;
+}
+
+/* Captions on the wallpaper need a firmer shadow over bright photos */
+.show-body,
+.mix .small,
+.mix-title {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7), 0 0 16px rgba(0, 0, 0, 0.65);
+}
+
+/* An empty tinted widget has no colour behind it, so it uses theme text */
+.widget.tinted.is-empty {
+  --ink: inherit;
+  --sub: inherit;
+  --track: inherit;
+  color: var(--ink);
+}
+
+/* Music tab: keep the now-playing card inside its row */
+.music-now {
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.music-art {
+  width: 264px;
+  height: 264px;
+  align-self: center;
+}
+
+.music-grid {
+  grid-template-rows: 336px;
+}
