@@ -1311,12 +1311,7 @@ button.info {
   white-space: nowrap;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before {
-    transition: none !important;
-  }
-}
+
 
 /* ---------- Tinted cards (colours from album art / weather) ---------- */
 
@@ -1376,4 +1371,108 @@ button.info {
 .tinted .np-art,
 .tinted .music-art {
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+}
+
+/* ---------- Motion ---------- */
+
+#stage {
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Icons grow slightly when the D-pad (or mouse) lands on them */
+.ib,
+.ctrl,
+.play,
+.chip {
+  transition: transform 0.28s var(--spring), color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.ib:is(:focus-visible, :hover),
+.ctrl:is(:focus-visible, :hover),
+.play:is(:focus-visible, :hover) {
+  transform: scale(1.14);
+}
+
+/* App icons and setting icons grow inside their tile or row */
+:is(.app, .app-card, .info, .set-row, .channel):is(:focus-visible, :hover, :focus-within) .chip {
+  transform: scale(1.1);
+}
+
+/* Page transitions: a view's cards rise and fade in, one after another */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* `backwards` only holds the first frame during the delay, so focus
+   transforms still apply once the entrance has finished. */
+.view .anim {
+  animation: rise-in 0.55s var(--ease-out) backwards;
+  animation-delay: var(--d, 0ms);
+}
+
+.header {
+  animation: fade-in 0.6s var(--ease-out) backwards;
+}
+
+.pill {
+  animation: fade-in 0.6s var(--ease-out) 0.1s backwards;
+}
+
+.overlay:not([hidden]) {
+  animation: fade-in 0.3s var(--ease-out);
+}
+
+.switch-card:not([hidden]) {
+  animation: pop-in 0.45s var(--spring);
+}
+
+.input-screen:not([hidden]) {
+  animation: fade-in 0.5s var(--ease-out);
+}
+
+.toast:not([hidden]) {
+  animation: toast-in 0.35s var(--spring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before {
+    transition: none !important;
+    animation: none !important;
+  }
 }

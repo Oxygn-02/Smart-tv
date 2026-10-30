@@ -546,9 +546,25 @@
 
   // ---------- Views and Games switching ----------
 
+  // Blocks that animate in when a view opens, staggered in reading order.
+  const ANIM_SELECTOR = ':is(.grid > .col > *, .also > *, .apps > *, .search-bar, .search-section, '
+    + '.music-grid > *, .music-mixes, .live-head, .channel, .view-apps > .eyebrow, .app-card, '
+    + '.games-hero, .info, .settings)';
+
+  function animateView(id) {
+    const view = stage.querySelector(`[data-view="${id}"]`);
+    view.querySelectorAll(ANIM_SELECTOR).forEach((el, i) => {
+      el.classList.remove('anim');
+      el.style.setProperty('--d', `${Math.min(i * 45, 400)}ms`);
+    });
+    view.offsetWidth; // restart the animation on views opened before
+    view.querySelectorAll(ANIM_SELECTOR).forEach((el) => el.classList.add('anim'));
+  }
+
   function openView(id) {
     state.view = id;
     applyState();
+    animateView(id);
     if (id === 'games' && state.games.autoSwitch) startSwitch();
   }
 
@@ -797,6 +813,7 @@
   addEventListener('resize', fit);
 
   build();
+  animateView('home');
   fit();
   stage.querySelector('[data-nav="home"]').focus();
 })();
