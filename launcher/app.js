@@ -15,6 +15,7 @@
     theme: initialTheme(), // resolved 'dark' | 'light'
     iconStyle: 'default', // 'default' | 'dark' | 'clear' | 'tinted'
     sampleData: true, // off = preview the empty states real data may need
+    live: false, // on the TV: a media session is playing
     wallpaper: D.wallpapers.length ? 'photo' : 'gradient', // 'gradient' | 'photo'
     photoIndex: 0,
     view: 'home',
@@ -109,7 +110,7 @@
                 <div class="np-title" data-np-title></div>
                 <div class="sub" data-np-artist></div>
               </div>
-              <div class="np-art" data-np-art><span class="art-app">${appIcon(APP.ytmusic, 34)}</span></div>
+              <div class="np-art" data-np-art><span class="art-app">${APP.ytmusic ? appIcon(APP.ytmusic, 34) : ''}</span></div>
             </div>
             <div class="np-next">
               <div class="np-next-label">Up next</div>
@@ -185,7 +186,7 @@
           <input id="search-input" data-focus type="search" autocomplete="off" spellcheck="false"
             placeholder="Search shows and films (press OK to type)" aria-label="Search">
           <span class="small" data-search-count></span>
-          <button class="btn lg google-search" data-focus data-toast="Opens Google TV search">Search with Google TV</button>
+          <button class="btn lg google-search" data-focus data-action="google-search">Search with Google TV</button>
         </label>
         <div class="search-section">
           <div class="eyebrow">Free on your apps</div>
@@ -225,7 +226,7 @@
             <div class="tint"></div>
             <div class="music-art" data-np-art></div>
             <div class="music-meta">
-              <div class="music-source">${appIcon(APP.ytmusic, 30)}<span>${D.music.source}</span></div>
+              <div class="music-source">${APP.ytmusic ? appIcon(APP.ytmusic, 30) : ''}<span>${D.music.source}</span></div>
               <div>
                 <div class="music-title" data-np-title></div>
                 <div class="sub" data-np-artist></div>
@@ -346,7 +347,6 @@
               <span class="vol-num tnum" data-vol></span>
               <button class="ctrl lg" data-focus data-action="vol-up" aria-label="Volume up">${icon('plus', 18)}</button>
               <button class="ctrl lg" data-focus data-action="mute" aria-label="Mute">${icon('volume', 18)}</button>
-              <button class="ctrl lg" data-focus data-action="sb-power" aria-label="Soundbar power">${icon('power', 18)}</button>
             </div>
           </div>
         </section>
@@ -410,7 +410,7 @@
 
   // Customize panel, after the iPadOS one: icon style, appearance, wallpaper.
   function customizeSheet() {
-    const sample = APP.youtube;
+    const sample = APP.youtube || D.apps[0];
     const opt = (action, id, label, desc, inner) => `
       <button class="opt" data-focus data-action="${action}" data-id="${id}">${inner}<span class="opt-label">${label}</span><span class="opt-desc">${desc}</span></button>`;
     const seg = (action, items) => `
@@ -437,6 +437,51 @@
           </div>
         </section>
       </div>`;
+  }
+
+  function launchApp(id) {
+    const a = APP[id];
+    if (!a) {
+      toast('That app isn\'t installed');
+      return;
+    }
+    if (NATIVE && a.pkg) nativeCall('launch', a.pkg);
+    else toast(`Opening ${a.name}`);
+  }
+
+  // Backlight colour to the Govee H6097 over the local network (Android side).
+  function sendBacklight() {
+    if (!NATIVE) return;
+    const h = state.home;
+    const model = H.backlights.model;
+    if (h.backlight === 'off') nativeCall('goveePower', model, false);
+    else if (h.backlight === 'sync') nativeCall('goveeSync', model);
+    else {
+      const [r, g, b] = BACKLIGHT[h.backlight].colors[0].match(/\w\w/g).map((x) => parseInt(x, 16));
+      nativeCall('goveeColor', model, r, g, b);
+    }
+  }
+
+  // What's playing on the TV (YouTube Music or any app with a media session).
+  let pollTick = 0;
+  function pollNowPlaying() {
+    const np = nativeJson('nowPlaying');
+    const was = state.live;
+    state.live = !!np;
+    if (np) {
+      D.music.tracks = [{
+        title: np.title,
+        artist: np.artist || '',
+        durationSec: Math.max(1, Math.round((np.durationMs || 0) / 1000)),
+        art: np.art ? `center / cover no-repeat url("${np.art}")` : 'linear-gradient(140deg,#3a3a48,#121218)',
+        palette: np.colors && np.colors.length === 3 ? np.colors : null,
+      }];
+      state.track = 0;
+      state.pos = Math.round((np.positionMs || 0) / 1000);
+      state.playing = !!np.playing;
+      renderTrack();
+    }
+    if (np || was !== state.live) applyState();
   }
 
   function build() {
@@ -553,9 +598,10 @@
     renderRoom();
 
     // Empty states: what Home shows when there's no data to fill a widget.
-    const sample = state.sampleData;
-    stage.querySelector('.w-music').classList.toggle('is-empty', !sample);
+    const sample = state.sampleData && !NATIVE;
+    stage.querySelector('.w-music').classList.toggle('is-empty', NATIVE ? !state.live : !sample);
     stage.querySelector('.w-hero').classList.toggle('is-empty', !sample);
+    stage.querySelector('.w-music .np-next').hidden = !!NATIVE;
     stage.querySelector('.w-weather').classList.toggle('is-empty', !state.town);
     all('[data-cw]').forEach((el) => { el.hidden = !sample; });
     all('[data-recent]').forEach((el) => { el.hidden = sample; });
@@ -632,7 +678,7 @@
   function renderTrack() {
     const t = track();
     all('[data-np-art]').forEach((el) => { el.style.background = t.art; });
-    all('[data-np-card]').forEach((el) => setTint(el, artPalette(t.art)));
+    all('[data-np-card]').forEach((el) => setTint(el, t.palette || artPalette(t.art)));
     all('[data-np-title]').forEach((el) => { el.textContent = t.title; });
     all('[data-np-artist]').forEach((el) => { el.textContent = t.artist; });
     all('[data-duration]').forEach((el) => { el.textContent = fmt(t.durationSec); });
@@ -648,6 +694,11 @@
     }).join('');
 
     const queue = stage.querySelector('[data-queue]');
+    if (NATIVE) {
+      queue.innerHTML = '<div class="small">The app playing doesn\'t share its queue.</div>';
+      updatePlayback();
+      return;
+    }
     const hadFocus = queue.contains(document.activeElement);
     queue.innerHTML = [1, 2, 3, 4].map((k) => {
       const i = (state.track + k) % tracks.length;
@@ -803,8 +854,15 @@
     }, 1000);
   }
 
-  // Prototype stand-in for the TV leaving the launcher for the HDMI input.
+  // On the TV this switches input for real; in the browser a stand-in screen
+  // shows what would happen.
   function showInputScreen() {
+    if (NATIVE) {
+      const ok = nativeCall('switchToHdmi', state.games.hdmiPort);
+      closeOverlay();
+      if (!ok) toast(`Couldn't find HDMI ${state.games.hdmiPort} on this TV`);
+      return;
+    }
     refs.switchCard.hidden = true;
     refs.inputScreen.hidden = false;
     stage.querySelector('[data-action="close-overlay"]').focus();
@@ -826,7 +884,7 @@
 
     if (b.dataset.nav) openView(b.dataset.nav);
     else if (b.dataset.navTo) openView(b.dataset.navTo);
-    else if (b.dataset.app) toast(`Opening ${APP[b.dataset.app].name}`);
+    else if (b.dataset.app) launchApp(b.dataset.app);
     else if (b.dataset.track) setTrack(Number(b.dataset.track));
     else if (b.dataset.toast) toast(b.dataset.toast);
     else if (act === 'theme') state.appearance = { auto: 'light', light: 'dark', dark: 'auto' }[state.appearance];
@@ -847,26 +905,31 @@
       state.home.scene = null;
       const id = b.dataset.id;
       toast(`TV backlight: ${id === 'sync' ? 'matching the picture' : id === 'off' ? 'off' : BACKLIGHT[id].name}`);
+      sendBacklight();
     } else if (act === 'room-scene') {
       const sc = ROOM_SCENE[b.dataset.id];
       Object.assign(state.home.lights, sc.lights);
       setBacklight(sc.backlight);
       state.home.scene = sc.id;
       toast(`${sc.name} scene`);
+      sendBacklight();
     } else if (act === 'light') {
       const id = b.dataset.id;
       state.home.lights[id] = !state.home.lights[id];
       state.home.scene = null;
-    } else if (act === 'sb-power') {
-      const sb = state.home.sound;
-      sb.on = !sb.on;
-      toast(`Soundbar ${sb.on ? 'on' : 'in standby'}`);
     } else if (act === 'vol-up' || act === 'vol-down') {
+      // TV volume; over HDMI ARC the TV passes it on to the soundbar.
       const sb = state.home.sound;
       sb.muted = false;
       sb.volume = Math.max(0, Math.min(H.soundbar.volumeMax, sb.volume + (act === 'vol-up' ? 1 : -1)));
+      nativeCall('volume', act === 'vol-up' ? 1 : -1);
     } else if (act === 'mute') {
       state.home.sound.muted = !state.home.sound.muted;
+      nativeCall('toggleMute');
+    }
+    else if (NATIVE && state.live && ['play', 'prev', 'next'].includes(act)) {
+      nativeCall('media', act === 'play' ? (state.playing ? 'pause' : 'play') : act);
+      setTimeout(pollNowPlaying, 400);
     }
     else if (act === 'play') state.playing = !state.playing;
     else if (act === 'prev') {
@@ -874,13 +937,20 @@
       else setTrack(state.track - 1);
     }
     else if (act === 'next') setTrack(state.track + 1);
+    else if (act === 'google-search') {
+      if (NATIVE) nativeCall('googleSearch', state.query.trim());
+      else toast('Opens Google TV search');
+    }
     else if (act === 'switch-now') startSwitch();
     else if (act === 'cancel-switch' || act === 'close-overlay') closeOverlay();
     else if (act === 'toggle-auto') g.autoSwitch = !g.autoSwitch;
     else if (act === 'cycle-hdmi') g.hdmiPort = (g.hdmiPort % 4) + 1;
     else if (act === 'cycle-countdown') g.countdownSec = COUNTDOWN_STEPS[(COUNTDOWN_STEPS.indexOf(g.countdownSec) + 1) % COUNTDOWN_STEPS.length];
     else if (act === 'wifi') {
-      if (state.view === 'settings') toast('Opens Android Wi-Fi settings on the TV');
+      if (state.view === 'settings') {
+        if (NATIVE) nativeCall('openSettings', 'wifi');
+        else toast('Opens Android Wi-Fi settings on the TV');
+      }
       else openView('settings');
     }
 
@@ -1056,7 +1126,13 @@
 
   setInterval(() => {
     updateClock();
-    if (state.playing) {
+    if (NATIVE) {
+      if (++pollTick % 3 === 0) pollNowPlaying();
+      if (state.playing && state.live) {
+        state.pos = Math.min(state.pos + 1, track().durationSec);
+        updatePlayback();
+      }
+    } else if (state.playing) {
       if (state.pos >= track().durationSec) setTrack(state.track + 1);
       else {
         state.pos += 1;
@@ -1072,7 +1148,18 @@
   addEventListener('resize', fit);
   matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyState);
 
+  // The Android shell forwards the remote's Back and Home buttons here.
+  window.launcherBack = goBack;
+  window.launcherHome = () => {
+    if (!refs.sheet.hidden) closeSheet();
+    if (!refs.overlay.hidden) closeOverlay();
+    openView('home');
+    stage.querySelector('.dock-app')?.focus();
+  };
+  window.launcherResume = () => { if (NATIVE) pollNowPlaying(); };
+
   build();
+  if (NATIVE) pollNowPlaying();
   animateView('home');
   fit();
   stage.querySelector('.dock-app').focus();

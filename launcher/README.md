@@ -50,6 +50,7 @@ Real logos come from Simple Icons (CC0) where available. BBC iPlayer, My5 and Go
 - `index.html`: page shell, loads the scripts below in order.
 - `data.js`: placeholder content (now playing, weather, hero, continue watching, apps). Replace with real sources on device.
 - `icons.js`: line icons copied from the mockup.
+- `bridge.js`: on the TV, swaps sample data for real data from the Android shell (`../android/`); does nothing in a browser.
 - `styles.css`: design tokens for dark and light, glass surfaces, and layout.
 - `app.js`: builds the screen once, updates only changing nodes (so focus survives the clock tick), and handles D-pad focus.
 

@@ -20,6 +20,8 @@ Since mid-Oct 2026 people have been pointing Claude Code at Android/Google TVs o
 
 ## Decisions already made
 
+> **Update (30 Oct 2026):** we're building our own launcher instead of reskinning an existing one. The UI is in `launcher/` (web), hosted on the TV by the native shell in `android/`. FLauncher's reusable parts (app list, launching, focus) are small, and every feature we need is a native Android API that Flutter would need extra glue for. The notes below are kept for history.
+
 - **Base on an existing open-source launcher, reskin it.** Keep its app-listing, launching and especially **D-pad focus/navigation** logic; rewrite visuals. Candidates: the launcher in tv-vibehack/CleanYourTV, or FLauncher (Flutter). Check the licence first (MIT fine; GPL fine for personal use).
 - Projectivy is closed source — not usable as a base.
 - Prototype in an **Android TV emulator** before installing on the real TV.
