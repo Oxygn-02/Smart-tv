@@ -21,10 +21,22 @@
     query: '',
     town: D.weather.town,
     games: { ...D.games },
+    matchLights: false, // wallpaper gradient follows the backlight colours
+    home: {
+      backlight: D.smartHome.backlights.start, // scene id, 'sync' or 'off'
+      lastScene: D.smartHome.backlights.start, // colours used while syncing or off
+      scene: null, // room scene last applied
+      lights: Object.fromEntries(D.smartHome.lights.map((l) => [l.id, l.on])),
+      sound: { mode: D.smartHome.soundbar.mode, volume: D.smartHome.soundbar.volume, muted: false },
+    },
   };
 
   const COUNTDOWN_STEPS = [0, 3, 5, 10];
   const RING_C = 2 * Math.PI * 34;
+
+  const H = D.smartHome;
+  const BACKLIGHT = Object.fromEntries(H.backlights.scenes.map((s) => [s.id, s]));
+  const ROOM_SCENE = Object.fromEntries(H.scenes.map((s) => [s.id, s]));
 
   const pad = (n) => String(n).padStart(2, '0');
   const fmt = (sec) => `${Math.floor(sec / 60)}:${pad(sec % 60)}`;
@@ -276,6 +288,69 @@
       </section>`;
   }
 
+  function roomView() {
+    const sb = H.soundbar;
+    return `
+      <section class="view view-room" data-view="room" hidden>
+        <div class="room-grid">
+          <section class="card glass room-card" aria-label="${H.backlights.name}">
+            <div class="room-head">
+              <span class="lg chip room-chip">${icon('room')}</span>
+              <span class="room-title">${H.backlights.name}<span class="small" data-backlight-status></span></span>
+              <button class="btn lg" data-focus data-action="match-lights">Match wallpaper: <span data-val="match"></span></button>
+            </div>
+            <div class="swatches">
+              <button class="swatch" data-focus data-action="backlight" data-id="sync">
+                <span class="swatch-dot lg chip">${icon('sync', 26)}</span><span class="small">Match picture</span>
+              </button>
+              ${H.backlights.scenes.map((s) => `
+                <button class="swatch" data-focus data-action="backlight" data-id="${s.id}">
+                  <span class="swatch-dot" style="background:linear-gradient(135deg,${s.colors.join(',')})"></span>
+                  <span class="small">${s.name}</span>
+                </button>`).join('')}
+              <button class="swatch" data-focus data-action="backlight" data-id="off">
+                <span class="swatch-dot lg chip">${icon('power', 22)}</span><span class="small">Off</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="card glass room-card" aria-label="Room lights">
+            <div class="room-head">
+              <span class="lg chip room-chip">${icon('lamp')}</span>
+              <span class="room-title">Room lights<span class="small">Google Home</span></span>
+            </div>
+            <div class="pill-row">
+              ${H.scenes.map((sc) => `<button class="pillbtn" data-focus data-action="room-scene" data-id="${sc.id}">${sc.name}</button>`).join('')}
+            </div>
+            <div class="light-list">
+              ${H.lights.map((l) => `
+                <button class="light-row" data-focus data-action="light" data-id="${l.id}">
+                  <span class="light-dot"></span><span class="light-name">${l.name}</span>
+                  <span class="small" data-light-state="${l.id}"></span>
+                </button>`).join('')}
+            </div>
+          </section>
+        </div>
+
+        <section class="card glass soundbar" aria-label="Soundbar">
+          <div class="room-head">
+            <span class="lg chip room-chip">${icon('speaker')}</span>
+            <span class="room-title">${sb.name}<span class="small">${sb.connection} · <span data-sound-status></span></span></span>
+            <div class="volume">
+              <button class="ctrl lg" data-focus data-action="vol-down" aria-label="Volume down">${icon('minus', 18)}</button>
+              <span class="track vol-track"><span class="fill" data-vol-fill></span></span>
+              <span class="vol-num tnum" data-vol></span>
+              <button class="ctrl lg" data-focus data-action="vol-up" aria-label="Volume up">${icon('plus', 18)}</button>
+              <button class="ctrl lg" data-focus data-action="mute" aria-label="Mute">${icon('volume', 18)}</button>
+            </div>
+          </div>
+          <div class="pill-row">
+            ${sb.modes.map((m) => `<button class="pillbtn" data-focus data-action="sound-mode" data-id="${m}">${m}</button>`).join('')}
+          </div>
+        </section>
+      </section>`;
+  }
+
   function settingsRow(chip, label, help, control) {
     return `
       <span class="lg chip set-chip">${chip}</span>
@@ -341,6 +416,7 @@
         <button class="ib" data-focus data-action="wifi" aria-label="Wi-Fi">${icon('wifi')}</button>
         <button class="ib" data-focus data-action="theme" data-theme-icon></button>
         <button class="ib" data-focus data-action="wallpaper"></button>
+        <button class="ib" data-focus data-action="match-lights" aria-label="Match wallpaper to backlights">${icon('drop')}</button>
         <button class="ib" data-focus data-nav="settings" aria-label="Settings">${icon('gear')}</button>
       </nav>
 
@@ -353,7 +429,7 @@
       </header>
 
       <div class="views">
-        ${homeView()}${searchView()}${musicView()}${liveView()}${appsView()}${gamesView()}${settingsView()}
+        ${homeView()}${searchView()}${musicView()}${liveView()}${appsView()}${gamesView()}${roomView()}${settingsView()}
       </div>
 
       ${overlay()}
@@ -426,9 +502,12 @@
       auto: g.autoSwitch ? 'On' : 'Off',
       countdown: g.countdownSec ? `${g.countdownSec} s` : 'None',
       wifi: 'Connected',
+      match: state.matchLights ? 'On' : 'Off',
     };
     all('[data-val]').forEach((el) => { el.textContent = values[el.dataset.val]; });
     all('[data-town]').forEach((el) => { el.textContent = state.town || 'Set your town in Settings'; });
+
+    renderRoom();
 
     stage.querySelector('[data-games-sub]').textContent = g.autoSwitch
       ? `Opening Games switches the TV to HDMI ${g.hdmiPort}${g.countdownSec ? ` after a ${g.countdownSec} second countdown` : ' straight away'}.`
@@ -447,6 +526,44 @@
     el.style.setProperty('--t0', light);
     el.style.setProperty('--t1', mid);
     el.style.setProperty('--t2', dark);
+  }
+
+  function renderRoom() {
+    const h = state.home;
+    const colors = BACKLIGHT[h.lastScene].colors;
+    const press = (sel, isOn) => all(sel).forEach((b) => {
+      const on = isOn(b.dataset.id);
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+
+    // Wallpaper gradient follows the backlights (fades between scenes).
+    ['--l0', '--l1', '--l2'].forEach((v, i) => stage.style.setProperty(v, colors[i]));
+    stage.classList.toggle('lights', state.matchLights && h.backlight !== 'off');
+    const matchBtn = stage.querySelector('.ib[data-action="match-lights"]');
+    matchBtn.classList.toggle('on', state.matchLights);
+    matchBtn.style.color = state.matchLights ? colors[0] : '';
+
+    press('[data-action="backlight"]', (id) => id === h.backlight);
+    press('[data-action="room-scene"]', (id) => id === h.scene);
+    press('[data-action="light"]', (id) => h.lights[id]);
+    press('[data-action="sound-mode"]', (id) => id === h.sound.mode);
+    all('[data-light-state]').forEach((el) => { el.textContent = h.lights[el.dataset.lightState] ? 'On' : 'Off'; });
+
+    stage.querySelector('[data-backlight-status]').textContent = h.backlight === 'sync'
+      ? 'Matching the picture'
+      : h.backlight === 'off' ? 'Off' : BACKLIGHT[h.backlight].name;
+
+    const sb = h.sound;
+    stage.querySelector('[data-vol-fill]').style.width = `${sb.muted ? 0 : (sb.volume / H.soundbar.volumeMax) * 100}%`;
+    stage.querySelector('[data-vol]').textContent = sb.muted ? 'Muted' : sb.volume;
+    stage.querySelector('[data-sound-status]').textContent = `${sb.mode} mode`;
+  }
+
+  function setBacklight(id) {
+    const h = state.home;
+    h.backlight = id;
+    if (BACKLIGHT[id]) h.lastScene = id;
   }
 
   function renderTrack() {
@@ -563,7 +680,7 @@
   // Blocks that animate in when a view opens, staggered in reading order.
   const ANIM_SELECTOR = ':is(.grid > .col > *, .also > *, .apps > *, .search-bar, .search-section, '
     + '.music-grid > *, .music-mixes, .live-head, .channel, .view-apps > .eyebrow, .app-card, '
-    + '.games-hero, .info, .settings)';
+    + '.games-hero, .info, .settings, .room-grid > *, .soundbar)';
 
   function animateView(id) {
     const view = stage.querySelector(`[data-view="${id}"]`);
@@ -642,7 +759,37 @@
     else if (b.dataset.track) setTrack(Number(b.dataset.track));
     else if (b.dataset.toast) toast(b.dataset.toast);
     else if (act === 'theme') state.theme = state.theme === 'dark' ? 'light' : 'dark';
-    else if (act === 'wallpaper') state.wallpaper = state.wallpaper === 'photo' ? 'gradient' : 'photo';
+    else if (act === 'wallpaper') {
+      state.wallpaper = state.wallpaper === 'photo' ? 'gradient' : 'photo';
+      state.matchLights = false;
+    } else if (act === 'match-lights') {
+      state.matchLights = !state.matchLights;
+      toast(state.matchLights ? 'Wallpaper now matches your backlights' : 'Wallpaper back to your own');
+    } else if (act === 'backlight') {
+      setBacklight(b.dataset.id);
+      state.home.scene = null;
+      const id = b.dataset.id;
+      toast(`TV backlights: ${id === 'sync' ? 'matching the picture' : id === 'off' ? 'off' : BACKLIGHT[id].name}`);
+    } else if (act === 'room-scene') {
+      const sc = ROOM_SCENE[b.dataset.id];
+      Object.assign(state.home.lights, sc.lights);
+      setBacklight(sc.backlight);
+      state.home.scene = sc.id;
+      toast(`${sc.name} scene`);
+    } else if (act === 'light') {
+      const id = b.dataset.id;
+      state.home.lights[id] = !state.home.lights[id];
+      state.home.scene = null;
+    } else if (act === 'sound-mode') {
+      state.home.sound.mode = b.dataset.id;
+      toast(`Soundbar: ${b.dataset.id} mode`);
+    } else if (act === 'vol-up' || act === 'vol-down') {
+      const sb = state.home.sound;
+      sb.muted = false;
+      sb.volume = Math.max(0, Math.min(H.soundbar.volumeMax, sb.volume + (act === 'vol-up' ? 1 : -1)));
+    } else if (act === 'mute') {
+      state.home.sound.muted = !state.home.sound.muted;
+    }
     else if (act === 'play') state.playing = !state.playing;
     else if (act === 'prev') {
       if (state.pos > 3) state.pos = 0;
@@ -700,14 +847,19 @@
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   }
 
-  // D-pad: move to the nearest focusable control in that direction.
+  // D-pad: move to the nearest focusable control in that direction. Distances
+  // are measured between edges, so a wide row directly below counts as close
+  // even when its centre is off to one side.
   function nearest(cur, dir, candidates) {
+    const a = cur.getBoundingClientRect();
     const c = centre(cur);
+    const gap = (lo1, hi1, lo2, hi2) => Math.max(0, lo2 - hi1, lo1 - hi2);
     let best = null;
     let bestScore = Infinity;
 
     for (const el of candidates) {
       if (el === cur) continue;
+      const r = el.getBoundingClientRect();
       const p = centre(el);
       const dx = p.x - c.x;
       const dy = p.y - c.y;
@@ -716,29 +868,31 @@
       let secondary;
       switch (dir) {
         case 'left':
-          if (dx >= -1) continue;
-          primary = -dx;
-          secondary = Math.abs(dy);
+          if (p.x >= a.left) continue;
+          primary = Math.max(0, a.left - r.right);
+          secondary = gap(a.top, a.bottom, r.top, r.bottom);
           break;
         case 'right':
-          if (dx <= 1) continue;
-          primary = dx;
-          secondary = Math.abs(dy);
+          if (p.x <= a.right) continue;
+          primary = Math.max(0, r.left - a.right);
+          secondary = gap(a.top, a.bottom, r.top, r.bottom);
           break;
         case 'up':
-          if (dy >= -1) continue;
-          primary = -dy;
-          secondary = Math.abs(dx);
+          if (p.y >= a.top) continue;
+          primary = Math.max(0, a.top - r.bottom);
+          secondary = gap(a.left, a.right, r.left, r.right);
           break;
         case 'down':
-          if (dy <= 1) continue;
-          primary = dy;
-          secondary = Math.abs(dx);
+          if (p.y <= a.bottom) continue;
+          primary = Math.max(0, r.top - a.bottom);
+          secondary = gap(a.left, a.right, r.left, r.right);
           break;
       }
 
-      // Prefer targets straight ahead; penalise sideways drift.
-      const score = primary + secondary * 2;
+      // Targets must lie beyond the current control's edge.
+      // Prefer targets straight ahead; penalise sideways drift. Centre distance
+      // breaks ties between targets that are equally close.
+      const score = primary + secondary * 2 + Math.hypot(dx, dy) * 0.01;
       if (score < bestScore) {
         bestScore = score;
         best = el;

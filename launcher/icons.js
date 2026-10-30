@@ -18,6 +18,14 @@ const ICON_PATHS = {
   queue: '<path d="M4 6.5h12M4 11.5h12M4 16.5h7"/><path d="M15 14.5v5l4-2.5z"/>',
   location: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
   timer: '<circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 1.5M9.5 2.5h5"/>',
+  room: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1.1 1.3 1.1 2.2h5c0-.9.5-1.7 1.1-2.2A6 6 0 0 0 12 3z"/>',
+  lamp: '<path d="M8 3h8l3 8H5z"/><path d="M12 11v8M8 21h8"/>',
+  speaker: '<rect x="2.5" y="8.5" width="19" height="7" rx="2"/><circle cx="7" cy="12" r="1.2"/><circle cx="17" cy="12" r="1.2"/><path d="M11 12h2"/>',
+  volume: '<path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
+  sync: '<rect x="4" y="6" width="16" height="10" rx="1.5"/><path d="M9 19.5h6"/><path d="M1.5 8.5v5M22.5 8.5v5"/>',
+  drop: '<path d="M12 3.5s6 6.2 6 10.5a6 6 0 0 1-12 0c0-4.3 6-10.5 6-10.5z"/>',
   power: '<path d="M12 3v8"/><path d="M6.6 6.6a7.5 7.5 0 1 0 10.8 0"/>',
 };
 

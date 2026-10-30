@@ -15,6 +15,7 @@ const LAUNCHER_DATA = {
     { id: 'live', label: 'Live TV' },
     { id: 'apps', label: 'All apps' },
     { id: 'games', label: 'Games' },
+    { id: 'room', label: 'Room' },
   ],
 
   // Installed apps, in "All apps" order. `pinned` apps make the Home row.
@@ -111,6 +112,51 @@ const LAUNCHER_DATA = {
     { number: '005', name: 'Channel 5', app: 'my5', slotMin: 30, now: 'Fen Country', next: 'Roads Patrol' },
     { number: '006', name: 'ITV2', app: 'itvx', slotMin: 30, now: 'Kitchen Nights', next: 'Sun Seekers' },
   ],
+
+  // Room: lights, TV backlights and soundbar. All state here is simulated.
+  // On device:
+  // - Room lights: Google Home APIs for Android (Device + Automation APIs, with
+  //   the user's consent), or the lights' own local API (e.g. Hue bridge, Govee
+  //   LAN, WiZ, LIFX) over Wi-Fi. Brands still to confirm.
+  // - TV backlights: set a scene/colour through the same route; "Match picture"
+  //   hands control back to the backlights' own screen-sync mode.
+  // - Soundbar: optical carries audio only, so control needs an IR bridge
+  //   (e.g. a Wi-Fi IR blaster that has learned the D50 remote) or HDMI ARC/CEC.
+  smartHome: {
+    backlights: {
+      name: 'TV backlights',
+      start: 'aurora',
+      scenes: [
+        { id: 'aurora', name: 'Aurora', colors: ['#2bd47d', '#14b8a6', '#0e5f8a'] },
+        { id: 'sunset', name: 'Sunset', colors: ['#ff7a45', '#d6336c', '#5b2a86'] },
+        { id: 'ocean', name: 'Ocean', colors: ['#38bdf8', '#2563eb', '#0e7490'] },
+        { id: 'neon', name: 'Neon', colors: ['#f472b6', '#a855f7', '#22d3ee'] },
+        { id: 'ember', name: 'Ember', colors: ['#f59e0b', '#dc2626', '#7c2d12'] },
+        { id: 'warm', name: 'Warm white', colors: ['#ffd9a8', '#ffb36b', '#c27a3a'] },
+      ],
+    },
+    lights: [
+      { id: 'ceiling', name: 'Ceiling light', on: false },
+      { id: 'floor', name: 'Floor lamp', on: true },
+      { id: 'desk', name: 'Desk lamp', on: true },
+    ],
+    // One-press room scenes: which lights are on and the backlight scene.
+    scenes: [
+      { id: 'movie', name: 'Movie', lights: { ceiling: false, floor: true, desk: false }, backlight: 'ocean' },
+      { id: 'gaming', name: 'Gaming', lights: { ceiling: false, floor: false, desk: true }, backlight: 'neon' },
+      { id: 'relax', name: 'Relax', lights: { ceiling: false, floor: true, desk: true }, backlight: 'ember' },
+      { id: 'bright', name: 'Bright', lights: { ceiling: true, floor: true, desk: true }, backlight: 'warm' },
+      { id: 'off', name: 'All off', lights: { ceiling: false, floor: false, desk: false }, backlight: 'off' },
+    ],
+    soundbar: {
+      name: 'Ultimea Poseidon D50',
+      connection: 'Optical',
+      modes: ['Movie', 'Music', 'Voice', 'Night'],
+      mode: 'Movie',
+      volume: 18,
+      volumeMax: 40,
+    },
+  },
 
   // Games tab switches the TV to the Xbox's HDMI input.
   // On device: find the input via TvInputManager.getTvInputList() (TYPE_HDMI,

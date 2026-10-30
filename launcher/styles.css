@@ -1399,6 +1399,207 @@ button.info {
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
 }
 
+/* ---------- Room (lights, backlights, soundbar) ---------- */
+
+.view-room {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.room-grid {
+  flex: 1 1 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0;
+}
+
+.room-card,
+.soundbar {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.soundbar {
+  flex: none;
+  gap: 16px;
+}
+
+.room-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.room-chip {
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+}
+
+.room-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 17px;
+  font-weight: 400;
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px 10px;
+}
+
+.swatch {
+  border: 0;
+  padding: 6px 0;
+  border-radius: 18px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.swatch-dot {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  box-shadow: 0 6px 16px -6px var(--lg-drop);
+  transition: transform 0.5s var(--gentle, ease-out), outline-color 0.3s;
+  outline: 2px solid transparent;
+  outline-offset: 3px;
+}
+
+.swatch.on .swatch-dot {
+  outline-color: var(--ink);
+}
+
+.swatch:is(:focus-visible, :hover) .swatch-dot {
+  transform: scale(1.05);
+}
+
+.swatch:focus-visible {
+  outline-offset: 0;
+}
+
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pillbtn {
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--glass);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background 0.3s, color 0.3s;
+}
+
+.pillbtn.on {
+  background: var(--ink);
+  color: var(--playink);
+}
+
+.light-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.light-row {
+  height: 46px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.light-row:focus-visible {
+  background: var(--onbtn);
+  outline-offset: 0;
+}
+
+.light-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--track);
+  transition: background 0.3s, box-shadow 0.3s;
+}
+
+.light-row.on .light-dot {
+  background: #ffcf70;
+  box-shadow: 0 0 10px 2px rgba(255, 207, 112, 0.6);
+}
+
+.light-name {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vol-track {
+  width: 180px;
+}
+
+.vol-num {
+  min-width: 46px;
+  font-size: 14px;
+  color: var(--sub);
+  text-align: center;
+}
+
+/* Wallpaper that follows the backlights: their colours as soft glows */
+@property --l0 { syntax: '<color>'; inherits: true; initial-value: #2bd47d; }
+@property --l1 { syntax: '<color>'; inherits: true; initial-value: #14b8a6; }
+@property --l2 { syntax: '<color>'; inherits: true; initial-value: #0e5f8a; }
+
+#stage {
+  transition: background 0.4s, --l0 1.2s, --l1 1.2s, --l2 1.2s;
+}
+
+#stage.lights {
+  --bg:
+    radial-gradient(ellipse at 10% 0%, color-mix(in srgb, var(--l0) 42%, transparent) 0%, transparent 58%),
+    radial-gradient(ellipse at 95% 5%, color-mix(in srgb, var(--l1) 38%, transparent) 0%, transparent 58%),
+    radial-gradient(ellipse at 70% 105%, color-mix(in srgb, var(--l2) 40%, transparent) 0%, transparent 58%),
+    #050508;
+}
+
+#stage.light.lights {
+  --bg:
+    radial-gradient(ellipse at 10% 0%, color-mix(in srgb, var(--l0) 45%, #fff) 0%, transparent 58%),
+    radial-gradient(ellipse at 95% 5%, color-mix(in srgb, var(--l1) 40%, #fff) 0%, transparent 58%),
+    radial-gradient(ellipse at 70% 105%, color-mix(in srgb, var(--l2) 40%, #fff) 0%, transparent 58%),
+    #eff0f5;
+}
+
 /* ---------- Motion ---------- */
 
 #stage {
