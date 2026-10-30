@@ -1568,6 +1568,11 @@ button.info {
   width: 180px;
 }
 
+.soundbar.standby .vol-track,
+.soundbar.standby .vol-num {
+  opacity: 0.35;
+}
+
 .vol-num {
   min-width: 46px;
   font-size: 14px;

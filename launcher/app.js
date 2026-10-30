@@ -27,7 +27,7 @@
       lastScene: D.smartHome.backlights.start, // colours used while syncing or off
       scene: null, // room scene last applied
       lights: Object.fromEntries(D.smartHome.lights.map((l) => [l.id, l.on])),
-      sound: { mode: D.smartHome.soundbar.mode, volume: D.smartHome.soundbar.volume, muted: false },
+      sound: { on: true, volume: D.smartHome.soundbar.volume, muted: false },
     },
   };
 
@@ -317,7 +317,7 @@
           <section class="card glass room-card" aria-label="Room lights">
             <div class="room-head">
               <span class="lg chip room-chip">${icon('lamp')}</span>
-              <span class="room-title">Room lights<span class="small">Google Home</span></span>
+              <span class="room-title">Room lights<span class="small">${H.provider}</span></span>
             </div>
             <div class="pill-row">
               ${H.scenes.map((sc) => `<button class="pillbtn" data-focus data-action="room-scene" data-id="${sc.id}">${sc.name}</button>`).join('')}
@@ -342,10 +342,11 @@
               <span class="vol-num tnum" data-vol></span>
               <button class="ctrl lg" data-focus data-action="vol-up" aria-label="Volume up">${icon('plus', 18)}</button>
               <button class="ctrl lg" data-focus data-action="mute" aria-label="Mute">${icon('volume', 18)}</button>
+              <button class="ctrl lg" data-focus data-action="sb-power" aria-label="Soundbar power">${icon('power', 18)}</button>
             </div>
           </div>
           <div class="pill-row">
-            ${sb.modes.map((m) => `<button class="pillbtn" data-focus data-action="sound-mode" data-id="${m}">${m}</button>`).join('')}
+            <span class="small">Volume, mute and power go through the TV over HDMI-CEC. Sound modes stay on the D50 remote.</span>
           </div>
         </section>
       </section>`;
@@ -547,7 +548,6 @@
     press('[data-action="backlight"]', (id) => id === h.backlight);
     press('[data-action="room-scene"]', (id) => id === h.scene);
     press('[data-action="light"]', (id) => h.lights[id]);
-    press('[data-action="sound-mode"]', (id) => id === h.sound.mode);
     all('[data-light-state]').forEach((el) => { el.textContent = h.lights[el.dataset.lightState] ? 'On' : 'Off'; });
 
     stage.querySelector('[data-backlight-status]').textContent = h.backlight === 'sync'
@@ -557,7 +557,8 @@
     const sb = h.sound;
     stage.querySelector('[data-vol-fill]').style.width = `${sb.muted ? 0 : (sb.volume / H.soundbar.volumeMax) * 100}%`;
     stage.querySelector('[data-vol]').textContent = sb.muted ? 'Muted' : sb.volume;
-    stage.querySelector('[data-sound-status]').textContent = `${sb.mode} mode`;
+    stage.querySelector('[data-sound-status]').textContent = sb.on ? 'On' : 'Standby';
+    stage.querySelector('.soundbar').classList.toggle('standby', !sb.on);
   }
 
   function setBacklight(id) {
@@ -780,9 +781,10 @@
       const id = b.dataset.id;
       state.home.lights[id] = !state.home.lights[id];
       state.home.scene = null;
-    } else if (act === 'sound-mode') {
-      state.home.sound.mode = b.dataset.id;
-      toast(`Soundbar: ${b.dataset.id} mode`);
+    } else if (act === 'sb-power') {
+      const sb = state.home.sound;
+      sb.on = !sb.on;
+      toast(`Soundbar ${sb.on ? 'on' : 'in standby'}`);
     } else if (act === 'vol-up' || act === 'vol-down') {
       const sb = state.home.sound;
       sb.muted = false;

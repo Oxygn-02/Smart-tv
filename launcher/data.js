@@ -115,13 +115,22 @@ const LAUNCHER_DATA = {
 
   // Room: lights, TV backlights and soundbar. All state here is simulated.
   // On device:
-  // - Room lights: Google Home APIs for Android (Device + Automation APIs, with
-  //   the user's consent), or the lights' own local API (e.g. Hue bridge, Govee
-  //   LAN, WiZ, LIFX) over Wi-Fi. Brands still to confirm.
-  // - TV backlights: set a scene/colour through the same route; "Match picture"
-  //   hands control back to the backlights' own screen-sync mode.
-  // - Soundbar: optical carries audio only, so control needs an IR bridge
-  //   (e.g. a Wi-Fi IR blaster that has learned the D50 remote) or HDMI ARC/CEC.
+  // - Lights and backlights are Govee. Two routes, used together:
+  //   * Govee LAN API (fast, local, no account). Turn on "LAN Control" for each
+  //     device in the Govee Home app. Discover with a UDP multicast to
+  //     239.255.255.250:4001 ({"msg":{"cmd":"scan","data":{"account_topic":"reserve"}}});
+  //     devices answer on port 4002 with ip and sku. Control by sending JSON to
+  //     <device ip>:4003: "turn" {value:0|1}, "brightness" {value:1-100},
+  //     "colorwc" {color:{r,g,b}, colorTemInKelvin}, "devStatus". One colour per device.
+  //   * Govee cloud API (API key from the Govee Home app) for what LAN can't do:
+  //     multi-colour segments on the backlights (the 3-colour scenes) and
+  //     switching DreamView (picture sync) on or off. Not every model supports
+  //     every capability: check each device's capability list.
+  //   "Match picture" turns DreamView back on.
+  // - Soundbar on HDMI ARC: power and volume go over HDMI-CEC. On Android TV the
+  //   launcher adjusts system volume (AudioManager) and the TV forwards it to the
+  //   soundbar. Sound modes have no CEC command, so they stay on the D50 remote.
+  //   Its Bluetooth is for playing audio into it, not for control.
   smartHome: {
     backlights: {
       name: 'TV backlights',
@@ -135,6 +144,7 @@ const LAUNCHER_DATA = {
         { id: 'warm', name: 'Warm white', colors: ['#ffd9a8', '#ffb36b', '#c27a3a'] },
       ],
     },
+    provider: 'Govee',
     lights: [
       { id: 'ceiling', name: 'Ceiling light', on: false },
       { id: 'floor', name: 'Floor lamp', on: true },
@@ -150,9 +160,7 @@ const LAUNCHER_DATA = {
     ],
     soundbar: {
       name: 'Ultimea Poseidon D50',
-      connection: 'Optical',
-      modes: ['Movie', 'Music', 'Voice', 'Night'],
-      mode: 'Movie',
+      connection: 'HDMI ARC',
       volume: 18,
       volumeMax: 40,
     },
