@@ -2944,17 +2944,28 @@ button.w-empty {
   position: relative;
 }
 
+.dock {
+  transition: padding 0.45s var(--gentle), bottom 0.45s var(--gentle);
+}
+
+/* On the dock: it deepens a little and the name sits inside its border,
+   under the icon, while the icons shrink to make room. */
+.dock.active {
+  padding-bottom: 40px;
+  bottom: 6px;
+}
+
 .dock-label {
   position: absolute;
-  top: calc(100% + 20px);
+  top: calc(100% + 10px);
   left: 50%;
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--playink);
+  padding: 0;
+  background: none;
+  color: var(--ink);
   font-size: 15px;
   font-weight: 600;
   line-height: 1.2;
+  white-space: nowrap;
   opacity: 0;
   transform: translate(-50%, -4px);
   pointer-events: none;
@@ -2967,12 +2978,12 @@ button.w-empty {
 }
 
 .dock.active .dock-app .app-ic {
-  transform: scale(0.9);
+  transform: scale(0.82);
 }
 
 .dock.active .dock-app:focus-visible .app-ic,
 .dock.active .dock-app:hover .app-ic {
-  transform: scale(1.1) translateY(-2px);
+  transform: scale(0.96);
 }
 
 /* ---------- Sliders (Customize > Tinted) ---------- */
@@ -3362,5 +3373,23 @@ button.w-empty {
 
 .search-hint {
   margin-top: 18px;
+  color: var(--sub);
+}
+
+/* Keeps text readable on bright photos: a soft darkening at the top and bottom
+   only, so the picture stays clear in the middle. */
+.shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.16), transparent 22%, transparent 70%, rgba(0, 0, 0, 0.2));
+}
+
+#stage.light .shade {
+  background: none;
+}
+
+.cleanup-note {
+  padding: 4px 6px 12px;
   color: var(--sub);
 }

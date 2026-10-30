@@ -226,14 +226,24 @@
         </div>
 
         <nav class="dock glass" aria-label="Apps">
-          ${D.apps.map((a, i) => `
-            ${!a.pinned && D.apps[i - 1]?.pinned ? '<span class="dock-divider"></span>' : ''}
+          ${dockApps().map((a, i, list) => `
+            ${!a.pinned && list[i - 1]?.pinned ? '<span class="dock-divider"></span>' : ''}
             <button class="dock-app" data-focus data-app="${a.id}" aria-label="${a.name}" style="--accent:${a.color}">
               ${appIcon(a, 76)}
               <span class="dock-label">${a.short || a.name}</span>
             </button>`).join('')}
         </nav>
       </section>`;
+  }
+
+  // The dock keeps the apps you use, plus the three you opened last. The
+  // rest are in the Apps tab.
+  function dockApps() {
+    const recent = (D.recentApps || []).slice(0, 3);
+    const keep = D.apps.filter((a) => a.pinned || (NATIVE && recent.includes(a.id)));
+    // Never leave the dock bare (no recent apps known yet): fill it up to six.
+    D.apps.forEach((a) => { if (keep.length < 6 && !keep.includes(a)) keep.push(a); });
+    return D.apps.filter((a) => keep.includes(a));
   }
 
   function appTile(a, cls, size) {
@@ -499,13 +509,13 @@
       return;
     }
     const states = NATIVE ? nativeJson('packageStates', JSON.stringify(D.cleanup.map((c) => c.pkg))) || [] : [];
-    list.innerHTML = D.cleanup.map((c) => {
+    list.innerHTML = '<p class="small cleanup-note">Press OK on an app to open its page. Disable switches it off; Enable brings it back, so nothing here is permanent.</p>' + D.cleanup.map((c) => {
       const st = states.find((x) => x.pkg === c.pkg);
       const value = !NATIVE ? 'On the TV' : !st || !st.installed ? 'Not on this TV' : st.enabled ? 'On' : 'Off';
       return `
         <button class="set-row" data-focus data-action="open-app-info" data-pkg="${c.pkg}">
           <span class="lg chip set-chip">${icon('power')}</span>
-          <span class="set-label">${st ? st.label : c.pkg}<span class="small">${c.reason}</span></span>
+          <span class="set-label">${st ? st.label : c.pkg}<span class="small">${c.reason}${value === 'Off' ? ' · Switched off. Press OK, then Enable, to bring it back.' : ''}</span></span>
           <span class="set-val">${value}</span>
         </button>`;
     }).join('');
@@ -1019,6 +1029,7 @@
   function build() {
     stage.innerHTML = `
       <div class="edge" aria-hidden="true"></div>
+      <div class="shade" aria-hidden="true"></div>
 
       <header class="topbar">
         <div class="status">
