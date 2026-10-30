@@ -16,7 +16,20 @@ cd launcher && python3 -m http.server 8080
 |---|---|
 | Arrow keys | Move focus to the nearest control in that direction (D-pad) |
 | Enter / Space | Activate the focused control |
+| Esc / Backspace | Back: close the Games overlay, or return to Home |
 | Mouse / touch | Click any control |
+
+## Tabs
+
+- **Home**: now playing, weather, continue watching, pinned apps.
+- **Search**: suggestions from installed apps only. Free titles first; rent or buy titles show the price in the card's bottom corner.
+- **Music**: now playing, a working up-next queue, and mixes.
+- **Live TV**: Freeview channels with now and next. Each opens in the broadcaster's app.
+- **All apps**: every installed app.
+- **Games**: opening it switches the TV to the Xbox's HDMI input (HDMI 2) after a short countdown you can cancel. Input, countdown and auto-switch are set in Settings.
+- **Settings**: weather town, appearance, wallpaper, Games input, Wi-Fi.
+
+Real logos come from Simple Icons (CC0) where available. BBC iPlayer, My5 and Google TV use lettermarks until the device supplies their icons.
 
 ## Files
 
@@ -29,6 +42,5 @@ cd launcher && python3 -m http.server 8080
 ## Not yet done
 
 - Photo wallpapers: the photo mode shows the placeholder label. Real photos go in `wallpapers/`.
-- App icons: colour swatches stand in for real icons read from `PackageManager`.
-- Launching: clicking an app only logs to the console.
-- Data: all content is static placeholder data.
+- Launching and input switching: the prototype shows a toast or a stand-in HDMI screen.
+- Data: all content is static placeholder data. Show titles, tracks and prices are made up.
