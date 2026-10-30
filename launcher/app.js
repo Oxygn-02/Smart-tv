@@ -12,7 +12,8 @@
 
   const state = {
     theme: initialTheme(), // 'dark' | 'light'
-    wallpaper: 'gradient', // 'gradient' | 'photo'
+    wallpaper: D.wallpapers.length ? 'photo' : 'gradient', // 'gradient' | 'photo'
+    photoIndex: 0,
     view: 'home',
     playing: true,
     track: 0,
@@ -376,6 +377,7 @@
     };
 
     refs.townInput.value = state.town;
+    showPhoto();
     setTint(stage.querySelector('[data-weather-card]'), D.weather.palette);
     applyState();
     renderTrack();
@@ -396,7 +398,7 @@
 
     stage.classList.toggle('light', !dark);
     stage.classList.toggle('photo', photo);
-    refs.photoLabel.hidden = !photo;
+    refs.photoLabel.hidden = !photo || D.wallpapers.length > 0;
 
     all('[data-theme-icon]').forEach((el) => { el.innerHTML = icon(dark ? 'sun' : 'moon'); });
     refs.themeBtn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
@@ -534,6 +536,18 @@
       stage.querySelector(`[data-live-next="${i}"]`).textContent = hm(new Date(end));
       stage.querySelector(`[data-live-progress="${i}"]`).style.width = `${((now - start) / slot) * 100}%`;
     });
+  }
+
+  function showPhoto() {
+    const file = D.wallpapers[state.photoIndex];
+    if (file) stage.style.setProperty('--photo', `url("${D.wallpaperBase}${file}")`);
+  }
+
+  if (D.wallpapers.length > 1) {
+    setInterval(() => {
+      state.photoIndex = (state.photoIndex + 1) % D.wallpapers.length;
+      showPhoto();
+    }, D.wallpaperCycleMin * 60000);
   }
 
   let toastTimer;

@@ -88,13 +88,28 @@ input {
     #eff0f5;
 }
 
-/* Photo wallpaper placeholder (real photos supplied later in wallpapers/) */
-#stage.photo {
-  --bg: linear-gradient(135deg, #1c1c22, #0b0b0f);
+/* Photo wallpaper from wallpapers/, under a light scrim so glass and text stay
+   legible. Falls back to a plain gradient when there is no photo. */
+#stage {
+  --photo: linear-gradient(135deg, #1c1c22, #0b0b0f);
+  --photo-scrim: linear-gradient(rgba(5, 5, 8, 0.18), rgba(5, 5, 8, 0.42));
 }
 
-#stage.light.photo {
-  --bg: linear-gradient(135deg, #e4e4ea, #d0d1d8);
+#stage.light {
+  --photo-scrim: linear-gradient(rgba(239, 240, 245, 0.55), rgba(239, 240, 245, 0.62));
+}
+
+/* Header text sits straight on the photo: a soft halo keeps it readable */
+#stage.light.photo .header {
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.85);
+}
+
+#stage.photo:not(.light) .header {
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.5);
+}
+
+#stage.photo {
+  --bg: var(--photo-scrim), var(--photo) center / cover no-repeat, #050508;
 }
 
 #stage {

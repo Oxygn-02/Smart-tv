@@ -52,6 +52,12 @@ const LAUNCHER_DATA = {
     ],
   },
 
+  // Photos for the photo wallpaper, cycled in order. Files live in the repo's
+  // wallpapers/ folder; the artifact page sets WALLPAPER_BASE for its own layout.
+  wallpaperBase: window.WALLPAPER_BASE || '../wallpapers/',
+  wallpapers: ['sydney-harbour-bridge.png'],
+  wallpaperCycleMin: 10,
+
   weather: {
     town: '[Your town]',
     tempC: 12,
