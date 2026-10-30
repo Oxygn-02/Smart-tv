@@ -25,7 +25,7 @@ The UI is copied into the app on every build (`copyWebUi` in `app/build.gradle.k
 
 ## Build
 
-Needs Android Studio (or JDK 17 and the Android SDK). From this folder:
+Needs Android Studio (or JDK 17 and the Android SDK; set `sdk.dir` in `local.properties`). From this folder:
 
 ```sh
 ./gradlew assembleDebug
@@ -38,6 +38,7 @@ Or open `android/` in Android Studio and run it on an Android TV emulator (Googl
 
 Ask before each step that changes the TV (see `../CLAUDE.md`).
 
+0. **Back up the TV first.** With adb connected (step 2), run `../debloat/backup-tv.sh --apks`. It only reads from the TV and saves its packages, home screen and settings to `debloat/backups/`. `../debloat/restore.sh <that folder>` puts the TV back.
 1. On the TV: Settings › System › About › tap "Android TV OS build" 7 times, then turn on USB/wireless debugging in Developer options.
 2. Connect and install:
    ```sh
@@ -58,6 +59,6 @@ Ask before each step that changes the TV (see `../CLAUDE.md`).
    ```sh
    adb shell pm enable com.google.android.apps.tv.launcherx
    ```
-   Add both commands to `debloat/disabled-packages.txt` and `debloat/restore.sh`.
+   or `../debloat/restore.sh --launcher-only`. Record it in `../debloat/disabled-packages.txt`.
 
 After a firmware update, check that the TV hasn't switched the stock home screen back on.

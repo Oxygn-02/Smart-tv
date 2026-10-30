@@ -1,0 +1,2 @@
+# Packages disabled on the TV with `pm disable-user --user 0`, one per line,
+# each with the reason. Nothing disabled yet. Undo with ./restore.sh.
