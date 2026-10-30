@@ -2437,8 +2437,10 @@ button.w-empty {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  /* One cheap gradient: clear in the middle, the light colour at the edges */
-  background: radial-gradient(ellipse 78% 82% at 50% 50%, transparent 58%, var(--glow-a) 135%);
+  /* A soft, thin glow that hugs the screen edges and corners (a rectangle,
+     not an oval), painted once. */
+  background: none;
+  box-shadow: inset 0 0 28px 2px var(--glow-a), inset 0 0 90px -6px var(--glow-a);
   transition: opacity 0.9s;
   animation: lights-on 2.4s var(--ease-out) 0.3s backwards;
 }
@@ -3506,3 +3508,22 @@ button.w-empty {
 
 #stage.light .aurora { opacity: 0.25; }
 
+
+/* ---------- Apps scroll inside their own panel ----------
+   The page itself never scrolls, so the glow and wallpaper layers stay put. */
+.view-apps {
+  inset: -10px;
+  padding: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.view-apps::-webkit-scrollbar {
+  display: none;
+}
+
+.view-apps {
+  -webkit-mask-image: linear-gradient(transparent, #000 22px, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(transparent, #000 22px, #000 calc(100% - 22px), transparent);
+}

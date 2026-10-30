@@ -1751,6 +1751,9 @@
     }
   }
 
+  // The stage itself must never scroll (focus can try to), or the glow layers slide away.
+  stage.addEventListener('scroll', () => { stage.scrollTop = 0; stage.scrollLeft = 0; });
+
   // Remember where focus was in each view, so coming back from the sidebar
   // lands where you left off.
   const lastFocus = {};
