@@ -2377,32 +2377,8 @@ button.w-empty {
   transform: translateX(18px);
 }
 
-/* Top-right tools show their name when focused, as the dock does */
 .tool {
   position: relative;
-}
-
-.tool::after {
-  content: attr(data-tip);
-  position: absolute;
-  top: calc(100% + 10px);
-  left: 50%;
-  transform: translate(-50%, -4px);
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--playink);
-  font-size: 15px;
-  font-weight: 600;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s, transform 0.4s var(--gentle);
-}
-
-.tool:is(:focus-visible, :hover)::after {
-  opacity: 1;
-  transform: translate(-50%, 0);
 }
 
 .opt-desc {
@@ -2725,29 +2701,6 @@ button.w-empty {
   filter: drop-shadow(0 0 8px var(--focus-glow)) drop-shadow(0 0 2px var(--focus));
 }
 
-.tab::before {
-  content: attr(data-tip);
-  position: absolute;
-  top: calc(100% + 12px);
-  left: 50%;
-  transform: translate(-50%, -4px);
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--playink);
-  font-size: 15px;
-  font-weight: 600;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s, transform 0.4s var(--gentle);
-}
-
-.tab:is(:focus-visible, :hover)::before {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-
 .tab.on::after {
   bottom: 2px;
 }
@@ -2770,22 +2723,57 @@ button.w-empty {
   box-shadow: 0 0 26px 2px var(--focus-glow);
 }
 
-/* Real app icons from the TV fill their chip */
-.app-ic.has-img {
+/* Real app icons from the TV. Default shows the app's own icon; the other
+   styles show a one-colour glyph (traced, drawn or a logo) in the style's
+   colour, so every app matches Clear, Dark and Tinted. */
+.app-ic {
+  position: relative;
   overflow: hidden;
-  background: none;
 }
 
-.app-ic.has-img img {
+.app-ic .ic-glyph {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.app-ic .ic-glyph .mark {
+  font-size: 1em;
+  color: var(--glyph);
+}
+
+.ic-mask {
+  display: block;
+  width: 1.5em;
+  height: 1.5em;
+  background: var(--glyph);
+  -webkit-mask: var(--mask) center / contain no-repeat;
+  mask: var(--mask) center / contain no-repeat;
+  opacity: 0;
+}
+
+.ic-mask.ready {
+  opacity: 1;
+  transition: opacity 0.3s;
+}
+
+.app-ic .ic-img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: none;
 }
 
-.app-ic.has-img.s-clear img,
-.app-ic.has-img.s-tinted img {
-  filter: grayscale(1) brightness(1.3);
-  opacity: 0.85;
+.app-ic.has-img.s-default .ic-img {
+  display: block;
+}
+
+.app-ic.has-img.s-default .ic-glyph {
+  visibility: hidden;
 }
 
 
@@ -3370,4 +3358,9 @@ button.w-empty {
   gap: 8px;
   padding: 28px 24px;
   max-width: 680px;
+}
+
+.search-hint {
+  margin-top: 18px;
+  color: var(--sub);
 }

@@ -61,3 +61,9 @@ Real logos come from Simple Icons (CC0) where available. BBC iPlayer, My5 and Go
 - Photo wallpapers: the photo mode shows the placeholder label. Real photos go in `wallpapers/`.
 - Launching and input switching: the prototype shows a toast or a stand-in HDMI screen.
 - Data: all content is static placeholder data. Show titles, tracks and prices are made up.
+
+## App icons and real data (v0.3.1)
+
+- Every app has a one-colour glyph for the Dark, Clear and Tinted icon styles: a logo, a hand-drawn glyph (BBC iPlayer, My5, Google TV), or one traced on the TV from the app's own icon (flat background removed). If tracing finds nothing clear, the app's letters are used. Default style shows the app's real icon.
+- The top bar shows no hover text. Dock names remain.
+- On the TV, only real data is shown: Search lists the installed apps (titles and prices come from Search with Google TV), the backlight reads "Not chosen yet" until you pick one, and volume is the TV's real volume.

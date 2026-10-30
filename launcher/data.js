@@ -21,14 +21,14 @@ const LAUNCHER_DATA = {
   // the device supplies the real icon.
   apps: [
     { id: 'youtube', name: 'YouTube', color: '#ff3b3b', logo: 'youtube', pinned: true },
-    { id: 'iplayer', name: 'BBC iPlayer', short: 'iPlayer', color: '#ff4fa3', mark: 'iP', pinned: true },
+    { id: 'iplayer', name: 'BBC iPlayer', short: 'iPlayer', color: '#ff4fa3', glyph: 'iplayer', mark: 'iP', pinned: true },
     { id: 'itvx', name: 'ITVX', color: '#e6c341', logo: 'itvx', pinned: true },
     { id: 'c4', name: 'Channel 4', color: '#47c98f', logo: 'channel4', pinned: true },
-    { id: 'my5', name: 'My5', color: '#4f8fff', mark: '5', pinned: true },
+    { id: 'my5', name: 'My5', color: '#4f8fff', glyph: 'my5', mark: '5', pinned: true },
     { id: 'prime', name: 'Prime Video', color: '#38b6f0', logo: 'primevideo', pinned: true },
     { id: 'ytmusic', name: 'YouTube Music', short: 'YT Music', color: '#ff5a5a', logo: 'youtubemusic', pinned: true },
     { id: 'playstore', name: 'Google Play Store', short: 'Play Store', color: '#5bb974', logo: 'googleplay' },
-    { id: 'playmovies', name: 'Google TV', color: '#8ab4f8', mark: 'TV' },
+    { id: 'playmovies', name: 'Google TV', color: '#8ab4f8', glyph: 'googletv', mark: 'TV' },
   ],
 
   music: {

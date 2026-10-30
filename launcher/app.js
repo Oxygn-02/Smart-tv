@@ -36,11 +36,11 @@
     games: { ...D.games },
     matchLights: false, // wallpaper gradient follows the backlight colours
     home: {
-      backlight: D.smartHome.backlights.start, // scene id, 'sync' or 'off'
-      lastScene: D.smartHome.backlights.start, // colours used while syncing or off
+      backlight: NATIVE ? 'none' : D.smartHome.backlights.start, // scene id, 'none' (not chosen yet), 'sync' or 'off'
+      lastScene: NATIVE ? 'none' : D.smartHome.backlights.start, // colours used while syncing or off
       scene: null, // room scene last applied
       lights: Object.fromEntries(D.smartHome.lights.map((l) => [l.id, l.on])),
-      sound: { on: true, volume: D.smartHome.soundbar.volume, muted: false },
+      sound: { on: true, volume: D.smartHome.soundbar.volume, max: D.smartHome.soundbar.volumeMax, muted: false },
     },
   };
 
@@ -49,6 +49,7 @@
 
   const H = D.smartHome;
   const BACKLIGHT = Object.fromEntries(H.backlights.scenes.map((s) => [s.id, s]));
+  BACKLIGHT.none = { id: 'none', name: 'Not chosen yet', colors: ['#8e8e9a', '#6b6b78', '#4a4a55'] };
   const ROOM_SCENE = Object.fromEntries(H.scenes.map((s) => [s.id, s]));
 
   const pad = (n) => String(n).padStart(2, '0');
@@ -250,10 +251,16 @@
         <label class="search-bar glass">
           <span class="lg chip" style="width:40px;height:40px;border-radius:50%">${icon('search', 18)}</span>
           <input id="search-input" data-focus type="search" autocomplete="off" spellcheck="false"
-            placeholder="Search shows and films (press OK to type)" aria-label="Search">
+            placeholder="${NATIVE ? 'Search apps on this TV (press OK to type)' : 'Search shows and films (press OK to type)'}" aria-label="Search">
           <span class="small" data-search-count></span>
           <button class="btn lg google-search" data-focus data-action="google-search">Search with Google TV</button>
         </label>
+        ${NATIVE ? `
+        <div class="search-section">
+          <div class="eyebrow" data-apps-head>Apps on this TV</div>
+          <div class="shows" data-shows="apps"></div>
+          <p class="small search-hint">For shows and films, where to watch and prices, use Search with Google TV.</p>
+        </div>` : `
         <div class="search-section">
           <div class="eyebrow">Free on your apps</div>
           <div class="shows" data-shows="free"></div>
@@ -261,7 +268,7 @@
         <div class="search-section">
           <div class="eyebrow">Rent or buy</div>
           <div class="shows" data-shows="paid"></div>
-        </div>
+        </div>`}
       </section>`;
   }
 
@@ -1020,13 +1027,13 @@
         </div>
         <nav class="tabbar glass" aria-label="Main">
           ${D.nav.map((n) => `
-            <button class="tab" data-focus data-nav="${n.id}" data-tip="${n.label}" aria-label="${n.label}">${icon(n.id, 22)}</button>`).join('')}
+            <button class="tab" data-focus data-nav="${n.id}" aria-label="${n.label}">${icon(n.id, 22)}</button>`).join('')}
         </nav>
         <div class="tools">
           <span class="status-wifi" title="Wi-Fi connected">${icon('wifi', 18)}</span>
-          <button class="tool" data-focus data-action="match-lights" data-tip="Match lights" aria-label="Match wallpaper to backlights">${icon('drop', 20)}</button>
-          <button class="tool" data-focus data-action="customize" data-tip="Customize" aria-label="Customize">${icon('sun', 20)}</button>
-          <button class="tool" data-focus data-nav="settings" data-tip="Settings" aria-label="Settings">${icon('gear', 20)}</button>
+          <button class="tool" data-focus data-action="match-lights" aria-label="Match wallpaper to backlights">${icon('drop', 20)}</button>
+          <button class="tool" data-focus data-action="customize" aria-label="Customize">${icon('sun', 20)}</button>
+          <button class="tool" data-focus data-nav="settings" aria-label="Settings">${icon('gear', 20)}</button>
         </div>
       </header>
 
@@ -1218,9 +1225,9 @@
       : h.backlight === 'off' ? 'Off' : BACKLIGHT[h.backlight].name;
 
     const sb = h.sound;
-    stage.querySelector('[data-vol-fill]').style.width = `${sb.muted ? 0 : (sb.volume / H.soundbar.volumeMax) * 100}%`;
+    stage.querySelector('[data-vol-fill]').style.width = `${sb.muted ? 0 : (sb.volume / sb.max) * 100}%`;
     stage.querySelector('[data-vol]').textContent = sb.muted ? 'Muted' : sb.volume;
-    stage.querySelector('[data-sound-status]').textContent = sb.on ? 'On' : 'Standby';
+    stage.querySelector('[data-sound-status]').textContent = (NATIVE ? 'Follows the TV volume' : sb.on ? 'On' : 'Standby');
     stage.querySelector('.soundbar').classList.toggle('standby', !sb.on);
   }
 
@@ -1296,8 +1303,19 @@
     renderTrack();
   }
 
+  // On the TV, only real things are listed: the apps installed. Titles and
+  // prices come from Google TV's own search.
+  function renderTvSearch(q) {
+    const list = D.apps.filter((a) => !q || a.name.toLowerCase().includes(q));
+    const el = stage.querySelector('[data-shows="apps"]');
+    el.innerHTML = list.slice(0, 10).map((a) => appTile(a, 'app-card glass', 68)).join('');
+    if (!list.length) el.innerHTML = `<div class="empty small">No app called “${state.query.trim()}”. Try Search with Google TV.</div>`;
+    stage.querySelector('[data-search-count]').textContent = q ? `${list.length} app${list.length === 1 ? '' : 's'}` : '';
+  }
+
   function renderSearch() {
     const q = state.query.trim().toLowerCase();
+    if (NATIVE) return renderTvSearch(q);
     const results = D.catalogue.filter((s) => APP[s.app] && (!q
       || s.title.toLowerCase().includes(q)
       || s.meta.toLowerCase().includes(q)
@@ -1548,11 +1566,13 @@
       // TV volume; over HDMI ARC the TV passes it on to the soundbar.
       const sb = state.home.sound;
       sb.muted = false;
-      sb.volume = Math.max(0, Math.min(H.soundbar.volumeMax, sb.volume + (act === 'vol-up' ? 1 : -1)));
+      sb.volume = Math.max(0, Math.min(sb.max, sb.volume + (act === 'vol-up' ? 1 : -1)));
       nativeCall('volume', act === 'vol-up' ? 1 : -1);
+      setTimeout(syncVolume, 250);
     } else if (act === 'mute') {
       state.home.sound.muted = !state.home.sound.muted;
       nativeCall('toggleMute');
+      setTimeout(syncVolume, 250);
     }
     else if (NATIVE && state.live && ['play', 'prev', 'next'].includes(act)) {
       nativeCall('media', act === 'play' ? (state.playing ? 'pause' : 'play') : act);
@@ -1875,8 +1895,17 @@
     stage.querySelector('.dock-app')?.focus();
   };
   // Back from an app or a settings screen: refresh what's playing and access.
+  // The TV's real volume (HDMI ARC passes it to the soundbar).
+  function syncVolume() {
+    const v = nativeJson('volumeInfo');
+    if (!v) return;
+    Object.assign(state.home.sound, { volume: v.level, max: v.max || 1, muted: !!v.muted });
+    applyState();
+  }
+
   window.launcherResume = () => {
     if (!NATIVE) return;
+    syncVolume();
     pollNowPlaying();
     refreshNativeStatus();
     if (state.view === 'cleanup') renderCleanup(); // back from the TV's Settings
@@ -1896,6 +1925,11 @@
   fit(); // first, so nothing below can leave the screen unscaled
   state.weather = NATIVE ? null : { ...D.weather, label: D.weather.condition, temp: D.weather.tempC };
   build();
+  ensureGlyphs();
+  let glyphTimer = 0;
+  new MutationObserver(() => {
+    if (!glyphTimer) glyphTimer = requestAnimationFrame(() => { glyphTimer = 0; ensureGlyphs(); });
+  }).observe(document.getElementById('stage'), { childList: true, subtree: true });
   if (NATIVE || state.town) {
     setTimeout(loadWeather, 1200); // after the first screen is up
     setInterval(loadWeather, 30 * 60 * 1000);
@@ -1905,6 +1939,7 @@
   stage.querySelector('.dock-app').focus();
   if (NATIVE) {
     try {
+      syncVolume();
       pollNowPlaying();
       applyGovee(nativeJson('goveeStatus'));
       nativeCall('goveeConnect', ''); // reads the saved key; the answer arrives as an event

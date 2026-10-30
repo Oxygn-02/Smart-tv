@@ -267,6 +267,15 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         audio?.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
     }
 
+    /** The TV's real music volume, as JSON {level, max, muted}. */
+    @JavascriptInterface
+    fun volumeInfo(): String {
+        val a = audio ?: return "{}"
+        val muted = a.isStreamMute(AudioManager.STREAM_MUSIC)
+        return JSONObject().put("level", a.getStreamVolume(AudioManager.STREAM_MUSIC))
+            .put("max", a.getStreamMaxVolume(AudioManager.STREAM_MUSIC)).put("muted", muted).toString()
+    }
+
     @JavascriptInterface
     fun toggleMute() {
         audio?.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, AudioManager.FLAG_SHOW_UI)
