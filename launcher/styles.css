@@ -369,25 +369,28 @@ button {
   min-width: 0;
 }
 
+/* Album art on the right at full card height; text and controls on the left */
 .now-playing {
   height: 262px;
   padding: 22px;
+  display: flex;
+  gap: 20px;
+}
+
+.np-left {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
 }
 
-.np-body {
-  display: flex;
-  gap: 20px;
-  align-items: center;
-}
-
 .np-art {
-  width: 112px;
-  height: 112px;
+  width: 184px;
+  height: 184px;
   flex: none;
-  border-radius: 16px;
+  align-self: center;
+  border-radius: 18px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   transition: background 0.4s;
 }
@@ -397,6 +400,12 @@ button {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+}
+
+.np-meta > * {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .np-title {
@@ -414,6 +423,7 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
 }
 
 .transport {

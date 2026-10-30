@@ -57,15 +57,15 @@
           <div class="col">
             <section class="card glass now-playing tinted" data-np-card aria-label="Now playing">
               <div class="tint"></div>
-              <div class="eyebrow">${icon('playCircle', 14)}<span>Now playing · ${D.music.source}</span></div>
-              <div class="np-body">
-                <div class="np-art" data-np-art></div>
+              <div class="np-left">
+                <div class="eyebrow">${icon('playCircle', 14)}<span>${D.music.source}</span></div>
                 <div class="np-meta">
                   <div class="np-title" data-np-title></div>
                   <div class="sub" data-np-artist></div>
                 </div>
+                ${nowPlayingControls()}
               </div>
-              ${nowPlayingControls()}
+              <div class="np-art" data-np-art></div>
             </section>
 
             <section class="card glass weather tinted" data-weather-card aria-label="Weather">
