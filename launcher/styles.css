@@ -2437,8 +2437,10 @@ button.w-empty {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  /* One cheap gradient: clear in the middle, the light colour at the edges */
-  background: radial-gradient(ellipse 78% 82% at 50% 50%, transparent 58%, var(--glow-a) 135%);
+  /* A soft, thin glow that hugs the screen edges and corners (a rectangle,
+     not an oval), painted once. */
+  background: none;
+  box-shadow: inset 0 0 28px 2px var(--glow-a), inset 0 0 90px -6px var(--glow-a);
   transition: opacity 0.9s;
   animation: lights-on 2.4s var(--ease-out) 0.3s backwards;
 }
@@ -3392,4 +3394,239 @@ button.w-empty {
 .cleanup-note {
   padding: 4px 6px 12px;
   color: var(--sub);
+}
+
+/* ---------- Room: backlight strip on top, lights in two columns ---------- */
+.room-grid {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+}
+
+.room-card {
+  padding: 18px 22px;
+  gap: 12px;
+}
+
+.swatches {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.swatch {
+  padding: 2px 0;
+  gap: 6px;
+}
+
+.swatch-dot {
+  width: 44px;
+  height: 44px;
+  border-radius: 15px;
+}
+
+.room-head .btn {
+  flex: none;
+  height: 38px;
+  font-size: 14px;
+}
+
+.light-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(var(--rows, 5), 40px);
+  grid-auto-flow: column;
+  column-gap: 18px;
+  row-gap: 0;
+}
+
+.light-row {
+  height: 40px;
+  min-width: 0;
+}
+
+.light-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.light-cta {
+  grid-column: 1 / -1;
+}
+
+/* Soundbar volume lives on the Music tab */
+.view-music .soundbar {
+  padding: 14px 24px;
+  gap: 0;
+}
+
+/* A slow drift of colour behind everything, in the room's light colour.
+   Two soft gradients moving by transform only, so it costs next to nothing. */
+.aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.5;
+  transition: opacity 1.2s;
+}
+
+#stage.lights .aurora {
+  opacity: 0.9;
+}
+
+.aurora i {
+  position: absolute;
+  width: 70%;
+  height: 90%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--lw0, var(--glow-a)), transparent);
+  will-change: transform;
+}
+
+.aurora i:first-child {
+  left: -15%;
+  top: -25%;
+  animation: drift-a 38s ease-in-out infinite alternate;
+}
+
+.aurora i:last-child {
+  right: -15%;
+  bottom: -35%;
+  background: radial-gradient(closest-side, var(--lw1, var(--glow-a)), transparent);
+  animation: drift-b 46s ease-in-out infinite alternate;
+}
+
+@keyframes drift-a {
+  to { transform: translate(55%, 30%) scale(1.15); }
+}
+
+@keyframes drift-b {
+  to { transform: translate(-60%, -25%) scale(1.2); }
+}
+
+#stage.light .aurora { opacity: 0.25; }
+
+
+/* ---------- Apps scroll inside their own panel ----------
+   The page itself never scrolls, so the glow and wallpaper layers stay put. */
+.view-apps {
+  inset: -10px;
+  padding: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.view-apps::-webkit-scrollbar {
+  display: none;
+}
+
+.view-apps {
+  -webkit-mask-image: linear-gradient(transparent, #000 22px, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(transparent, #000 22px, #000 calc(100% - 22px), transparent);
+}
+
+/* ---------- Ambient screen ---------- */
+.ambient {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: #000;
+  overflow: hidden;
+  animation: fade-in 1.2s var(--ease-out);
+}
+
+.ambient .amb-a,
+.ambient .amb-b {
+  position: absolute;
+  inset: -4%;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 3s ease;
+  animation: amb-pan 50s ease-in-out infinite alternate;
+}
+
+.ambient .on {
+  opacity: 0.85;
+}
+
+@keyframes amb-pan {
+  to { transform: scale(1.08) translate(-1.5%, -1%); }
+}
+
+.amb-info {
+  position: absolute;
+  left: 64px;
+  bottom: 56px;
+  text-align: left;
+  color: #fff;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.6);
+}
+
+.amb-clock {
+  font-size: 96px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.amb-sub {
+  margin-top: 8px;
+  font-size: 22px;
+  opacity: 0.85;
+}
+
+/* ---------- Guest Wi-Fi ---------- */
+.guest {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+  height: 100%;
+  padding: 32px;
+}
+
+.guest .qr {
+  width: 360px;
+  height: 360px;
+  flex: none;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.guest .qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.guest-text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 340px;
+  text-align: left;
+}
+
+.view-roles .cleanup,
+.view-guest .guest {
+  max-height: 100%;
+  overflow: auto;
+}
+
+.pillbtn[data-action="sleep"] {
+  margin-left: auto;
+}
+
+/* Settings now holds nine rows a side: a little tighter so all fit */
+.settings .set-row {
+  height: 56px;
+}
+
+.settings .set-col {
+  gap: 0;
 }

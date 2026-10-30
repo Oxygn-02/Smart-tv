@@ -167,9 +167,10 @@ const LAUNCHER_DATA = {
     // One-press room scenes: what every room light does, and the backlight scene.
     scenes: [
       { id: 'movie', name: 'Movie', lights: { on: false }, backlight: 'ocean' },
-      { id: 'gaming', name: 'Gaming', lights: { on: true, brightness: 25, kelvin: 3000 }, backlight: 'neon' },
+      { id: 'gaming', name: 'Gaming', lights: { on: true, brightness: 25, kelvin: 3000, ceiling: false }, backlight: 'sync' },
       { id: 'relax', name: 'Relax', lights: { on: true, brightness: 55, kelvin: 2400 }, backlight: 'ember' },
       { id: 'bright', name: 'Bright', lights: { on: true, brightness: 100, kelvin: 4000 }, backlight: 'warm' },
+      { id: 'night', name: 'Good night', lights: { on: false }, backlight: 'off' },
       { id: 'off', name: 'All off', lights: { on: false }, backlight: 'off' },
     ],
     soundbar: {

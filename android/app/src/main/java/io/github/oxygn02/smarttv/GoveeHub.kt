@@ -57,6 +57,23 @@ class GoveeHub(context: Context, private val publish: (String) -> Unit) {
         }
     }
 
+    @Volatile var sleepAt = 0L
+    private var sleeper: java.util.concurrent.ScheduledFuture<*>? = null
+    private val clock = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
+
+    /** Every light off after [minutes] (0 cancels). */
+    fun sleepIn(minutes: Int) {
+        sleeper?.cancel(false)
+        sleeper = null
+        sleepAt = 0
+        if (minutes <= 0) return
+        sleepAt = System.currentTimeMillis() + minutes * 60_000L
+        sleeper = clock.schedule({
+            sleepAt = 0
+            devices.filter { it.isLight && it.has("powerSwitch") }.forEach { power(it.id, false) }
+        }, minutes.toLong(), java.util.concurrent.TimeUnit.MINUTES)
+    }
+
     fun forgetKey() {
         prefs.edit().remove("key").apply()
         devices = emptyList()
@@ -79,7 +96,8 @@ class GoveeHub(context: Context, private val publish: (String) -> Unit) {
                     .put("color", d.has("colorRgb"))
                     .put("white", d.has("colorTemperatureK"))
                     .put("brightness", d.has("brightness"))
-                    .put("dream", d.dreamViewInstance != null),
+                    .put("dream", d.dreamViewInstance != null)
+                    .put("lan", lan.ipFor(d.id) != null),
             )
         }
         val json = JSONObject()
@@ -139,6 +157,22 @@ class GoveeHub(context: Context, private val publish: (String) -> Unit) {
         isOn[id] = true
     }
 
+    /**
+     * Reads what a light is doing now (so a change made in the Govee app shows
+     * up here). The answer arrives as a "govee" event: {live:{id,on,rgb,...}}.
+     */
+    fun readLive(id: String) {
+        io.execute {
+            try {
+                val live = cloud.state(find(id)).put("id", id)
+                if (live.has("on")) isOn[id] = live.optBoolean("on")
+                publish(JSONObject().put("live", live).toString())
+            } catch (_: Exception) {
+                // Offline or rate-limited: try again next time.
+            }
+        }
+    }
+
     /** DreamView: the backlight follows the picture (its camera). */
     fun dreamView(id: String, enable: Boolean) = run {
         val d = find(id)
@@ -148,7 +182,11 @@ class GoveeHub(context: Context, private val publish: (String) -> Unit) {
         dreamOn[id] = enable
     }
 
-    fun close() = io.shutdownNow()
+    fun close() {
+        sleeper?.cancel(false)
+        clock.shutdownNow()
+        io.shutdownNow()
+    }
 
     // ---------- internals ----------
 

@@ -52,6 +52,15 @@
     </section>
 
     <section>
+      <h2>Guest Wi-Fi</h2>
+      <p class="help">Shown on the TV as a QR code that guests scan to join. The password stays on the TV and is only in the code.</p>
+      <input id="ssid" type="text" autocomplete="off" placeholder="Network name">
+      <input id="wpass" type="text" autocomplete="off" placeholder="Password (leave empty for an open network)">
+      <button id="saveWifi">Save</button>
+      <div class="status" id="wifiStatus"></div>
+    </section>
+
+    <section>
       <h2>Weather town</h2>
       <p class="help">Leave this empty to use the TV's own location.</p>
       <input id="town" type="text" autocomplete="off" placeholder="For example Cardiff">
@@ -95,6 +104,7 @@
     $('goveeState').textContent = s.govee.connected ? `Connected. ${s.govee.devices.length} lights found.`
       : s.govee.hasKey ? (s.govee.error || 'Connecting...') : 'Not connected.';
     $('town').value = s.town || '';
+    if (s.wifi) $('ssid').value = s.wifi;
     $('packages').href = '/packages.txt?pin=' + encodeURIComponent(pin);
     $('photoList').innerHTML = s.wallpapers.map((w) => `<li><img src="${w.url}" alt=""><span>${w.name}</span><button class="quiet" data-name="${w.name}">Remove</button></li>`).join('');
   }
@@ -113,6 +123,15 @@
       say('keyStatus', 'Saved. The TV is checking with Govee.', true);
       setTimeout(refresh, 3500);
     } catch (e) { say('keyStatus', e.message); }
+  };
+
+  $('saveWifi').onclick = async () => {
+    try {
+      const open = !$('wpass').value;
+      await api('/api/wifi', { ssid: $('ssid').value, password: $('wpass').value, security: open ? 'nopass' : 'WPA' });
+      $('wpass').value = '';
+      say('wifiStatus', 'Saved. Open Guest Wi-Fi on the TV.', true);
+    } catch (e) { say('wifiStatus', e.message); }
   };
 
   $('saveTown').onclick = async () => {
