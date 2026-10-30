@@ -377,7 +377,10 @@
           ${row('toggle-auto', icon('games'), 'Switch input when Games opens', 'Turn off to stay on the launcher', 'auto')}
           ${row('cycle-countdown', icon('timer'), 'Switch countdown', 'Time to cancel before switching', 'countdown')}
           ${row('wifi', icon('wifi'), 'Wi-Fi', 'Opens Android network settings', 'wifi')}
-          ${row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to preview empty widgets', 'sample')}
+          ${NATIVE ? `
+            ${row('grant-np', icon('music'), 'Now playing access', 'Lets Home show what is playing', 'np-access')}
+            ${row('grant-usage', icon('apps'), 'Recent apps access', 'Lets Home show the apps you used last', 'usage-access')}`
+          : row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to preview empty widgets', 'sample')}
         </section>
       </section>`;
   }
@@ -582,6 +585,7 @@
     });
     all('[data-view]').forEach((v) => { v.hidden = v.dataset.view !== state.view; });
 
+    const access = (NATIVE && nativeJson('access')) || {};
     const values = {
       theme: { auto: `Auto (${dark ? 'dark' : 'light'})`, light: 'Light', dark: 'Dark' }[state.appearance],
       wallpaper: { lights: 'Matches lights', photo: 'Photo', gradient: 'Gradient' }[wp],
@@ -591,6 +595,8 @@
       wifi: 'Connected',
       match: state.matchLights ? 'On' : 'Off',
       sample: state.sampleData ? 'On' : 'Off',
+      'np-access': access.nowPlaying ? 'Allowed' : 'Off. Press OK to allow',
+      'usage-access': access.recentApps ? 'Allowed' : 'Off. Press OK to allow',
     };
     all('[data-val]').forEach((el) => { el.textContent = values[el.dataset.val]; });
     all('[data-town]').forEach((el) => { el.textContent = state.town || 'Set your town in Settings'; });
@@ -890,6 +896,8 @@
     else if (act === 'theme') state.appearance = { auto: 'light', light: 'dark', dark: 'auto' }[state.appearance];
     else if (act === 'customize') openSheet();
     else if (act === 'toggle-sample') state.sampleData = !state.sampleData;
+    else if (act === 'grant-np') nativeCall('openSettings', 'notification-access');
+    else if (act === 'grant-usage') nativeCall('openSettings', 'usage-access');
     else if (act === 'close-sheet') closeSheet();
     else if (act === 'icon-style') state.iconStyle = b.dataset.id;
     else if (act === 'appearance') state.appearance = b.dataset.id;
@@ -1156,7 +1164,12 @@
     openView('home');
     stage.querySelector('.dock-app')?.focus();
   };
-  window.launcherResume = () => { if (NATIVE) pollNowPlaying(); };
+  // Back from an app or a settings screen: refresh what's playing and access.
+  window.launcherResume = () => {
+    if (!NATIVE) return;
+    pollNowPlaying();
+    applyState();
+  };
 
   build();
   if (NATIVE) pollNowPlaying();
