@@ -231,7 +231,7 @@ input {
 .info,
 .queue-row,
 .set-row {
-  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+  transition: transform 0.5s var(--gentle, ease-out), box-shadow 0.3s, background 0.3s;
 }
 
 .mini:focus-visible,
@@ -240,7 +240,7 @@ input {
 .channel:focus-visible,
 .app-card:focus-visible,
 .info:focus-visible {
-  transform: scale(1.03);
+  transform: scale(1.015);
   outline-offset: 2px;
 }
 
@@ -293,13 +293,24 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: transparent;
   color: var(--sub);
   transition: color 0.2s, background 0.2s;
 }
 
 .ib.on {
-  background: linear-gradient(165deg, var(--lg-on-top), var(--lg-on-bottom));
   color: var(--ink);
+}
+
+/* Sidebar focus: no ring, the icon brightens, glows softly and grows */
+.ib:focus-visible {
+  outline: none;
+  color: var(--ink);
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35));
+}
+
+#stage.light .ib:focus-visible {
+  filter: drop-shadow(0 0 6px rgba(21, 21, 29, 0.25));
 }
 
 .div {
@@ -647,7 +658,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  transition: box-shadow 0.2s, transform 0.2s;
+  transition: box-shadow 0.4s, transform 0.5s var(--gentle, ease-out);
 }
 
 /* Focused app: thin ring and soft glow in the app's brand colour */
@@ -659,7 +670,7 @@ button {
 }
 
 .app:focus-visible {
-  transform: scale(1.04);
+  transform: scale(1.02);
 }
 
 .app-name {
@@ -1336,7 +1347,7 @@ button.info {
   --lg-rim: rgba(255, 255, 255, 0.2);
   --lg-drop: rgba(0, 0, 0, 0.25);
   --lg-sheen: rgba(255, 255, 255, 0.3);
-  transition: --t0 0.9s, --t1 0.9s, --t2 0.9s, transform 0.2s;
+  transition: --t0 0.9s, --t1 0.9s, --t2 0.9s, transform 0.5s var(--gentle);
 }
 
 .tinted > :not(.tint) {
@@ -1377,6 +1388,7 @@ button.info {
 
 #stage {
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --gentle: cubic-bezier(0.25, 0.8, 0.3, 1);
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -1385,18 +1397,18 @@ button.info {
 .ctrl,
 .play,
 .chip {
-  transition: transform 0.28s var(--spring), color 0.2s, background 0.2s, box-shadow 0.2s;
+  transition: transform 0.5s var(--gentle), color 0.3s, background 0.3s, box-shadow 0.3s, filter 0.3s;
 }
 
 .ib:is(:focus-visible, :hover),
 .ctrl:is(:focus-visible, :hover),
 .play:is(:focus-visible, :hover) {
-  transform: scale(1.14);
+  transform: scale(1.06);
 }
 
 /* App icons and setting icons grow inside their tile or row */
 :is(.app, .app-card, .info, .set-row, .channel):is(:focus-visible, :hover, :focus-within) .chip {
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 /* Page transitions: a view's cards rise and fade in, one after another */

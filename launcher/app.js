@@ -335,12 +335,12 @@
 
       <nav class="pill glass" aria-label="Main">
         ${D.nav.map((n) => `
-          <button class="ib lg" data-focus data-nav="${n.id}" aria-label="${n.label}">${icon(n.id)}</button>`).join('')}
+          <button class="ib" data-focus data-nav="${n.id}" aria-label="${n.label}">${icon(n.id)}</button>`).join('')}
         <div class="div"></div>
-        <button class="ib lg" data-focus data-action="wifi" aria-label="Wi-Fi">${icon('wifi')}</button>
-        <button class="ib lg" data-focus data-action="theme" data-theme-icon></button>
-        <button class="ib lg" data-focus data-action="wallpaper"></button>
-        <button class="ib lg" data-focus data-nav="settings" aria-label="Settings">${icon('gear')}</button>
+        <button class="ib" data-focus data-action="wifi" aria-label="Wi-Fi">${icon('wifi')}</button>
+        <button class="ib" data-focus data-action="theme" data-theme-icon></button>
+        <button class="ib" data-focus data-action="wallpaper"></button>
+        <button class="ib" data-focus data-nav="settings" aria-label="Settings">${icon('gear')}</button>
       </nav>
 
       <header class="header">
