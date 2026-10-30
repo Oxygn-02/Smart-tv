@@ -47,10 +47,14 @@ if (NATIVE) {
       }
     });
   }
-  D.apps = D.apps.filter((a) => a.pkg);
-  installed.filter((i) => !used.has(i.pkg)).forEach((i) => {
-    D.apps.push({ id: i.pkg, pkg: i.pkg, name: i.label, color: '#8e8e9a', mark: i.label.slice(0, 1), iconUrl: i.icon });
-  });
+  // If the TV reports no apps at all (something failed), keep the sample dock
+  // rather than showing nothing.
+  if (installed.length) {
+    D.apps = D.apps.filter((a) => a.pkg);
+    installed.filter((i) => !used.has(i.pkg)).forEach((i) => {
+      D.apps.push({ id: i.pkg, pkg: i.pkg, name: i.label, color: '#8e8e9a', mark: i.label.slice(0, 1), iconUrl: i.icon });
+    });
+  }
 
   // Continue watching can't read other apps' Watch Next rows, so Home shows
   // the most recently used apps instead.

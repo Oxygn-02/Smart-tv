@@ -17,13 +17,22 @@
     sampleData: true, // off = preview the empty states real data may need
     live: false, // on the TV: a media session is playing
     wallpaper: D.wallpapers.length ? 'photo' : 'gradient', // 'gradient' | 'photo'
-    photoIndex: 0,
+    wallpaperName: D.wallpapers[0]?.name || null, // which photo
+    glow: null, // colour of the edge glow and focus ring; null = the room light
+    govee: { hasKey: false, connected: false, devices: [], error: '' }, // from the Android side
+    homeDefault: false, // this launcher is the TV's home app
+    setupOpen: false,
+    // Tinted icons (Customize): colour from the room light or a hue of your own,
+    // warmth 0 (cool) to 100 (warm), opacity 10 to 100.
+    tint: { source: 'room', hue: 200, warmth: 50, opacity: 60 },
     view: 'home',
     playing: true,
     track: 0,
     pos: D.music.startPositionSec,
     query: '',
-    town: D.weather.town,
+    town: '', // weather town set by the user; empty = use the TV's location
+    weather: null, // {town, temp, high, low, label, icon, palette}; sample in the preview
+    weatherNote: 'loading', // 'loading' | 'permission' | 'offline' | 'notfound' | ''
     games: { ...D.games },
     matchLights: false, // wallpaper gradient follows the backlight colours
     home: {
@@ -43,6 +52,68 @@
   const ROOM_SCENE = Object.fromEntries(H.scenes.map((s) => [s.id, s]));
 
   const pad = (n) => String(n).padStart(2, '0');
+
+  // ---------- Saved settings ----------
+  // Remembered on the TV between launches (browser storage inside the app).
+  const SAVED = ['appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
+
+  function loadSaved() {
+    try {
+      const o = JSON.parse(localStorage.getItem('settings') || '{}');
+      SAVED.forEach((k) => { if (o[k] !== undefined) state[k] = o[k]; });
+      if (o.games) Object.assign(state.games, o.games);
+    } catch {
+      // Nothing saved yet, or storage is unavailable.
+    }
+    if (!D.wallpapers.some((w) => w.name === state.wallpaperName)) state.wallpaperName = D.wallpapers[0]?.name || null;
+    if (state.wallpaper === 'photo' && !state.wallpaperName) state.wallpaper = 'gradient';
+  }
+
+  let saveTimer;
+  function saveSoon() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try {
+        const o = Object.fromEntries(SAVED.map((k) => [k, state[k]]));
+        o.games = { hdmiPort: state.games.hdmiPort, autoSwitch: state.games.autoSwitch, countdownSec: state.games.countdownSec };
+        localStorage.setItem('settings', JSON.stringify(o));
+      } catch {
+        // Not saved; it just won't be remembered.
+      }
+    }, 300);
+  }
+
+  // ---------- Colours ----------
+  // Everything derived from the light colour, the theme or the tint sliders is
+  // worked out here and handed to the CSS as plain values (see color.js).
+  function applyColors() {
+    const dark = state.theme === 'dark';
+    const [c0, c1, c2] = BACKLIGHT[state.home.lastScene].colors;
+    const glow = state.glow || c0;
+    const set = (k, v) => stage.style.setProperty(k, v);
+
+    set('--glowc', glow);
+    set('--glow-a', withAlpha(glow, dark ? 0.8 : 0.55));
+    set('--focus', dark ? mixHex(glow, '#ffffff', 0.45) : mixHex(glow, '#15151d', 0.55));
+    set('--focus-glow', withAlpha(glow, dark ? 0.5 : 0.35));
+
+    // Wallpaper that follows the lights
+    [c0, c1, c2].forEach((c, i) => {
+      set(`--lw${i}`, dark ? withAlpha(c, [0.42, 0.38, 0.4][i]) : mixHex(c, '#ffffff', [0.45, 0.4, 0.4][i]));
+    });
+
+    // Tinted icons
+    const t = state.tint;
+    let base = t.source === 'room' ? c0 : hslToHex(t.hue, 0.7, 0.58);
+    const w = (t.warmth - 50) / 50;
+    if (w > 0) base = mixHex('#ffb35c', base, w * 0.55);
+    else if (w < 0) base = mixHex('#6fa8ff', base, -w * 0.55);
+    const a = t.opacity / 100;
+    set('--tint-bg1', withAlpha(mixHex(base, '#000000', 0.55), 0.22 + 0.6 * a));
+    set('--tint-bg2', withAlpha(mixHex(base, '#000000', 0.8), 0.18 + 0.55 * a));
+    set('--tint-glyph', !dark && a < 0.5 ? mixHex(base, '#000000', 0.5) : mixHex(base, '#ffffff', 0.65));
+    set('--tint-base', base);
+  }
   const fmt = (sec) => `${Math.floor(sec / 60)}:${pad(sec % 60)}`;
   const track = () => D.music.tracks[state.track];
   const appName = (id) => APP[id].short || APP[id].name;
@@ -83,34 +154,29 @@
             <div class="tint"></div>
             <button class="w-empty" data-focus data-nav-to="settings">
               ${icon('location', 28)}
-              <span class="w-empty-title">Add your town</span>
-              <span class="small">Set it in Settings to see the weather</span>
+              <span class="w-empty-title" data-w-empty-title></span>
+              <span class="small" data-w-empty-text></span>
             </button>
             <div class="w-weather-top">
-              <span class="w-label" data-town></span>
-              <svg class="w-weather-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${WEATHER_ICON}</svg>
+              <span class="w-label" data-w-town></span>
+              <span class="w-weather-icon" data-w-icon></span>
             </div>
-            <div class="temp">${w.tempC}°</div>
+            <div class="temp" data-w-temp></div>
             <div class="w-weather-foot">
-              <span>${w.condition}</span>
-              <span class="small">High ${w.high}°, low ${w.low}°</span>
+              <span data-w-label></span>
+              <span class="small" data-w-range></span>
             </div>
           </section>
 
           <section class="widget glass now-playing tinted w-music" data-np-card aria-label="Now playing">
             <div class="tint"></div>
-            <div class="w-empty">
-              ${icon('music', 34)}
-              <span class="w-empty-title">Nothing playing</span>
-              <span class="small">Music you play in YouTube Music shows up here</span>
-              <button class="btn lg" data-focus data-app="ytmusic">Open YouTube Music</button>
-            </div>
+            ${npEmpty()}
             <div class="np-top">
               <div class="np-meta">
                 <div class="np-title" data-np-title></div>
                 <div class="sub" data-np-artist></div>
               </div>
-              <div class="np-art" data-np-art><span class="art-app">${APP.ytmusic ? appIcon(APP.ytmusic, 34) : ''}</span></div>
+              <div class="np-art" data-np-art><span class="art-app" data-np-src-icon="34"></span></div>
             </div>
             <div class="np-next">
               <div class="np-next-label">Up next</div>
@@ -218,15 +284,32 @@
       </button>`;
   }
 
+  // Shown instead of the Now playing card when nothing is playing, or when
+  // the launcher hasn't been allowed to see what's playing yet.
+  function npEmpty() {
+    return `
+      <div class="w-empty">
+        ${icon('music', 34)}
+        <span class="w-empty-title" data-np-empty-title>Nothing playing</span>
+        <span class="small" data-np-empty-text></span>
+        <button class="btn lg" data-focus data-action="grant-np" data-np-allow hidden>Allow access</button>
+        <button class="btn lg" data-focus data-app="ytmusic" data-np-open hidden>Open YouTube Music</button>
+      </div>`;
+  }
+
   function musicView() {
     return `
       <section class="view view-music" data-view="music" hidden>
+        <section class="card glass music-empty-card tinted" data-music-empty hidden>
+          <div class="tint"></div>
+          ${npEmpty()}
+        </section>
         <div class="music-grid">
           <section class="card glass music-now tinted" data-np-card aria-label="Now playing">
             <div class="tint"></div>
             <div class="music-art" data-np-art></div>
             <div class="music-meta">
-              <div class="music-source">${APP.ytmusic ? appIcon(APP.ytmusic, 30) : ''}<span>${D.music.source}</span></div>
+              <div class="music-source"><span data-np-src-icon="30"></span><span data-np-source></span></div>
               <div>
                 <div class="music-title" data-np-title></div>
                 <div class="sub" data-np-artist></div>
@@ -327,13 +410,7 @@
             <div class="pill-row">
               ${H.scenes.map((sc) => `<button class="pillbtn" data-focus data-action="room-scene" data-id="${sc.id}">${sc.name}</button>`).join('')}
             </div>
-            <div class="light-list">
-              ${H.lights.map((l) => `
-                <button class="light-row" data-focus data-action="light" data-id="${l.id}">
-                  <span class="light-dot"></span><span class="light-name">${l.name}</span>
-                  <span class="switch" aria-hidden="true"><span></span></span>
-                </button>`).join('')}
-            </div>
+            <div class="light-list" data-light-list></div>
           </section>
         </div>
 
@@ -368,22 +445,115 @@
     return `
       <section class="view view-settings" data-view="settings" hidden>
         <section class="card glass settings" aria-label="Settings">
-          <label class="set-row">
-            ${settingsRow(icon('location'), 'Weather location', 'Town for the weather card', '<input id="town-input" class="set-input" data-focus autocomplete="off" spellcheck="false">')}
-          </label>
-          ${row('theme', '<span data-theme-icon></span>', 'Appearance', 'Light, dark, or follow the TV', 'theme')}
-          ${row('wallpaper', icon('image'), 'Wallpaper', 'Your photos, the gradient, or your light colours', 'wallpaper')}
-          ${row('screen-fit', icon('live'), 'Screen size', 'Resize if the edges are cropped', 'fit')}
-          ${row('cycle-hdmi', icon('hdmi'), 'Games input', `Where the ${state.games.device} is plugged in`, 'hdmi')}
-          ${row('toggle-auto', icon('games'), 'Switch input when Games opens', 'Turn off to stay on the launcher', 'auto')}
-          ${row('cycle-countdown', icon('timer'), 'Switch countdown', 'Time to cancel before switching', 'countdown')}
-          ${row('wifi', icon('wifi'), 'Wi-Fi', 'Opens Android network settings', 'wifi')}
-          ${NATIVE ? `
-            ${row('grant-np', icon('music'), 'Now playing access', 'Lets Home show what is playing', 'np-access')}
-            ${row('grant-usage', icon('apps'), 'Recent apps access', 'Lets Home show the apps you used last', 'usage-access')}`
-          : row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to preview empty widgets', 'sample')}
+          <div class="set-col">
+            ${row('theme', '<span data-theme-icon></span>', 'Appearance', 'Light, dark, or follow the TV', 'theme')}
+            ${row('wallpaper', icon('image'), 'Wallpaper', 'Photo, gradient, or your light colours', 'wallpaper')}
+            ${row('open-wallpapers', icon('image'), 'Wallpaper photos', 'Choose one, or add your own', 'wp')}
+            ${row('screen-fit', icon('live'), 'Screen size', 'Resize if the edges are cropped', 'fit')}
+            <label class="set-row">
+              ${settingsRow(icon('location'), 'Weather town', 'Leave empty to use the TV location', '<input id="town-input" class="set-input" data-focus autocomplete="off" spellcheck="false" placeholder="TV location">')}
+            </label>
+            ${row('wifi', icon('wifi'), 'Wi-Fi', 'Opens the TV network settings', 'wifi')}
+            ${row('open-cleanup', icon('power'), 'Clean up apps', 'Switch off apps you don\'t want', 'cleanup')}
+          </div>
+          <div class="set-col">
+            ${row('open-setup', icon('phone'), 'Set up from your phone', 'Govee key, wallpapers, town', 'setup')}
+            ${row('open-setup', icon('lamp'), 'Govee account', 'Lights and backlight', 'govee')}
+            ${row('home-role', icon('home'), 'Home button', 'Which app opens on Home', 'home')}
+            ${row('cycle-hdmi', icon('hdmi'), 'Games input', `Where the ${state.games.device} is plugged in`, 'hdmi')}
+            ${row('toggle-auto', icon('games'), 'Switch input for Games', 'Turn off to stay here', 'auto')}
+            ${row('cycle-countdown', icon('timer'), 'Switch countdown', 'Time to cancel first', 'countdown')}
+            ${NATIVE ? `
+              ${row('grant-np', icon('music'), 'Now playing access', 'Show what is playing', 'np-access')}
+              ${row('grant-usage', icon('apps'), 'Recent apps access', 'Show the apps you used last', 'usage-access')}`
+            : row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to see empty widgets', 'sample')}
+          </div>
         </section>
       </section>`;
+  }
+
+  // Clean up apps: the apps agreed for switching off. Each row opens that
+  // app's page in the TV's Settings; the Disable button there is yours to press.
+  function cleanupView() {
+    return `
+      <section class="view view-cleanup" data-view="cleanup" hidden>
+        <section class="card glass cleanup" data-cleanup-list aria-label="Clean up apps"></section>
+      </section>`;
+  }
+
+  function renderCleanup() {
+    const list = stage.querySelector('[data-cleanup-list]');
+    if (!D.cleanup.length) {
+      list.innerHTML = `
+        <div class="cleanup-empty">
+          <span class="w-empty-title">Nothing to clean up yet</span>
+          <span class="small">Open Set up from your phone, download the app list there and send it over. Together we choose what goes, and this screen then lists those apps one by one.</span>
+        </div>`;
+      return;
+    }
+    const states = NATIVE ? nativeJson('packageStates', JSON.stringify(D.cleanup.map((c) => c.pkg))) || [] : [];
+    list.innerHTML = D.cleanup.map((c) => {
+      const st = states.find((x) => x.pkg === c.pkg);
+      const value = !NATIVE ? 'On the TV' : !st || !st.installed ? 'Not on this TV' : st.enabled ? 'On' : 'Off';
+      return `
+        <button class="set-row" data-focus data-action="open-app-info" data-pkg="${c.pkg}">
+          <span class="lg chip set-chip">${icon('power')}</span>
+          <span class="set-label">${st ? st.label : c.pkg}<span class="small">${c.reason}</span></span>
+          <span class="set-val">${value}</span>
+        </button>`;
+    }).join('');
+  }
+
+  // Wallpaper chooser. Built when it opens and emptied when it closes, so the
+  // photos aren't all held in memory on a small TV.
+  function wallpapersView() {
+    return `
+      <section class="view view-wallpapers" data-view="wallpapers" hidden>
+        <div class="wp-grid" data-wp-grid></div>
+      </section>`;
+  }
+
+  function renderWallpapers() {
+    const grid = stage.querySelector('[data-wp-grid]');
+    grid.innerHTML = `
+      <button class="wp-tile wp-add" data-focus data-action="open-setup" aria-label="Add wallpapers from your phone">
+        <span class="lg chip wp-add-chip">${icon('phone', 30)}</span>
+        <span class="wp-name">Add from your phone</span>
+      </button>
+      ${D.wallpapers.map((w) => `
+        <button class="wp-tile" data-focus data-action="pick-wallpaper" data-id="${w.name}" aria-label="${w.label}">
+          <img src="${w.url}" alt="" decoding="async">
+          <span class="wp-name">${w.label}</span>
+          <span class="wp-check lg chip">${icon('check', 18)}</span>
+        </button>`).join('')}`;
+    markWallpaper();
+  }
+
+  function markWallpaper() {
+    all('[data-action="pick-wallpaper"]').forEach((b) => {
+      const on = b.dataset.id === state.wallpaperName && state.wallpaper === 'photo';
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+  }
+
+  // Set up from your phone: the TV shows an address and a code; the phone page
+  // (served by the app while this screen is open) takes the Govee key,
+  // wallpapers and town.
+  function setupOverlay() {
+    return `
+      <div class="setup" hidden>
+        <section class="setup-card">
+          <div class="setup-title">Set up from your phone</div>
+          <ol class="setup-steps">
+            <li>Join the same Wi-Fi as this TV.</li>
+            <li>On your phone, open <strong class="tnum" data-setup-url></strong></li>
+            <li>Enter the code <strong class="setup-pin tnum" data-setup-pin></strong></li>
+          </ol>
+          <div class="setup-status" data-setup-status></div>
+          <button class="btn btn-primary" data-focus data-action="close-setup">Done</button>
+        </section>
+      </div>`;
   }
 
   function overlay() {
@@ -430,9 +600,61 @@
       </div>`;
   }
 
+  // A slider you move with the remote: focus it, then Left and Right.
+  function sliderMarkup(id, label) {
+    return `
+      <span class="slider" data-focus data-slider="${id}" role="slider" tabindex="0" aria-label="${label}" aria-valuemin="0" aria-valuemax="100">
+        <span class="slider-track"></span>
+        <span class="slider-thumb"></span>
+      </span>`;
+  }
+
+  // Slider positions are 0 to 100 for all three; hue is 0 to 360 underneath.
+  const sliderValue = {
+    hue: () => state.tint.hue / 3.6,
+    warmth: () => state.tint.warmth,
+    opacity: () => state.tint.opacity,
+  };
+
+  function renderSliders() {
+    all('[data-slider]').forEach((el) => {
+      const v = Math.round(sliderValue[el.dataset.slider]());
+      el.setAttribute('aria-valuenow', String(v));
+      el.querySelector('.slider-thumb').style.left = `${v}%`;
+      el.classList.toggle('muted', el.dataset.slider === 'hue' && state.tint.source === 'room');
+    });
+    all('[data-action="tint-room"]').forEach((b) => {
+      const on = state.tint.source === 'room';
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+  }
+
+  function setSlider(id, value) {
+    const t = state.tint;
+    const v = clamp(Math.round(value), id === 'opacity' ? 10 : 0, 100);
+    if (id === 'hue') {
+      t.hue = v * 3.6;
+      t.source = 'custom';
+    } else {
+      t[id] = v;
+    }
+    applyColors();
+    renderSliders();
+    saveSoon();
+  }
+
+  function nudgeSlider(id, dir) {
+    setSlider(id, sliderValue[id]() + dir * 5);
+  }
+
+  function wallpaperLabel() {
+    return D.wallpapers.find((w) => w.name === state.wallpaperName)?.label || 'None';
+  }
+
   // Customize panel, after the iPadOS one: icon style, appearance, wallpaper.
   function customizeSheet() {
-    const sample = APP.youtube || D.apps[0];
+    const sample = APP.youtube || D.apps[0] || { name: 'App', color: '#8e8e9a', mark: 'A' };
     const opt = (action, id, label, desc, inner) => `
       <button class="opt" data-focus data-action="${action}" data-id="${id}">${inner}<span class="opt-label">${label}</span><span class="opt-desc">${desc}</span></button>`;
     const seg = (action, items) => `
@@ -446,8 +668,25 @@
           </div>
           <div class="sheet-label">Icons</div>
           <div class="opts">
-            ${[['default', 'Default', 'Brand colours'], ['dark', 'Dark', 'Dark glass'], ['clear', 'Clear', 'Frosted glass'], ['tinted', 'Tinted', 'Your light colour']]
+            ${[['default', 'Default', 'Brand colours'], ['dark', 'Dark', 'Dark glass'], ['clear', 'Clear', 'Frosted glass'], ['tinted', 'Tinted', 'Pick a colour']]
               .map(([id, label, desc]) => opt('icon-style', id, label, desc, appIcon(sample, 76, id))).join('')}
+          </div>
+          <div class="tint-block" data-tint-block hidden>
+            <div class="sheet-row">
+              <span class="sheet-label">Colour</span>
+              <span class="slider-wrap">
+                <button class="seg seg-pill" data-focus data-action="tint-room">Room light</button>
+                ${sliderMarkup('hue', 'Colour')}
+              </span>
+            </div>
+            <div class="sheet-row">
+              <span class="sheet-label">Warmth</span>
+              <span class="slider-wrap">${sliderMarkup('warmth', 'Warmth')}</span>
+            </div>
+            <div class="sheet-row">
+              <span class="sheet-label">Opacity</span>
+              <span class="slider-wrap">${sliderMarkup('opacity', 'Opacity')}</span>
+            </div>
           </div>
           <div class="sheet-row">
             <span class="sheet-label">Appearance<span class="sheet-help">Auto follows the TV</span></span>
@@ -461,6 +700,183 @@
       </div>`;
   }
 
+  // ---------- Weather ----------
+  // Open-Meteo (free, no key). Where: the town typed in Settings; else the TV's
+  // own location (Android, needs the Location setting on); else an approximate
+  // place from the internet connection.
+  const SKY = {
+    clear: ['#9fd3ff', '#3f86d9', '#1d4c9c'],
+    night: ['#6a7bd1', '#2b3a8c', '#10163f'],
+    partly: ['#9fd3ff', '#3f86d9', '#1d4c9c'],
+    cloud: ['#b5c2d3', '#6f84a1', '#3b4a63'],
+    rain: ['#8fa6bd', '#4a6480', '#222f42'],
+    snow: ['#dfe9f5', '#9db6d3', '#5f7a99'],
+    storm: ['#8a8fb3', '#3f4470', '#1a1c38'],
+    fog: ['#c7cdd4', '#8b95a1', '#505a66'],
+  };
+
+  // WMO weather codes as Open-Meteo reports them.
+  function describeWeather(code, isDay) {
+    const sky = (label, iconName, key) => ({ label, icon: iconName, palette: SKY[key] });
+    if (code === 0 || code === 1) return isDay ? sky(code ? 'Mostly clear' : 'Clear', 'sun', 'clear') : sky(code ? 'Mostly clear' : 'Clear', 'moon', 'night');
+    if (code === 2) return sky('Partly cloudy', 'wPartly', isDay ? 'partly' : 'night');
+    if (code === 3) return sky('Cloudy', 'wCloud', 'cloud');
+    if (code === 45 || code === 48) return sky('Fog', 'wFog', 'fog');
+    if (code >= 51 && code <= 57) return sky('Drizzle', 'wRain', 'rain');
+    if (code >= 61 && code <= 67) return sky('Rain', 'wRain', 'rain');
+    if (code >= 71 && code <= 77) return sky('Snow', 'wSnow', 'snow');
+    if (code >= 80 && code <= 82) return sky('Showers', 'wRain', 'rain');
+    if (code === 85 || code === 86) return sky('Snow showers', 'wSnow', 'snow');
+    if (code >= 95) return sky('Thunderstorm', 'wStorm', 'storm');
+    return sky('Cloudy', 'wCloud', 'cloud');
+  }
+
+  async function getJson(url) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 10000);
+    try {
+      const r = await fetch(url, { signal: ctl.signal });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return await r.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  let weatherAt = 0;
+  let locationAsks = 0;
+  async function loadWeather() {
+    try {
+      let place = null;
+      if (state.town) {
+        const g = (await getJson(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(state.town)}&count=1&language=en&format=json`)).results?.[0];
+        if (!g) {
+          state.weather = null;
+          state.weatherNote = 'notfound';
+          renderWeather();
+          return;
+        }
+        place = { lat: g.latitude, lon: g.longitude, name: g.name };
+      } else if (NATIVE) {
+        // The TV asks "allow location?" the first couple of times only.
+        const granted = (nativeJson('access') || {}).location === true;
+        state.locationPending = false;
+        if (granted || locationAsks < 2) {
+          if (!granted) locationAsks++;
+          const loc = nativeJson('location');
+          if (loc && !loc.error) {
+            place = { lat: loc.lat, lon: loc.lon, name: await placeName(loc.lat, loc.lon) };
+          } else if (loc?.error === 'permission') {
+            state.weatherNote = 'permission';
+            state.locationPending = true; // use the internet connection's area until it's answered
+          }
+        } else {
+          state.weatherNote = 'permission';
+        }
+      }
+      if (!place) {
+        const ip = await getJson('https://get.geojs.io/v1/ip/geo.json');
+        place = { lat: Number(ip.latitude), lon: Number(ip.longitude), name: ip.city || 'Your area' };
+      }
+      const w = await getJson(`https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`);
+      state.weather = {
+        town: place.name,
+        temp: Math.round(w.current.temperature_2m),
+        high: Math.round(w.daily.temperature_2m_max[0]),
+        low: Math.round(w.daily.temperature_2m_min[0]),
+        ...describeWeather(w.current.weather_code, w.current.is_day),
+      };
+      state.weatherNote = '';
+      weatherAt = Date.now();
+    } catch {
+      if (!state.weather) state.weatherNote = 'offline';
+    }
+    renderWeather();
+  }
+
+  async function placeName(lat, lon) {
+    try {
+      const r = await getJson(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
+      return r.city || r.locality || r.principalSubdivision || 'Your location';
+    } catch {
+      return 'Your location';
+    }
+  }
+
+  function renderWeather() {
+    const w = state.weather;
+    const card = stage.querySelector('[data-weather-card]');
+    card.classList.toggle('is-empty', !w);
+    if (!w) {
+      const msg = {
+        loading: ['Getting the weather', 'One moment'],
+        permission: ['Allow location', 'Turn on location for this app, or add your town in Settings'],
+        offline: ['No weather yet', 'Check the TV is online, or add your town in Settings'],
+        notfound: ['Town not found', `Couldn't find "${state.town}". Check the spelling in Settings`],
+      }[state.weatherNote] || ['Add your town', 'Set it in Settings to see the weather'];
+      stage.querySelector('[data-w-empty-title]').textContent = msg[0];
+      stage.querySelector('[data-w-empty-text]').textContent = msg[1];
+      return;
+    }
+    stage.querySelector('[data-w-town]').textContent = w.town;
+    stage.querySelector('[data-w-icon]').innerHTML = icon(w.icon, 40);
+    stage.querySelector('[data-w-temp]').textContent = `${w.temp}°`;
+    stage.querySelector('[data-w-label]').textContent = w.label;
+    stage.querySelector('[data-w-range]').textContent = `High ${w.high}°, low ${w.low}°`;
+    setTint(card, w.palette);
+  }
+
+  function openSetup() {
+    if (!NATIVE) {
+      toast('Set-up from your phone works on the TV');
+      return;
+    }
+    const info = nativeJson('startSetup');
+    if (!info || info.error) {
+      toast(info?.error || 'Could not start. Check the TV is on Wi-Fi');
+      return;
+    }
+    state.setupOpen = true;
+    refs.setup.hidden = false;
+    stage.querySelector('[data-setup-url]').textContent = info.url;
+    stage.querySelector('[data-setup-pin]').textContent = info.pin;
+    renderSetupStatus();
+    refs.setup.querySelector('[data-action="close-setup"]').focus();
+  }
+
+  function closeSetup() {
+    state.setupOpen = false;
+    refs.setup.hidden = true;
+    nativeCall('stopSetup');
+    applyState();
+  }
+
+  function renderSetupStatus() {
+    const g = state.govee;
+    const lines = [
+      g.connected ? `Govee: connected, ${g.devices.length} devices` : g.hasKey ? `Govee: ${g.error || 'connecting'}` : 'Govee: waiting for your key',
+      `Wallpapers added: ${D.wallpapers.filter((w) => w.custom).length}`,
+    ];
+    stage.querySelector('[data-setup-status]').innerHTML = lines.map((l) => `<div>${l}</div>`).join('');
+  }
+
+  // Messages from the Android side: the phone page was used, Govee answered.
+  window.onNative = (name, data) => {
+    if (name === 'setup') {
+      refreshWallpapers();
+      if (state.view === 'wallpapers') renderWallpapers();
+      if (data?.town !== undefined) {
+        state.town = data.town;
+        stage.querySelector('#town-input').value = state.town;
+        saveSoon();
+        loadWeather();
+      }
+    }
+    if (name === 'govee') applyGovee(data);
+    if (state.setupOpen) renderSetupStatus();
+    applyState();
+  };
+
   function launchApp(id) {
     const a = APP[id];
     if (!a) {
@@ -471,17 +887,88 @@
     else toast(`Opening ${a.name}`);
   }
 
-  // Backlight colour to the Govee H6097 over the local network (Android side).
+  // ---------- Govee ----------
+  // The account's lights come from the Android side. The TV backlight is the
+  // device that matches the model in data.js (the H6097) or is named for the TV.
+  function goveeDevices() {
+    return NATIVE ? state.govee.devices.filter((d) => d.light) : [];
+  }
+
+  function backlightDevice() {
+    const all = goveeDevices();
+    return all.find((d) => d.sku === H.backlights.model) || all.find((d) => /tv|backlight/i.test(d.name)) || null;
+  }
+
+  // The room lights: every light on the account except the TV backlight.
+  // The browser preview uses the sample lights.
+  function roomLights() {
+    if (!NATIVE) return H.lights;
+    const bl = backlightDevice();
+    return goveeDevices().filter((d) => d !== bl);
+  }
+
+  function applyGovee(data) {
+    if (!data) return;
+    state.govee = { hasKey: !!data.hasKey, connected: !!data.connected, error: data.error || '', devices: data.devices || [] };
+    state.govee.devices.forEach((d) => {
+      if (d.light) state.home.lights[d.id] = !!d.on;
+    });
+    if (data.message) toast(data.message);
+    renderLights();
+  }
+
+  function renderLights() {
+    const list = stage.querySelector('[data-light-list]');
+    if (!list) return;
+    const hadFocus = list.contains(document.activeElement);
+    const lights = roomLights();
+    list.innerHTML = lights.length ? lights.map((l) => `
+      <button class="light-row" data-focus data-action="light" data-id="${l.id}">
+        <span class="light-dot"></span><span class="light-name">${l.name}</span>
+        <span class="switch" aria-hidden="true"><span></span></span>
+      </button>`).join('') : `
+      <button class="light-cta" data-focus data-action="open-setup">
+        ${icon('phone', 24)}
+        <span><span class="light-name">Connect your Govee lights</span><span class="small">${state.govee.error || 'Add your Govee key from your phone'}</span></span>
+      </button>`;
+    if (hadFocus) list.querySelector('[data-focus]')?.focus();
+    renderRoom();
+  }
+
+  // Sends the backlight choice to the TV backlight (the local network if the
+  // light answers there, otherwise Govee's cloud).
   function sendBacklight() {
     if (!NATIVE) return;
-    const h = state.home;
-    const model = H.backlights.model;
-    if (h.backlight === 'off') nativeCall('goveePower', model, false);
-    else if (h.backlight === 'sync') nativeCall('goveeSync', model);
-    else {
-      const [r, g, b] = BACKLIGHT[h.backlight].colors[0].match(/\w\w/g).map((x) => parseInt(x, 16));
-      nativeCall('goveeColor', model, r, g, b);
+    const bl = backlightDevice();
+    if (!bl) {
+      toast('Connect Govee first (Settings, Set up from your phone)');
+      return;
     }
+    const h = state.home;
+    if (h.backlight === 'off') nativeCall('goveePower', bl.id, false);
+    else if (h.backlight === 'sync') nativeCall('goveeDreamView', bl.id, true);
+    else {
+      const [r, g, b] = hexToRgb(BACKLIGHT[h.backlight].colors[0]);
+      nativeCall('goveeColor', bl.id, r, g, b);
+    }
+  }
+
+  function applyScene(sc) {
+    const rule = sc.lights;
+    roomLights().forEach((l) => {
+      state.home.lights[l.id] = rule.on;
+      if (!NATIVE) return;
+      if (!rule.on) {
+        nativeCall('goveePower', l.id, false);
+        return;
+      }
+      if (l.white) nativeCall('goveeWhite', l.id, rule.kelvin); // also turns it on
+      else nativeCall('goveePower', l.id, true);
+      if (l.brightness) nativeCall('goveeBrightness', l.id, rule.brightness);
+    });
+    setBacklight(sc.backlight);
+    state.home.scene = sc.id;
+    sendBacklight();
   }
 
   // What's playing on the TV (YouTube Music or any app with a media session).
@@ -500,9 +987,12 @@
       D.music.tracks = [{
         title: np.title,
         artist: np.artist || '',
-        durationSec: Math.max(1, Math.round((np.durationMs || 0) / 1000)),
+        durationSec: Math.max(0, Math.round((np.durationMs || 0) / 1000)),
         art: np.art ? `center / cover no-repeat url("${np.art}")` : 'linear-gradient(140deg,#3a3a48,#121218)',
         palette: np.colors && np.colors.length === 3 ? np.colors : null,
+        source: np.source || '',
+        icon: np.icon || '',
+        controls: np.controls !== false,
       }];
       state.track = 0;
       state.pos = Math.round((np.positionMs || 0) / 1000);
@@ -541,12 +1031,13 @@
       </header>
 
       <div class="views">
-        ${homeView()}${searchView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}
+        ${homeView()}${searchView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}${wallpapersView()}${cleanupView()}
       </div>
 
       ${overlay()}
       ${customizeSheet()}
       ${fitOverlay()}
+      ${setupOverlay()}
       <div class="toast glass" role="status" hidden></div>
     `;
 
@@ -555,6 +1046,7 @@
       date: stage.querySelector('[data-date]'),
       sheet: stage.querySelector('.sheet-scrim'),
       fit: stage.querySelector('.fit'),
+      setup: stage.querySelector('.setup'),
       searchInput: stage.querySelector('#search-input'),
       townInput: stage.querySelector('#town-input'),
       overlay: stage.querySelector('.overlay'),
@@ -567,10 +1059,10 @@
 
     refs.townInput.value = state.town;
     showPhoto();
-    setTint(stage.querySelector('[data-weather-card]'), D.weather.palette);
     applyState();
     renderTrack();
     renderSearch();
+    renderLights();
     updateClock();
   }
 
@@ -587,6 +1079,7 @@
 
     stage.classList.toggle('light', !dark);
     stage.classList.toggle('photo', photo);
+    applyColors();
     all('[data-theme-icon]').forEach((el) => { el.innerHTML = icon(dark ? 'moon' : 'sun'); });
 
     // Icon style: restyle every app icon except the fixed samples in Customize.
@@ -602,6 +1095,8 @@
     });
     const wp = state.matchLights ? 'lights' : state.wallpaper;
     pressed('[data-action="icon-style"]', (id) => id === state.iconStyle);
+    stage.querySelector('[data-tint-block]').hidden = state.iconStyle !== 'tinted';
+    renderSliders();
     pressed('[data-action="appearance"]', (id) => id === state.appearance);
     pressed('[data-action="wallpaper-set"]', (id) => id === wp);
 
@@ -626,21 +1121,42 @@
       wifi: 'Connected',
       match: state.matchLights ? 'On' : 'Off',
       sample: state.sampleData ? 'On' : 'Off',
+      wp: wallpaperLabel(),
+      setup: NATIVE ? 'Press OK' : 'On the TV',
+      cleanup: D.cleanup.length ? `${D.cleanup.length} apps` : 'Nothing yet',
+      govee: !NATIVE ? 'On the TV'
+        : state.govee.connected ? `Connected, ${state.govee.devices.length} devices`
+          : state.govee.hasKey ? (state.govee.error || 'Connecting') : 'Not connected',
+      home: !NATIVE ? 'On the TV' : state.homeDefault ? 'This launcher' : 'Google TV. Press OK',
       fit: `${Math.round((userFit || 1) * 100)}%`,
       'np-access': access.nowPlaying ? 'Allowed' : 'Off. Press OK to allow',
       'usage-access': access.recentApps ? 'Allowed' : 'Off. Press OK to allow',
     };
     all('[data-val]').forEach((el) => { el.textContent = values[el.dataset.val]; });
-    all('[data-town]').forEach((el) => { el.textContent = state.town || 'Set your town in Settings'; });
+    renderWeather();
 
     renderRoom();
 
     // Empty states: what Home shows when there's no data to fill a widget.
     const sample = state.sampleData && !NATIVE;
     stage.querySelector('.w-music').classList.toggle('is-empty', NATIVE ? !state.live : !sample);
+    if (NATIVE) {
+      const noAccess = !access.nowPlaying;
+      all('[data-np-empty-title]').forEach((el) => { el.textContent = noAccess ? 'Allow Now playing' : 'Nothing playing'; });
+      all('[data-np-empty-text]').forEach((el) => {
+        el.textContent = noAccess
+          ? 'Turn on access to show what is playing, from any app or cast from a phone'
+          : 'Anything playing on the TV shows up here, including music cast from a phone';
+      });
+      all('[data-np-allow]').forEach((el) => { el.hidden = !noAccess; });
+      all('[data-np-open]').forEach((el) => { el.hidden = noAccess || !APP.ytmusic; });
+      // The Music tab shows only what's really playing; the sample mixes are for the preview.
+      stage.querySelector('[data-music-empty]').hidden = state.live;
+      stage.querySelector('.music-grid').hidden = !state.live;
+      stage.querySelector('.music-mixes').hidden = true;
+    }
     stage.querySelector('.w-hero').classList.toggle('is-empty', !sample);
     stage.querySelector('.w-music .np-next').hidden = !!NATIVE;
-    stage.querySelector('.w-weather').classList.toggle('is-empty', !state.town);
     all('[data-cw]').forEach((el) => { el.hidden = !sample; });
     all('[data-recent]').forEach((el) => { el.hidden = sample; });
 
@@ -659,6 +1175,7 @@
 
   function setTint(el, [light, mid, dark]) {
     el.style.setProperty('--t0', light);
+    el.style.setProperty('--t0a', toHex(light) ? withAlpha(toHex(light), 0.75) : light);
     el.style.setProperty('--t1', mid);
     el.style.setProperty('--t2', dark);
   }
@@ -672,11 +1189,10 @@
       b.setAttribute('aria-pressed', String(on));
     });
 
-    // Wallpaper gradient follows the backlights (fades between scenes).
-    ['--l0', '--l1', '--l2'].forEach((v, i) => stage.style.setProperty(v, colors[i]));
     // Backlight bleed: the screen edges glow in the light colour. In "Sync to
-    // TV" mode the focused item's colour takes over (see focusin below).
-    if (h.backlight !== 'sync') stage.style.setProperty('--glowc', colors[0]);
+    // TV" mode the focused item's colour takes over (see syncGlow below).
+    if (h.backlight !== 'sync') state.glow = null;
+    applyColors();
     stage.querySelector('.edge').classList.toggle('off', h.backlight === 'off');
     stage.classList.toggle('lights', state.matchLights && h.backlight !== 'off');
     const matchBtn = stage.querySelector('.tool[data-action="match-lights"]');
@@ -687,12 +1203,13 @@
     press('[data-action="room-scene"]', (id) => id === h.scene);
     press('[data-action="light"]', (id) => h.lights[id]);
 
-    const lightsOn = Object.values(h.lights).filter(Boolean).length;
+    const roomList = roomLights();
+    const lightsOn = roomList.filter((l) => h.lights[l.id]).length;
     const swatch = stage.querySelector('[data-room-swatch]');
     swatch.style.background = h.backlight === 'off' ? 'var(--track)' : `linear-gradient(135deg, ${colors.join(',')})`;
     stage.querySelector('[data-room-scene]').textContent = h.backlight === 'off'
       ? 'Backlight off' : h.backlight === 'sync' ? 'Synced to TV' : BACKLIGHT[h.backlight].name;
-    stage.querySelector('[data-room-lights]').textContent = `${lightsOn} of ${H.lights.length} lights on`;
+    stage.querySelector('[data-room-lights]').textContent = roomList.length ? `${lightsOn} of ${roomList.length} lights on` : 'No lights yet';
     stage.querySelector('[data-room-sound]').textContent = !h.sound.on ? 'Soundbar off'
       : h.sound.muted ? 'Soundbar muted' : `Volume ${h.sound.volume}`;
 
@@ -718,8 +1235,12 @@
     all('[data-np-art]').forEach((el) => { el.style.background = t.art; });
     all('[data-np-card]').forEach((el) => setTint(el, t.palette || artPalette(t.art)));
     all('[data-np-title]').forEach((el) => { el.textContent = t.title; });
+    const src = t.icon ? { color: '#8e8e9a', mark: (t.source || '?').slice(0, 1), iconUrl: t.icon, name: t.source } : APP.ytmusic;
+    all('[data-np-src-icon]').forEach((el) => { el.innerHTML = src ? appIcon(src, Number(el.dataset.npSrcIcon)) : ''; });
+    all('[data-np-source]').forEach((el) => { el.textContent = t.source || D.music.source; });
+    all('[data-np-card]').forEach((el) => el.classList.toggle('no-controls', t.controls === false));
     all('[data-np-artist]').forEach((el) => { el.textContent = t.artist; });
-    all('[data-duration]').forEach((el) => { el.textContent = fmt(t.durationSec); });
+    all('[data-duration]').forEach((el) => { el.textContent = t.durationSec > 0 ? fmt(t.durationSec) : ''; });
 
     const tracks = D.music.tracks;
     stage.querySelector('[data-np-next]').innerHTML = [1].map((k) => {
@@ -764,8 +1285,8 @@
 
   function updatePlayback() {
     const dur = track().durationSec;
-    all('[data-progress]').forEach((el) => { el.style.width = `${(state.pos / dur) * 100}%`; });
-    all('[data-elapsed]').forEach((el) => { el.textContent = fmt(state.pos); });
+    all('[data-progress]').forEach((el) => { el.style.width = dur > 0 ? `${Math.min(100, (state.pos / dur) * 100)}%` : '0%'; });
+    all('[data-elapsed]').forEach((el) => { el.textContent = dur > 0 ? fmt(state.pos) : ''; });
   }
 
   function setTrack(i) {
@@ -810,12 +1331,19 @@
     refs.date.textContent = n.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
   }
 
+  // Built-in wallpapers plus photos added from a phone (app storage).
+  function refreshWallpapers() {
+    const builtin = D.wallpaperFiles.map(([file, label]) => ({ name: file, label, url: `${D.wallpaperBase}${file}`, custom: false }));
+    const added = (NATIVE ? nativeJson('wallpapers') || [] : []).map((w) => ({ name: `added:${w.name}`, label: 'Added from phone', url: w.url, custom: true }));
+    D.wallpapers = [...builtin, ...added];
+    if (!D.wallpapers.some((w) => w.name === state.wallpaperName)) state.wallpaperName = D.wallpapers[0]?.name || null;
+  }
+
   function showPhoto() {
-    const file = D.wallpapers[state.photoIndex];
-    if (!file) return;
-    const url = `${D.wallpaperBase}${file}`;
-    stage.style.setProperty('--photo', `url("${url}")`);
-    makeFrost(url);
+    const w = D.wallpapers.find((x) => x.name === state.wallpaperName);
+    if (!w) return;
+    stage.style.setProperty('--photo', `url("${w.url}")`);
+    makeFrost(w.url);
   }
 
   // The glass panels show a pre-blurred copy of the wallpaper instead of
@@ -843,13 +1371,6 @@
       }
     };
     img.src = url;
-  }
-
-  if (D.wallpapers.length > 1) {
-    setInterval(() => {
-      state.photoIndex = (state.photoIndex + 1) % D.wallpapers.length;
-      showPhoto();
-    }, D.wallpaperCycleMin * 60000);
   }
 
   let toastTimer;
@@ -893,8 +1414,11 @@
   }
 
   function openView(id) {
+    if (state.view === 'wallpapers' && id !== 'wallpapers') stage.querySelector('[data-wp-grid]').innerHTML = '';
     state.view = id;
     applyState();
+    if (id === 'wallpapers') renderWallpapers();
+    if (id === 'cleanup') renderCleanup();
     animateView(id);
     if (id === 'games' && state.games.autoSwitch) startSwitch();
   }
@@ -970,11 +1494,33 @@
     else if (act === 'customize') openSheet();
     else if (act === 'toggle-sample') state.sampleData = !state.sampleData;
     else if (act === 'screen-fit') openFit();
+    else if (act === 'open-wallpapers') {
+      if (!refs.sheet.hidden) closeSheet();
+      openView('wallpapers');
+    } else if (act === 'pick-wallpaper') {
+      state.wallpaperName = b.dataset.id;
+      state.wallpaper = 'photo';
+      state.matchLights = false;
+      showPhoto();
+      markWallpaper();
+      toast(`Wallpaper: ${wallpaperLabel()}`);
+    } else if (act === 'open-setup') openSetup();
+    else if (act === 'open-cleanup') openView('cleanup');
+    else if (act === 'open-app-info') nativeCall('openAppInfo', b.dataset.pkg);
+    else if (act === 'close-setup') closeSetup();
+    else if (act === 'home-role') {
+      if (NATIVE) toast(nativeCall('requestDefaultHome') === 'started' ? 'Choose Smart TV Launcher on the next screen' : 'This TV does not offer that choice. Ask me for the other way');
+      else toast('Works on the TV');
+    }
     else if (act === 'fit-done') closeFit();
     else if (act === 'grant-np') nativeCall('openSettings', 'notification-access');
     else if (act === 'grant-usage') nativeCall('openSettings', 'usage-access');
     else if (act === 'close-sheet') closeSheet();
     else if (act === 'icon-style') state.iconStyle = b.dataset.id;
+    else if (act === 'tint-room') {
+      state.tint.source = 'room';
+      applyColors();
+    }
     else if (act === 'appearance') state.appearance = b.dataset.id;
     else if (act === 'wallpaper-set') setWallpaper(b.dataset.id);
     else if (act === 'wallpaper') {
@@ -991,15 +1537,13 @@
       sendBacklight();
     } else if (act === 'room-scene') {
       const sc = ROOM_SCENE[b.dataset.id];
-      Object.assign(state.home.lights, sc.lights);
-      setBacklight(sc.backlight);
-      state.home.scene = sc.id;
+      applyScene(sc);
       toast(`${sc.name} scene`);
-      sendBacklight();
     } else if (act === 'light') {
       const id = b.dataset.id;
       state.home.lights[id] = !state.home.lights[id];
       state.home.scene = null;
+      if (NATIVE) nativeCall('goveePower', id, state.home.lights[id]);
     } else if (act === 'vol-up' || act === 'vol-down') {
       // TV volume; over HDMI ARC the TV passes it on to the soundbar.
       const sb = state.home.sound;
@@ -1039,8 +1583,18 @@
 
     applyState();
     updatePlayback();
+    saveSoon();
   });
 
+  // Mouse or touch on a slider (the remote uses Left and Right instead).
+  stage.addEventListener('click', (e) => {
+    const sl = e.target.closest('[data-slider]');
+    if (!sl) return;
+    const r = sl.getBoundingClientRect();
+    setSlider(sl.dataset.slider, ((e.clientX - r.left) / r.width) * 100);
+  });
+
+  let townTimer;
   stage.addEventListener('input', (e) => {
     if (e.target.id === 'search-input') {
       state.query = e.target.value;
@@ -1048,6 +1602,8 @@
     } else if (e.target.id === 'town-input') {
       state.town = e.target.value.trim();
       applyState();
+      clearTimeout(townTimer);
+      townTimer = setTimeout(loadWeather, 900);
     }
   });
 
@@ -1057,7 +1613,11 @@
     const host = target.closest('.w-hero, .w-mini, .show, .mix, .now-playing, .music-now, .dock-app, .app-card') || target;
     const styled = [host, ...host.querySelectorAll('[style]')].find((el) => /#[0-9a-f]{6}|rgb\(/i.test(el.getAttribute('style') || ''));
     const tone = styled && (styled.getAttribute('style').match(/#[0-9a-f]{6}|rgb\([^)]*\)/i) || [])[0];
-    if (tone) stage.style.setProperty('--glowc', tone);
+    const hex = toHex(tone);
+    if (hex) {
+      state.glow = hex;
+      applyColors();
+    }
   }
 
   // Remember where focus was in each view, so coming back from the sidebar
@@ -1066,6 +1626,7 @@
   stage.addEventListener('focusin', (e) => {
     const view = e.target.closest('[data-view]');
     if (view) lastFocus[view.dataset.view] = e.target;
+    stage.querySelector('.dock')?.classList.toggle('active', !!e.target.closest('.dock'));
     if (state.home.backlight === 'sync') syncGlow(e.target);
   });
 
@@ -1174,12 +1735,16 @@
   }
 
   function goBack() {
-    if (!refs.fit.hidden) {
+    if (!refs.setup.hidden) {
+      closeSetup();
+    } else if (!refs.fit.hidden) {
       closeFit();
     } else if (!refs.sheet.hidden) {
       closeSheet();
     } else if (!refs.overlay.hidden) {
       closeOverlay();
+    } else if (state.view === 'wallpapers' || state.view === 'cleanup') {
+      openView('settings');
     } else if (state.view !== 'home') {
       openView('home');
       stage.querySelector('.dock-app').focus();
@@ -1203,6 +1768,13 @@
 
     const dir = KEY_DIRECTION[e.key];
     if (!dir) return;
+
+    const slider = document.activeElement?.dataset?.slider;
+    if (slider && (dir === 'left' || dir === 'right')) {
+      e.preventDefault();
+      nudgeSlider(slider, dir === 'right' ? 1 : -1);
+      return;
+    }
 
     // Left/right move the caret inside a text field until it reaches an end.
     if (inText && (dir === 'left' || dir === 'right')) {
@@ -1306,19 +1878,39 @@
   window.launcherResume = () => {
     if (!NATIVE) return;
     pollNowPlaying();
+    refreshNativeStatus();
+    if (state.view === 'cleanup') renderCleanup(); // back from the TV's Settings
+    if (Date.now() - weatherAt > 15 * 60 * 1000 || state.locationPending) loadWeather();
     applyState();
   };
 
+  // Things Android can change while we're in another app (a permission, the
+  // home setting). Cheap calls, read from cache on the Android side.
+  function refreshNativeStatus() {
+    if (!NATIVE) return;
+    state.homeDefault = nativeCall('isDefaultHome') === true;
+  }
+
+  refreshWallpapers();
+  loadSaved();
   fit(); // first, so nothing below can leave the screen unscaled
+  state.weather = NATIVE ? null : { ...D.weather, label: D.weather.condition, temp: D.weather.tempC };
   build();
+  if (NATIVE || state.town) {
+    setTimeout(loadWeather, 1200); // after the first screen is up
+    setInterval(loadWeather, 30 * 60 * 1000);
+  }
   animateView('home');
   fit();
   stage.querySelector('.dock-app').focus();
   if (NATIVE) {
     try {
       pollNowPlaying();
+      applyGovee(nativeJson('goveeStatus'));
+      nativeCall('goveeConnect', ''); // reads the saved key; the answer arrives as an event
+      refreshNativeStatus();
     } catch (e) {
-      console.warn('now playing failed', e);
+      console.warn('start-up calls failed', e);
     }
     if (userFit === null) openFit(); // first run: set the screen size
   }

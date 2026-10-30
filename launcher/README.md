@@ -2,6 +2,8 @@
 
 **Design v2 (iPadOS-inspired, sized for a TV).** Floating glass tab bar along the top, a Home widget grid (analog clock, weather, now playing, continue watching) above a glass dock of apps, and a Customize panel for icon style (Default, Dark, Clear, Tinted), appearance (Light, Dark, Auto) and wallpaper (Photo, Gradient, Lights). Earlier designs are backed up in `designs/`.
 
+**v0.3.** Tint sliders for icons (Customize), a dock that fits its icons, one type voice (Geist at medium weight, like the date), weather from the TV's location, seven wallpapers plus photos sent from a phone, a Room tab wired to the Govee account, Now playing from any source (apps and casts), a phone setup page, a Home-button setting and a Clean up apps screen. Colours are computed in `color.js` and `applyColors()` rather than with newer CSS, so an older TV browser can't drop the focus ring.
+
 **Council review changes (v3).** Bright focus ring with a soft glow, distinct from "selected"; text at least 16px on the canvas (24px on a 1080p TV); 5% TV-safe margins; the clock widget is replaced by a Room status widget; Home starts focused on the dock; every Home widget has an empty state (turn off Settings › Sample content to preview them); plain labels in Room; top-right tools show their name on focus.
 
 **Top bar and tabs.** Icons only; each shows its name when focused. Live TV was removed: no programme guide data is available to a third-party launcher, and opening a channel only duplicated the dock.

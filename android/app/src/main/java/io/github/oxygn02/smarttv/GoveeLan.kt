@@ -9,62 +9,29 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.SocketTimeoutException
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
 
 /**
- * Govee LAN API: local control over Wi-Fi, no account. Each device must have
- * "LAN Control" switched on in the Govee Home app.
+ * Govee LAN API: local control over Wi-Fi, instant and with no account. A light
+ * is only found if "LAN Control" is switched on for it in the Govee Home app;
+ * anything else goes through the cloud ([GoveeCloud]).
  *
  * - Discovery: multicast {"msg":{"cmd":"scan",...}} to 239.255.255.250:4001;
- *   devices answer on UDP 4002 with their ip and sku (model).
+ *   devices answer on UDP 4002 with their id, model (sku) and ip.
  * - Control: JSON to <device ip>:4003 ("turn", "brightness", "colorwc").
  *
- * DreamView (picture sync) isn't in the LAN API; switching it back on needs
- * Govee's cloud API with an API key (not wired up yet).
+ * Not thread-safe on its own: [GoveeHub] calls it from one thread.
  */
 class GoveeLan(context: Context) {
 
     private val wifi = context.applicationContext.getSystemService(WifiManager::class.java)
-    private val io = Executors.newSingleThreadExecutor()
 
-    /** sku (e.g. "H6097") -> device IPs seen in the last scan. */
-    private val devices = ConcurrentHashMap<String, MutableSet<String>>()
+    /** device id -> ip, from the last scan. */
+    private val ips = ConcurrentHashMap<String, String>()
 
-    init {
-        io.execute { scan() }
-    }
+    fun ipFor(id: String): String? = ips[id]
 
-    fun setColor(sku: String, r: Int, g: Int, b: Int) = send(sku) {
-        command("turn", JSONObject().put("value", 1))
-        command(
-            "colorwc",
-            JSONObject()
-                .put("color", JSONObject().put("r", r).put("g", g).put("b", b))
-                .put("colorTemInKelvin", 0),
-        )
-    }
-
-    fun setPower(sku: String, on: Boolean) = send(sku) {
-        command("turn", JSONObject().put("value", if (on) 1 else 0))
-    }
-
-    fun close() = io.shutdownNow()
-
-    private fun send(sku: String, build: Commands.() -> Unit) {
-        io.execute {
-            if (devices[sku].isNullOrEmpty()) scan()
-            val ips = devices[sku] ?: return@execute
-            val commands = Commands().apply(build).list
-            DatagramSocket().use { socket ->
-                for (ip in ips) for (msg in commands) {
-                    val bytes = msg.toByteArray()
-                    socket.send(DatagramPacket(bytes, bytes.size, InetAddress.getByName(ip), CONTROL_PORT))
-                }
-            }
-        }
-    }
-
-    private fun scan() {
+    /** Looks for lights on the network for a couple of seconds. Blocks. */
+    fun scan() {
         // Multicast replies are dropped on many TVs unless we hold this lock.
         val lock = wifi?.createMulticastLock("govee-scan")?.apply {
             setReferenceCounted(false)
@@ -91,31 +58,52 @@ class GoveeLan(context: Context) {
                     }
                     val data = JSONObject(String(packet.data, 0, packet.length))
                         .optJSONObject("msg")?.optJSONObject("data") ?: continue
-                    val sku = data.optString("sku")
+                    val id = data.optString("device")
                     val ip = data.optString("ip")
-                    if (sku.isNotEmpty() && ip.isNotEmpty()) {
-                        devices.getOrPut(sku) { ConcurrentHashMap.newKeySet() }.add(ip)
-                    }
+                    if (id.isNotEmpty() && ip.isNotEmpty()) ips[id] = ip
                 }
             }
         } catch (_: Exception) {
-            // No Wi-Fi or port in use: try again on the next command.
+            // No Wi-Fi, or the port is in use: lights fall back to the cloud.
         } finally {
             lock?.release()
         }
     }
 
-    private class Commands {
-        val list = mutableListOf<String>()
-        fun command(cmd: String, data: JSONObject) {
-            list += JSONObject().put("msg", JSONObject().put("cmd", cmd).put("data", data)).toString()
+    fun send(ip: String, vararg messages: JSONObject) {
+        DatagramSocket().use { socket ->
+            for (m in messages) {
+                val bytes = m.toString().toByteArray()
+                socket.send(DatagramPacket(bytes, bytes.size, InetAddress.getByName(ip), CONTROL_PORT))
+            }
         }
     }
 
-    private companion object {
-        const val MULTICAST = "239.255.255.250"
-        const val SCAN_PORT = 4001
-        const val REPLY_PORT = 4002
-        const val CONTROL_PORT = 4003
+    companion object {
+        private const val MULTICAST = "239.255.255.250"
+        private const val SCAN_PORT = 4001
+        private const val REPLY_PORT = 4002
+        private const val CONTROL_PORT = 4003
+
+        private fun msg(cmd: String, data: JSONObject) =
+            JSONObject().put("msg", JSONObject().put("cmd", cmd).put("data", data))
+
+        fun turn(on: Boolean) = msg("turn", JSONObject().put("value", if (on) 1 else 0))
+
+        fun brightness(percent: Int) = msg("brightness", JSONObject().put("value", percent.coerceIn(1, 100)))
+
+        fun color(r: Int, g: Int, b: Int) = msg(
+            "colorwc",
+            JSONObject()
+                .put("color", JSONObject().put("r", r).put("g", g).put("b", b))
+                .put("colorTemInKelvin", 0),
+        )
+
+        fun white(kelvin: Int) = msg(
+            "colorwc",
+            JSONObject()
+                .put("color", JSONObject().put("r", 0).put("g", 0).put("b", 0))
+                .put("colorTemInKelvin", kelvin),
+        )
     }
 }

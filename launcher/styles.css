@@ -1072,9 +1072,6 @@ button.info {
 
 /* ---------- Tinted cards (colours from album art / weather) ---------- */
 
-@property --t0 { syntax: '<color>'; inherits: true; initial-value: #3a3a48; }
-@property --t1 { syntax: '<color>'; inherits: true; initial-value: #24242e; }
-@property --t2 { syntax: '<color>'; inherits: true; initial-value: #121218; }
 
 .tinted {
   position: relative;
@@ -1093,7 +1090,7 @@ button.info {
   --lg-rim: rgba(255, 255, 255, 0.2);
   --lg-drop: rgba(0, 0, 0, 0.25);
   --lg-sheen: rgba(255, 255, 255, 0.3);
-  transition: --t0 0.9s, --t1 0.9s, --t2 0.9s, transform 0.5s var(--gentle);
+  transition: transform 0.5s var(--gentle);
 }
 
 .tinted > :not(.tint) {
@@ -1105,7 +1102,7 @@ button.info {
   inset: 0;
   border-radius: inherit;
   background:
-    radial-gradient(80% 110% at 88% 10%, color-mix(in srgb, var(--t0) 75%, transparent), transparent 65%),
+    radial-gradient(80% 110% at 88% 10%, var(--t0a, var(--t0)), transparent 65%),
     linear-gradient(135deg, var(--t1), var(--t2));
   transition: opacity 0.6s, filter 0.6s;
 }
@@ -1312,27 +1309,20 @@ button.info {
 }
 
 /* Wallpaper that follows the backlights: their colours as soft glows */
-@property --l0 { syntax: '<color>'; inherits: true; initial-value: #2bd47d; }
-@property --l1 { syntax: '<color>'; inherits: true; initial-value: #14b8a6; }
-@property --l2 { syntax: '<color>'; inherits: true; initial-value: #0e5f8a; }
-
-#stage {
-  transition: background 0.4s, --l0 1.2s, --l1 1.2s, --l2 1.2s;
-}
 
 #stage.lights {
   --bg:
-    radial-gradient(ellipse at 10% 0%, color-mix(in srgb, var(--l0) 42%, transparent) 0%, transparent 58%),
-    radial-gradient(ellipse at 95% 5%, color-mix(in srgb, var(--l1) 38%, transparent) 0%, transparent 58%),
-    radial-gradient(ellipse at 70% 105%, color-mix(in srgb, var(--l2) 40%, transparent) 0%, transparent 58%),
+    radial-gradient(ellipse at 10% 0%, var(--lw0) 0%, transparent 58%),
+    radial-gradient(ellipse at 95% 5%, var(--lw1) 0%, transparent 58%),
+    radial-gradient(ellipse at 70% 105%, var(--lw2) 0%, transparent 58%),
     #050508;
 }
 
 #stage.light.lights {
   --bg:
-    radial-gradient(ellipse at 10% 0%, color-mix(in srgb, var(--l0) 45%, #fff) 0%, transparent 58%),
-    radial-gradient(ellipse at 95% 5%, color-mix(in srgb, var(--l1) 40%, #fff) 0%, transparent 58%),
-    radial-gradient(ellipse at 70% 105%, color-mix(in srgb, var(--l2) 40%, #fff) 0%, transparent 58%),
+    radial-gradient(ellipse at 10% 0%, var(--lw0) 0%, transparent 58%),
+    radial-gradient(ellipse at 95% 5%, var(--lw1) 0%, transparent 58%),
+    radial-gradient(ellipse at 70% 105%, var(--lw2) 0%, transparent 58%),
     #eff0f5;
 }
 
@@ -1845,7 +1835,7 @@ button.info {
 }
 
 .app-ic.s-default {
-  background: linear-gradient(165deg, color-mix(in srgb, var(--brand) 86%, #fff), color-mix(in srgb, var(--brand) 80%, #000));
+  background: linear-gradient(165deg, var(--b1, #8e8e9a), var(--b2, #4a4a55));
   --glyph: #fff;
 }
 
@@ -1859,8 +1849,8 @@ button.info {
 }
 
 .app-ic.s-tinted {
-  background: linear-gradient(165deg, color-mix(in srgb, var(--l0) 58%, rgba(255, 255, 255, 0.12)), color-mix(in srgb, var(--l0) 24%, rgba(0, 0, 0, 0.2)));
-  --glyph: color-mix(in srgb, var(--l0) 28%, #fff);
+  background: linear-gradient(165deg, var(--tint-bg1), var(--tint-bg2));
+  --glyph: var(--tint-glyph);
 }
 
 /* ---------- Customize panel ---------- */
@@ -2450,21 +2440,19 @@ button.w-empty {
    entrance effects everywhere.
    ===================================================================== */
 
-@property --glowc { syntax: '<color>'; inherits: true; initial-value: #2bd47d; }
 
 #stage {
   font-family: Geist, "Geist Local", "Helvetica Neue", Arial, sans-serif;
   letter-spacing: 0;
-  transition: background 0.4s, --l0 1.2s, --l1 1.2s, --l2 1.2s, --glowc 1s;
 
-  /* Focus is lit in the room's light colour */
-  --focus: color-mix(in srgb, var(--glowc) 45%, #fff);
-  --focus-glow: color-mix(in srgb, var(--glowc) 50%, transparent);
-}
-
-#stage.light {
-  --focus: color-mix(in srgb, var(--glowc) 55%, #15151d);
-  --focus-glow: color-mix(in srgb, var(--glowc) 35%, transparent);
+  /* Focus is lit in the room's light colour (set by applyColors in app.js) */
+  --focus: #ffffff;
+  --focus-glow: rgba(255, 255, 255, 0.3);
+  --glowc: #2bd47d;
+  --glow-a: rgba(43, 212, 125, 0.7);
+  --tint-bg1: rgba(40, 90, 70, 0.6);
+  --tint-bg2: rgba(10, 30, 24, 0.5);
+  --tint-glyph: #b8f0d6;
 }
 
 /* ---------- The backlight bleed ---------- */
@@ -2473,17 +2461,10 @@ button.w-empty {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  box-shadow:
-    inset 0 0 160px -40px color-mix(in srgb, var(--glowc) 80%, transparent),
-    inset 0 0 46px -22px color-mix(in srgb, var(--glowc) 70%, transparent);
+  /* One cheap gradient: clear in the middle, the light colour at the edges */
+  background: radial-gradient(ellipse 78% 82% at 50% 50%, transparent 58%, var(--glow-a) 135%);
   transition: opacity 0.9s;
   animation: lights-on 2.4s var(--ease-out) 0.3s backwards;
-}
-
-#stage.light .edge {
-  box-shadow:
-    inset 0 0 160px -40px color-mix(in srgb, var(--glowc) 55%, transparent),
-    inset 0 0 46px -22px color-mix(in srgb, var(--glowc) 45%, transparent);
 }
 
 .edge.off {
@@ -2914,4 +2895,479 @@ button.w-empty {
 
 #stage .fit [data-focus]:focus-visible {
   outline-color: #fff;
+}
+
+/* =====================================================================
+   v6: one type voice, a dock that fits its icons, sliders, tidy-up
+   ===================================================================== */
+
+/* The date ("Fri 30 Oct") sets the type for the whole page: Geist at medium
+   weight, normal spacing, no thin or light cuts anywhere. */
+#stage,
+.eyebrow,
+.btn,
+.small,
+.sub,
+.np-title,
+.hero-title,
+.music-title,
+.app-name,
+.search-bar input,
+.show-title,
+.queue-title,
+.mix-title,
+.info-val,
+.set-label,
+.switch-title,
+.toast,
+.room-title,
+.pillbtn,
+.light-name,
+.status-date {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.temp,
+.games-title,
+.ring-count,
+.fit-size {
+  font-weight: 500;
+}
+
+/* ---------- Dock: hugs its icons ----------
+   No room is kept for a label. The name appears in a small pill just under
+   the dock on the icon you're on, and the other icons step back a little. */
+.dock {
+  height: auto;
+  bottom: 34px;
+  padding: 12px 20px;
+  gap: 18px;
+  align-items: center;
+  border-radius: 34px;
+}
+
+.dock-divider {
+  height: 56px;
+  margin: 0 2px;
+}
+
+.dock-app {
+  position: relative;
+}
+
+.dock-label {
+  position: absolute;
+  top: calc(100% + 20px);
+  left: 50%;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--playink);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  opacity: 0;
+  transform: translate(-50%, -4px);
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.4s var(--gentle);
+}
+
+.dock-app:is(:focus-visible, :hover) .dock-label {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.dock.active .dock-app .app-ic {
+  transform: scale(0.9);
+}
+
+.dock.active .dock-app:focus-visible .app-ic,
+.dock.active .dock-app:hover .app-ic {
+  transform: scale(1.1) translateY(-2px);
+}
+
+/* ---------- Sliders (Customize > Tinted) ---------- */
+
+.slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.seg-pill {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  background: var(--glass);
+  font-size: 14px;
+}
+
+.slider {
+  position: relative;
+  width: 280px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.slider-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 10px;
+  border-radius: 6px;
+  background: var(--track);
+}
+
+.slider[data-slider="hue"] .slider-track {
+  background: linear-gradient(90deg, #ff4d4d, #ffb84d, #e6e64d, #4de68c, #4dc3ff, #6f6bff, #d84dff, #ff4d4d);
+}
+
+.slider[data-slider="warmth"] .slider-track {
+  background: linear-gradient(90deg, #6fa8ff, #e8eef8 50%, #ffb35c);
+}
+
+.slider[data-slider="opacity"] .slider-track {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12), var(--tint-base, #888));
+}
+
+.slider.muted .slider-track {
+  opacity: 0.4;
+}
+
+.slider-thumb {
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+#stage .slider:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+#stage .slider:focus-visible .slider-thumb {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  box-shadow: 0 0 22px 2px var(--focus-glow);
+}
+
+.tint-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tint-block[hidden] {
+  display: none;
+}
+
+.sheet {
+  max-height: 640px;
+}
+
+/* Customize panel: tighter, and nothing squashes when the tint rows appear */
+.sheet {
+  gap: 10px;
+  padding: 22px 30px 24px;
+}
+
+.sheet > *,
+.tint-block > * {
+  flex: none;
+}
+
+.sheet-row {
+  min-height: 44px;
+}
+
+.tint-block {
+  gap: 4px;
+}
+
+.opts {
+  margin-bottom: 0;
+}
+
+.opt {
+  padding: 4px 0;
+  gap: 8px;
+}
+
+/* Panels that float over other content need a solid backing now that nothing
+   is blurred behind them. */
+#stage {
+  --solid-panel: rgba(26, 28, 34, 0.97);
+}
+
+#stage.light {
+  --solid-panel: rgba(247, 248, 251, 0.97);
+}
+
+#stage .sheet.glass,
+#stage .switch-card.glass,
+#stage .toast.glass {
+  background: var(--solid-panel);
+}
+
+/* ---------- Settings: two columns ---------- */
+
+.settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 14px;
+  align-content: start;
+  padding: 12px;
+}
+
+.set-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.set-row {
+  height: 62px;
+  min-width: 0;
+}
+
+.set-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.set-val {
+  max-width: 190px;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.set-input {
+  width: 190px;
+}
+
+/* ---------- Wallpaper chooser ---------- */
+
+.wp-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  padding: 4px 4px 0;
+}
+
+.wp-tile {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 0;
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--track);
+  color: #fff;
+  cursor: pointer;
+}
+
+.wp-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wp-name {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), 0 0 14px rgba(0, 0, 0, 0.6);
+}
+
+.wp-check {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: none;
+  color: var(--ink);
+}
+
+.wp-tile.on .wp-check {
+  display: flex;
+  background: var(--solid-panel);
+}
+
+.wp-tile.on {
+  outline: 3px solid var(--ink);
+  outline-offset: -3px;
+}
+
+#stage .wp-tile:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  transform: scale(1.015);
+}
+
+.wp-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--glass);
+  box-shadow: inset 0 0 0 1px var(--glass-rim);
+  color: var(--ink);
+}
+
+.wp-add .wp-name {
+  position: static;
+  color: var(--ink);
+  text-shadow: none;
+}
+
+.wp-add-chip {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+}
+
+/* ---------- Set up from your phone ---------- */
+
+.setup {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+}
+
+.setup-card {
+  width: 640px;
+  box-sizing: border-box;
+  padding: 34px 40px;
+  border-radius: 34px;
+  background: var(--solid-panel);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.setup-title {
+  font-size: 31px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.setup-steps {
+  margin: 0;
+  padding-left: 28px;
+  font-size: 20px;
+  line-height: 1.7;
+}
+
+.setup-steps strong {
+  font-weight: 600;
+}
+
+.setup-pin {
+  font-size: 40px;
+  letter-spacing: 0.25em;
+}
+
+.setup-status {
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--sub);
+}
+
+.setup-card .btn {
+  align-self: flex-start;
+  margin-top: 6px;
+}
+
+.w-weather-icon {
+  display: flex;
+}
+
+/* ---------- Now playing: no controls, empty Music tab, Govee prompt ---------- */
+
+.no-controls .np-controls {
+  display: none;
+}
+
+.music-empty-card {
+  position: relative;
+  height: 336px;
+  overflow: hidden;
+}
+
+.music-empty-card .w-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 24px;
+}
+
+.w-empty .btn[hidden] {
+  display: none;
+}
+
+.light-cta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.light-cta > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ---------- Clean up apps ---------- */
+
+.cleanup {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 560px;
+  overflow-y: auto;
+}
+
+.cleanup-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 28px 24px;
+  max-width: 680px;
 }

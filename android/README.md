@@ -15,12 +15,21 @@ A small native Android app that makes the launcher UI in `../launcher/` the TV's
 
 The UI is copied into the app on every build (`copyWebUi` in `app/build.gradle.kts`), so `launcher/` stays the one source of the design. The same page still runs in a normal browser, where `launcher/bridge.js` does nothing and the sample data is used.
 
+## What each feature does on the TV
+
+- **Now playing** shows whatever is coming out of the speakers: an app on the TV, or a phone or iPad casting to it (the Cast receiver publishes its own media session). If a session has no details it falls back to the media notification, then to "Playing on this TV". Needs *Now playing access* (Settings).
+- **Weather** uses the TV's own location (Settings > Privacy > Location must be on; the launcher asks once), else the town set in Settings or on the phone page, else an approximate place from the internet connection. Data from Open-Meteo.
+- **Govee**: lights and the TV backlight, through the Govee account. Needs the API key (see *Set up from your phone*). Lights that answer on the local network (Govee Home app > the light > LAN Control) are controlled instantly; the rest go through Govee's cloud. The cloud code follows Govee's published API but hasn't been run against a real account yet: Settings > Govee account and the setup screen show exactly what Govee answers.
+- **Set up from your phone** (Settings): the TV shows an address and a four-digit code. On a phone on the same Wi-Fi, open the address, enter the code, then paste the Govee key, set the town, send wallpaper photos, or download the list of apps on the TV. The page only runs while that screen is open.
+- **Wallpaper photos**: seven built in (`wallpapers/`), plus photos sent from a phone (kept in the app's private storage).
+- **Home button** (Settings): asks Android to make this the home app. The TV shows its own question and you choose. It can be undone in the TV's settings, and the stock home screen stays installed.
+- **Clean up apps** (Settings): lists the apps agreed for switching off; each row opens that app's page in the TV's Settings where you press Disable. See `../debloat/README.md`.
+
 ## Not done yet
 
-- DreamView on/off needs Govee's cloud API (API key); `goveeSync` returns false for now.
-- Room lights other than the backlight aren't sent to Govee yet (their models are unknown).
+- Picture sync (DreamView) only works if Govee lists it for the light in its cloud API; otherwise the button says so.
 - Search results still use the sample catalogue. Real data: TMDB search and "where to watch" (JustWatch data) plus a pricing source.
-- The weather card still uses sample numbers; Open-Meteo goes here.
+- The Games switch to HDMI 2 depends on the TV's firmware allowing it; test it early.
 
 ## Build
 
@@ -41,7 +50,9 @@ The latest test build is `tv.apk` at the top of the repo. To update, download it
 2. Open Downloader, allow it to install apps when asked (or Settings › Apps › Security & restrictions › Unknown sources › Downloader), and enter:
    `raw.githubusercontent.com/Oxygn-02/Smart-tv/main/tv.apk`
    (capital O; it's case-sensitive). Choose Install.
-3. Open **Smart TV Launcher** from your apps. The first time, it asks you to fit the screen: press Up or Down until the white border sits just inside the TV's edges, then OK (change it later in Settings › Screen size). In its Settings tab, press OK on **Now playing access** and **Recent apps access** and switch the launcher on in the screen that opens.
+3. Open **Smart TV Launcher** from your apps. The first time, it asks you to fit the screen: press Up or Down until the white border sits just inside the TV's edges, then OK (change it later in Settings > Screen size).
+4. In Settings, press OK on **Now playing access** and **Recent apps access** and switch the launcher on in the screen that opens. Say yes if it asks about location.
+5. Press OK on **Set up from your phone** and follow the steps to add your Govee key.
 
 This installs it as a normal app; uninstalling it removes it completely. Making it the home screen (below) still needs adb.
 

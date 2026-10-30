@@ -26,6 +26,15 @@ const ICON_PATHS = {
   minus: '<path d="M5 12h14"/>',
   sync: '<rect x="4" y="6" width="16" height="10" rx="1.5"/><path d="M9 19.5h6"/><path d="M1.5 8.5v5M22.5 8.5v5"/>',
   drop: '<path d="M12 3.5s6 6.2 6 10.5a6 6 0 0 1-12 0c0-4.3 6-10.5 6-10.5z"/>',
+  // Weather (24x24 line icons) and a few more for the new screens
+  wPartly: '<circle cx="8" cy="8" r="2.8"/><path d="M8 2.3v1.4M2.3 8h1.4M4 4l1 1M12 4l-1 1"/><path d="M8.5 20h9a3.7 3.7 0 0 0 .3-7.4 5.2 5.2 0 0 0-9.9 1.5A3 3 0 0 0 8.5 20z"/>',
+  wCloud: '<path d="M7 19h10.5a4 4 0 0 0 .3-8 6 6 0 0 0-11.5 1.6A3.3 3.3 0 0 0 7 19z"/>',
+  wRain: '<path d="M7 15h10.5a4 4 0 0 0 .3-8 6 6 0 0 0-11.5 1.6A3.3 3.3 0 0 0 7 15z"/><path d="M8.5 18.5l-1 2.2M12.5 18.5l-1 2.2M16.5 18.5l-1 2.2"/>',
+  wSnow: '<path d="M7 15h10.5a4 4 0 0 0 .3-8 6 6 0 0 0-11.5 1.6A3.3 3.3 0 0 0 7 15z"/><path d="M8 18.5h.01M12 19.5h.01M16 18.5h.01M10 21.5h.01M14 21.5h.01"/>',
+  wStorm: '<path d="M7 15h10.5a4 4 0 0 0 .3-8 6 6 0 0 0-11.5 1.6A3.3 3.3 0 0 0 7 15z"/><path d="M13 15.5l-2.5 3.5h3L11 22.5"/>',
+  wFog: '<path d="M5 8h14M3 12h18M5 16h14M8 20h8"/>',
+  phone: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   power: '<path d="M12 3v8"/><path d="M6.6 6.6a7.5 7.5 0 1 0 10.8 0"/>',
 };
 
@@ -61,7 +70,9 @@ function appIcon(app, size = 52, style = iconStyle) {
   const inner = app.logo
     ? `<svg width="${glyph}" height="${glyph}" viewBox="0 0 24 24" style="fill:var(--glyph)" aria-hidden="true"><path d="${LOGO_PATHS[app.logo]}"/></svg>`
     : `<span class="mark" style="color:var(--glyph);font-size:${Math.round(size * 0.36)}px">${app.mark}</span>`;
-  return `<span class="lg chip app-ic s-${style}" style="--brand:${app.color};width:${size}px;height:${size}px;border-radius:${Math.round(size * 0.27)}px">${inner}</span>`;
+  const b1 = toHex(app.color) ? mixHex(toHex(app.color), '#ffffff', 0.86) : '#8e8e9a';
+  const b2 = toHex(app.color) ? mixHex(toHex(app.color), '#000000', 0.8) : '#4a4a55';
+  return `<span class="lg chip app-ic s-${style}" style="--brand:${app.color};--b1:${b1};--b2:${b2};width:${size}px;height:${size}px;border-radius:${Math.round(size * 0.27)}px">${inner}</span>`;
 }
 
 // Filled glyphs for the play/pause control.
