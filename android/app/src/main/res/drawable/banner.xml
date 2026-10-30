@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 320x180 TV banner: a dark tile with a green glow line, standing in for
+     a proper banner image. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <size android:width="320dp" android:height="180dp" />
+            <solid android:color="#0B0F14" />
+        </shape>
+    </item>
+    <item android:gravity="bottom" android:height="6dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#2BD47D" />
+        </shape>
+    </item>
+</layer-list>

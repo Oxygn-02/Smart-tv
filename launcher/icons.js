@@ -53,6 +53,11 @@ let iconStyle = 'default';
 // the app's lettermark. The logo is drawn in --glyph, which each style sets.
 function appIcon(app, size = 52, style = iconStyle) {
   const glyph = Math.round(size * 0.54 * (LOGO_SCALE[app.logo] || 1));
+  // On the TV, the installed app's own icon is used for the Default style,
+  // and for any app we have no logo for.
+  if (app.iconUrl && (style === 'default' || !app.logo)) {
+    return `<span class="lg chip app-ic s-${style} has-img" style="--brand:${app.color};width:${size}px;height:${size}px;border-radius:${Math.round(size * 0.27)}px"><img src="${app.iconUrl}" alt=""></span>`;
+  }
   const inner = app.logo
     ? `<svg width="${glyph}" height="${glyph}" viewBox="0 0 24 24" style="fill:var(--glyph)" aria-hidden="true"><path d="${LOGO_PATHS[app.logo]}"/></svg>`
     : `<span class="mark" style="color:var(--glyph);font-size:${Math.round(size * 0.36)}px">${app.mark}</span>`;
