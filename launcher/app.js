@@ -40,6 +40,7 @@
       lastScene: NATIVE ? 'none' : D.smartHome.backlights.start, // colours used while syncing or off
       scene: null, // room scene last applied
       lights: Object.fromEntries(D.smartHome.lights.map((l) => [l.id, l.on])),
+      drift: false, // slowly moves the backlight through the scene's colours
       sound: { on: true, volume: D.smartHome.soundbar.volume, max: D.smartHome.soundbar.volumeMax, muted: false },
     },
   };
@@ -49,6 +50,7 @@
 
   const H = D.smartHome;
   const BACKLIGHT = Object.fromEntries(H.backlights.scenes.map((s) => [s.id, s]));
+  BACKLIGHT.live = { id: 'live', name: 'Following your lights', colors: ['#8e8e9a', '#6b6b78', '#4a4a55'] };
   BACKLIGHT.none = { id: 'none', name: 'Not chosen yet', colors: ['#8e8e9a', '#6b6b78', '#4a4a55'] };
   const ROOM_SCENE = Object.fromEntries(H.scenes.map((s) => [s.id, s]));
 
@@ -144,7 +146,7 @@
     return `
       <section class="view view-home" data-view="home">
         <div class="widgets">
-          <button class="widget glass w-room" data-focus data-nav-to="room" aria-label="Room: open lights and soundbar">
+          <button class="widget glass w-room" data-focus data-nav-to="room" aria-label="Room: open lights">
             <span class="w-label">Room</span>
             <span class="w-room-row"><span class="w-room-swatch" data-room-swatch></span><span data-room-scene></span></span>
             <span class="w-room-row">${icon('lamp', 20)}<span data-room-lights></span></span>
@@ -315,6 +317,7 @@
   }
 
   function musicView() {
+    const sb = H.soundbar;
     return `
       <section class="view view-music" data-view="music" hidden>
         <section class="card glass music-empty-card tinted" data-music-empty hidden>
@@ -339,6 +342,19 @@
             <div class="queue" data-queue></div>
           </section>
         </div>
+        <section class="card glass soundbar" aria-label="Soundbar">
+          <div class="room-head">
+            <span class="lg chip room-chip">${icon('speaker')}</span>
+            <span class="room-title">Soundbar<span class="small" data-sound-status></span></span>
+            <div class="volume">
+              <button class="ctrl lg" data-focus data-action="vol-down" aria-label="Volume down">${icon('minus', 18)}</button>
+              <span class="track vol-track"><span class="fill" data-vol-fill></span></span>
+              <span class="vol-num tnum" data-vol></span>
+              <button class="ctrl lg" data-focus data-action="vol-up" aria-label="Volume up">${icon('plus', 18)}</button>
+              <button class="ctrl lg" data-focus data-action="mute" aria-label="Mute">${icon('volume', 18)}</button>
+            </div>
+          </div>
+        </section>
         <div class="music-mixes">
           <div class="eyebrow">Your mixes</div>
           <div class="mixes">
@@ -394,7 +410,6 @@
   }
 
   function roomView() {
-    const sb = H.soundbar;
     return `
       <section class="view view-room" data-view="room" hidden>
         <div class="room-grid">
@@ -402,6 +417,7 @@
             <div class="room-head">
               <span class="lg chip room-chip">${icon('room')}</span>
               <span class="room-title">${H.backlights.name}<span class="small" data-backlight-status></span></span>
+              <button class="btn lg" data-focus data-action="drift">Animate: <span data-val="drift"></span></button>
               <button class="btn lg" data-focus data-action="match-lights">Wallpaper follows lights: <span data-val="match"></span></button>
             </div>
             <div class="swatches">
@@ -431,19 +447,6 @@
           </section>
         </div>
 
-        <section class="card glass soundbar" aria-label="Soundbar">
-          <div class="room-head">
-            <span class="lg chip room-chip">${icon('speaker')}</span>
-            <span class="room-title">Soundbar<span class="small" data-sound-status></span></span>
-            <div class="volume">
-              <button class="ctrl lg" data-focus data-action="vol-down" aria-label="Volume down">${icon('minus', 18)}</button>
-              <span class="track vol-track"><span class="fill" data-vol-fill></span></span>
-              <span class="vol-num tnum" data-vol></span>
-              <button class="ctrl lg" data-focus data-action="vol-up" aria-label="Volume up">${icon('plus', 18)}</button>
-              <button class="ctrl lg" data-focus data-action="mute" aria-label="Mute">${icon('volume', 18)}</button>
-            </div>
-          </div>
-        </section>
       </section>`;
   }
 
@@ -927,12 +930,95 @@
 
   function applyGovee(data) {
     if (!data) return;
+    if (data.live) {
+      applyLive(data.live);
+      return;
+    }
     state.govee = { hasKey: !!data.hasKey, connected: !!data.connected, error: data.error || '', devices: data.devices || [] };
     state.govee.devices.forEach((d) => {
       if (d.light) state.home.lights[d.id] = !!d.on;
     });
     if (data.message) toast(data.message);
+    if (data.connected && !firstRead) { firstRead = true; setTimeout(readBacklight, 400); }
     renderLights();
+  }
+
+  // ---------- The backlight as it really is ----------
+  // Read from Govee every so often, so a change made in the Govee app shows
+  // here too: the glow and wallpaper take the light's own colour.
+
+  function paletteFrom(hex) {
+    const [r, g, b] = hexToRgb(hex).map((v) => v / 255);
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    const d = max - min;
+    let hue = 0;
+    if (d) {
+      if (max === r) hue = ((g - b) / d) % 6;
+      else if (max === g) hue = (b - r) / d + 2;
+      else hue = (r - g) / d + 4;
+      hue *= 60;
+    }
+    const sat = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+    const s = Math.max(0.35, Math.min(1, sat));
+    return [hex, hslToHex((hue + 28 + 360) % 360, s, Math.max(0.35, Math.min(0.6, l))), hslToHex((hue - 28 + 360) % 360, s, 0.32)];
+  }
+
+  function kelvinHex(k) {
+    return mixHex('#ff8a2a', '#fff4e8', Math.max(0, Math.min(1, (k - 2000) / 4500)));
+  }
+
+  let lastSent = 0;
+  let firstRead = false;
+  let livePoll = 0;
+
+  function applyLive(l) {
+    const bl = backlightDevice();
+    if (!bl || l.id !== bl.id || Date.now() - lastSent < 12000) return;
+    const h = state.home;
+    if (l.on === false) {
+      if (h.backlight !== 'off') { h.backlight = 'off'; applyState(); }
+      return;
+    }
+    const hex = l.rgb ? rgbToHex((l.rgb >> 16) & 255, (l.rgb >> 8) & 255, l.rgb & 255) : l.kelvin ? kelvinHex(l.kelvin) : null;
+    if (hex) {
+      BACKLIGHT.live.colors = paletteFrom(hex);
+      h.lastScene = 'live';
+      if (h.backlight === 'off' || h.backlight === 'none') h.backlight = 'live';
+      else if (BACKLIGHT[h.backlight] && !['sync', 'live'].includes(h.backlight)
+        && hexToRgb(BACKLIGHT[h.backlight].colors[0]).some((v, i) => Math.abs(v - hexToRgb(hex)[i]) > 40)) h.backlight = 'live'; // changed in the Govee app
+    } else if (h.backlight === 'off') {
+      h.backlight = 'live';
+    }
+    applyState();
+  }
+
+  function readBacklight() {
+    const bl = backlightDevice();
+    if (NATIVE && bl) nativeCall('goveeRead', bl.id);
+  }
+
+  // The glow drifts around the scene's colours; with Animate on, so does the
+  // backlight itself (over the local network, a small step every 1.5 seconds).
+  let driftT = 0;
+  function driftStep() {
+    if (document.hidden) return;
+    const h = state.home;
+    if (!h.drift || h.backlight === 'off' || h.backlight === 'sync') return;
+    const cols = BACKLIGHT[h.backlight === 'none' ? 'live' : h.backlight]?.colors || BACKLIGHT[h.lastScene].colors;
+    driftT = (driftT + 1.5 / 36) % 1; // a full circuit takes 36 seconds
+    const x = driftT * cols.length;
+    const i = Math.floor(x);
+    const hex = mixHex(cols[i % cols.length], cols[(i + 1) % cols.length], x - i);
+    state.glow = hex;
+    applyColors();
+    const bl = backlightDevice();
+    if (NATIVE && bl && bl.lan) {
+      const [r, g, b] = hexToRgb(hex);
+      nativeCall('goveeColor', bl.id, r, g, b);
+      lastSent = Date.now();
+    }
   }
 
   function renderLights() {
@@ -940,6 +1026,7 @@
     if (!list) return;
     const hadFocus = list.contains(document.activeElement);
     const lights = roomLights();
+    list.style.setProperty('--rows', Math.max(1, Math.ceil(lights.length / 2)));
     list.innerHTML = lights.length ? lights.map((l) => `
       <button class="light-row" data-focus data-action="light" data-id="${l.id}">
         <span class="light-dot"></span><span class="light-name">${l.name}</span>
@@ -969,6 +1056,7 @@
       const [r, g, b] = hexToRgb(BACKLIGHT[h.backlight].colors[0]);
       nativeCall('goveeColor', bl.id, r, g, b);
     }
+    if (h.backlight !== 'sync') lastSent = Date.now();
   }
 
   function applyScene(sc) {
@@ -1031,6 +1119,7 @@
     stage.innerHTML = `
       <div class="edge" aria-hidden="true"></div>
       <div class="shade" aria-hidden="true"></div>
+      <div class="aurora" aria-hidden="true"><i></i><i></i></div>
 
       <header class="topbar">
         <div class="status">
@@ -1139,6 +1228,7 @@
       countdown: g.countdownSec ? `${g.countdownSec} s` : 'None',
       wifi: 'Connected',
       match: state.matchLights ? 'On' : 'Off',
+      drift: state.home.drift ? 'On' : 'Off',
       sample: state.sampleData ? 'On' : 'Off',
       wp: wallpaperLabel(),
       setup: NATIVE ? 'Press OK' : 'On the TV',
@@ -1210,7 +1300,7 @@
 
     // Backlight bleed: the screen edges glow in the light colour. In "Sync to
     // TV" mode the focused item's colour takes over (see syncGlow below).
-    if (h.backlight !== 'sync') state.glow = null;
+    if ((h.backlight !== 'sync' || NATIVE) && !h.drift) state.glow = null;
     applyColors();
     stage.querySelector('.edge').classList.toggle('off', h.backlight === 'off');
     stage.classList.toggle('lights', state.matchLights && h.backlight !== 'off');
@@ -1556,6 +1646,15 @@
     else if (act === 'wallpaper') {
       const cur = state.matchLights ? 'lights' : state.wallpaper;
       setWallpaper({ photo: 'gradient', gradient: 'lights', lights: 'photo' }[cur]);
+    } else if (act === 'drift') {
+      const bl = backlightDevice();
+      if (NATIVE && bl && !bl.lan) {
+        toast('Turn on LAN Control for the backlight in the Govee Home app to animate it');
+      } else {
+        state.home.drift = !state.home.drift;
+        if (!state.home.drift) state.glow = null;
+        toast(state.home.drift ? 'Backlight drifting through its colours' : 'Animation off');
+      }
     } else if (act === 'match-lights') {
       state.matchLights = !state.matchLights;
       toast(state.matchLights ? 'Wallpaper now matches your backlights' : 'Wallpaper back to your own');
@@ -1659,7 +1758,7 @@
     const view = e.target.closest('[data-view]');
     if (view) lastFocus[view.dataset.view] = e.target;
     stage.querySelector('.dock')?.classList.toggle('active', !!e.target.closest('.dock'));
-    if (state.home.backlight === 'sync') syncGlow(e.target);
+    if (state.home.backlight === 'sync' && !NATIVE) syncGlow(e.target);
   });
 
   const KEY_DIRECTION = {
@@ -1908,6 +2007,9 @@
     stage.querySelector('.dock-app')?.focus();
   };
   // Back from an app or a settings screen: refresh what's playing and access.
+  setInterval(driftStep, 1500);
+  setInterval(() => { if (!document.hidden) readBacklight(); }, 20000);
+
   // The TV's real volume (HDMI ARC passes it to the soundbar).
   function syncVolume() {
     const v = nativeJson('volumeInfo');
@@ -1919,6 +2021,7 @@
   window.launcherResume = () => {
     if (!NATIVE) return;
     syncVolume();
+    readBacklight();
     pollNowPlaying();
     refreshNativeStatus();
     if (state.view === 'cleanup') renderCleanup(); // back from the TV's Settings

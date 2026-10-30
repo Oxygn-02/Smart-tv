@@ -79,7 +79,8 @@ class GoveeHub(context: Context, private val publish: (String) -> Unit) {
                     .put("color", d.has("colorRgb"))
                     .put("white", d.has("colorTemperatureK"))
                     .put("brightness", d.has("brightness"))
-                    .put("dream", d.dreamViewInstance != null),
+                    .put("dream", d.dreamViewInstance != null)
+                    .put("lan", lan.ipFor(d.id) != null),
             )
         }
         val json = JSONObject()
@@ -137,6 +138,22 @@ class GoveeHub(context: Context, private val publish: (String) -> Unit) {
             cloud.control(d, COLOR, "colorTemperatureK", k)
         }
         isOn[id] = true
+    }
+
+    /**
+     * Reads what a light is doing now (so a change made in the Govee app shows
+     * up here). The answer arrives as a "govee" event: {live:{id,on,rgb,...}}.
+     */
+    fun readLive(id: String) {
+        io.execute {
+            try {
+                val live = cloud.state(find(id)).put("id", id)
+                if (live.has("on")) isOn[id] = live.optBoolean("on")
+                publish(JSONObject().put("live", live).toString())
+            } catch (_: Exception) {
+                // Offline or rate-limited: try again next time.
+            }
+        }
     }
 
     /** DreamView: the backlight follows the picture (its camera). */

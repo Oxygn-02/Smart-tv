@@ -339,6 +339,10 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
     @JavascriptInterface
     fun goveeWhite(id: String, kelvin: Int) = govee.white(id, kelvin)
 
+    /** Reads a light's current state; the answer arrives as a "govee" event. */
+    @JavascriptInterface
+    fun goveeRead(id: String) = govee.readLive(id)
+
     /** Picture sync on the TV backlight, if Govee offers it for that light. */
     @JavascriptInterface
     fun goveeDreamView(id: String, on: Boolean) = govee.dreamView(id, on)

@@ -94,6 +94,27 @@ class GoveeCloud(private val key: () -> String) {
         return null
     }
 
+    /** What the light is doing now: {on, brightness, rgb, kelvin}. Missing values are left out. */
+    fun state(device: GoveeDevice): JSONObject {
+        val body = JSONObject()
+            .put("requestId", UUID.randomUUID().toString())
+            .put("payload", JSONObject().put("sku", device.sku).put("device", device.id))
+        val out = JSONObject()
+        val caps = call("POST", "/router/api/v1/device/state", body)
+            .optJSONObject("payload")?.optJSONArray("capabilities") ?: return out
+        for (i in 0 until caps.length()) {
+            val c = caps.getJSONObject(i)
+            val v = c.optJSONObject("state")?.opt("value") ?: continue
+            when (c.optString("instance")) {
+                "powerSwitch" -> out.put("on", (v as? Number)?.toInt() == 1)
+                "brightness" -> (v as? Number)?.let { out.put("brightness", it.toInt()) }
+                "colorRgb" -> (v as? Number)?.toInt()?.takeIf { it > 0 }?.let { out.put("rgb", it) }
+                "colorTemperatureK" -> (v as? Number)?.toInt()?.takeIf { it > 0 }?.let { out.put("kelvin", it) }
+            }
+        }
+        return out
+    }
+
     private class MethodNotAllowed : Exception()
 
     private fun call(method: String, path: String, body: JSONObject?): JSONObject {
