@@ -77,6 +77,7 @@ const LAUNCHER_DATA = {
     low: 8,
     icon: 'wPartly',
     palette: ['#9fd3ff', '#3f86d9', '#1d4c9c'],
+    extra: { feels: 10, wind: 9, humidity: 72, hours: [{ at: '14:00', temp: 13, rain: 5 }, { at: '16:00', temp: 14, rain: 10 }, { at: '18:00', temp: 12, rain: 20 }, { at: '20:00', temp: 10, rain: 35 }, { at: '22:00', temp: 9, rain: 20 }, { at: '00:00', temp: 8, rain: 10 }] },
   },
 
   hero: {

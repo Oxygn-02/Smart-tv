@@ -3630,3 +3630,202 @@ button.w-empty {
 .settings .set-col {
   gap: 0;
 }
+
+/* =====================================================================
+   v0.6: Home cards you can select, and the window they open into
+   ===================================================================== */
+
+/* Lighter edge glow, easier on the eyes */
+.edge {
+  opacity: 0.7;
+}
+
+/* Hover and focus on a card: a slow lift and a soft glow in the room colour */
+.widget {
+  transition: transform 0.6s var(--gentle), box-shadow 0.5s;
+}
+
+.widget:is(:focus-visible, :hover) {
+  transform: translateY(-4px) scale(1.025);
+  box-shadow: 0 26px 60px -16px var(--focus-glow), 0 0 0 1px var(--glass-hi), inset 0 1px 0 var(--glass-hi);
+}
+
+.widget[data-expand] {
+  cursor: pointer;
+}
+
+/* The window */
+.xscrim {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+  animation: fade-in 0.35s var(--ease-out);
+}
+
+.xscrim.closing {
+  opacity: 0;
+  transition: opacity 0.28s;
+}
+
+.xpanel {
+  width: 780px;
+  max-height: 600px;
+  box-sizing: border-box;
+  padding: 26px 30px 28px;
+  border-radius: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: left;
+  color: var(--ink);
+  background: var(--solid-panel, rgba(26, 28, 34, 0.97));
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 40px 90px rgba(0, 0, 0, 0.5), 0 0 60px -10px var(--focus-glow);
+  transition: transform 0.6s var(--gentle), opacity 0.4s;
+  overflow: hidden;
+}
+
+.xscrim.closing .xpanel {
+  transform: scale(0.97);
+  transition: transform 0.28s;
+}
+
+.x-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.x-title {
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.x-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.x-swatches {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.x-swatches .swatch-dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+}
+
+.x-lights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(var(--rows, 3), 40px);
+  grid-auto-flow: column;
+  column-gap: 18px;
+}
+
+.x-weather {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.x-temp {
+  font-size: 96px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.x-cond {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 24px;
+}
+
+.x-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.x-stat,
+.x-hour {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--glass);
+}
+
+.x-val {
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.x-hours {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+.x-hour {
+  align-items: center;
+}
+
+.x-music {
+  display: flex;
+  gap: 28px;
+  align-items: center;
+}
+
+.x-art {
+  width: 240px;
+  height: 240px;
+  flex: none;
+  border-radius: 28px;
+  box-shadow: 0 20px 50px -14px rgba(0, 0, 0, 0.5);
+}
+
+.x-music-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.x-song {
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.x-cw {
+  display: flex;
+  gap: 26px;
+}
+
+.x-cw-art {
+  width: 300px;
+  height: 180px;
+  flex: none;
+  border-radius: 22px;
+}
+
+.x-cw-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
