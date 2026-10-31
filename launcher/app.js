@@ -150,16 +150,16 @@
     return `
       <section class="view view-home" data-view="home">
         <div class="widgets">
-          <button class="widget glass w-room" data-focus data-nav-to="room" aria-label="Room: open lights">
+          <button class="widget glass w-room" data-focus data-expand="room" aria-label="Room: lights and scenes">
             <span class="w-label">Room</span>
             <span class="w-room-row"><span class="w-room-swatch" data-room-swatch></span><span data-room-scene></span></span>
             <span class="w-room-row">${icon('lamp', 20)}<span data-room-lights></span></span>
             <span class="w-room-row">${icon('speaker', 20)}<span data-room-sound></span></span>
           </button>
 
-          <section class="widget glass tinted w-weather" data-weather-card aria-label="Weather">
+          <section class="widget glass tinted w-weather" data-weather-card data-focus data-expand="weather" tabindex="0" aria-label="Weather">
             <div class="tint"></div>
-            <button class="w-empty" data-focus data-nav-to="settings">
+            <button class="w-empty" tabindex="-1" data-nav-to="settings">
               ${icon('location', 28)}
               <span class="w-empty-title" data-w-empty-title></span>
               <span class="small" data-w-empty-text></span>
@@ -175,7 +175,7 @@
             </div>
           </section>
 
-          <section class="widget glass now-playing tinted w-music" data-np-card aria-label="Now playing">
+          <section class="widget glass now-playing tinted w-music" data-np-card data-focus data-expand="music" tabindex="0" aria-label="Now playing">
             <div class="tint"></div>
             ${npEmpty()}
             <div class="np-top">
@@ -183,7 +183,7 @@
                 <div class="np-title" data-np-title></div>
                 <div class="sub" data-np-artist></div>
               </div>
-              <div class="np-art" data-np-art><span class="art-app" data-np-src-icon="34"></span></div>
+              <div class="np-art" data-np-art></div>
             </div>
             <div class="np-next">
               <div class="np-next-label">Up next</div>
@@ -192,7 +192,7 @@
             ${nowPlayingControls()}
           </section>
 
-          <section class="widget hero w-hero" aria-label="Continue watching">
+          <section class="widget hero w-hero" aria-label="Continue watching" ${NATIVE ? '' : 'data-focus data-expand="hero" tabindex="0"'}>
             <div class="w-empty">
               ${icon('live', 34)}
               <span class="w-empty-title">Nothing to continue</span>
@@ -223,7 +223,7 @@
               <span class="w-mini-title">${APP[id].name}</span>
             </button>`).join('')}
           ${D.continueWatching.map((c) => `
-            <button class="widget glass w-mini" data-cw data-focus data-toast="Resuming ${c.title} on ${c.app}" aria-label="Continue ${c.title} on ${c.app}">
+            <button class="widget glass w-mini" data-cw data-focus data-expand="cw" data-i="${D.continueWatching.indexOf(c)}" aria-label="Continue ${c.title} on ${c.app}">
               <span class="w-mini-art" style="background:${c.art}">${appIcon(APP[c.appId], 30)}</span>
               <span class="w-mini-title">${c.title}</span>
               <span class="small">${c.meta}</span>
@@ -455,6 +455,110 @@
         </div>
 
       </section>`;
+  }
+
+  // ---------- Cards that open into a window ----------
+  // Selecting a Home card grows it into a panel with quick actions or details.
+  let xFrom = null;
+
+  const wx = () => (state.weather && state.weather.extra) || null;
+
+  function xContent(kind) {
+    const close = '<button class="btn lg x-close" data-focus data-action="x-close">Close</button>';
+    if (kind === 'room') {
+      const lights = roomLights();
+      const h = state.home;
+      return `
+        <div class="x-head"><span class="x-title">Room</span>${close}</div>
+        <div class="pill-row">${H.scenes.map((sc) => `<button class="pillbtn" data-focus data-action="room-scene" data-id="${sc.id}">${sc.name}</button>`).join('')}</div>
+        <div class="x-swatches">
+          <button class="swatch" data-focus data-action="backlight" data-id="sync"><span class="swatch-dot lg chip">${icon('sync', 22)}</span><span class="small">Sync</span></button>
+          ${H.backlights.scenes.map((s) => `<button class="swatch" data-focus data-action="backlight" data-id="${s.id}"><span class="swatch-dot" style="background:linear-gradient(135deg,${s.colors.join(',')})"></span><span class="small">${s.name}</span></button>`).join('')}
+          <button class="swatch" data-focus data-action="backlight" data-id="off"><span class="swatch-dot lg chip">${icon('power', 20)}</span><span class="small">Off</span></button>
+        </div>
+        <div class="x-lights" style="--rows:${Math.max(1, Math.ceil(Math.min(lights.length, 10) / 2))}">
+          ${lights.slice(0, 10).map((l) => `<button class="light-row" data-focus data-action="light" data-id="${l.id}"><span class="light-dot"></span><span class="light-name">${l.name}</span><span class="switch" aria-hidden="true"><span></span></span></button>`).join('')
+            || '<span class="small">No lights yet. Connect Govee in Settings.</span>'}
+        </div>
+        <div class="x-foot"><span class="small">${lights.filter((l) => h.lights[l.id]).length} of ${lights.length} lights on</span><button class="btn lg" data-focus data-nav-to="room">All room controls</button></div>`;
+    }
+    if (kind === 'weather') {
+      const w = state.weather;
+      if (!w) return `<div class="x-head"><span class="x-title">Weather</span>${close}</div><p class="small">No weather yet. Check the TV is online, or add your town in Settings.</p><button class="btn lg" data-focus data-nav-to="settings">Open Settings</button>`;
+      const e = wx();
+      const stat = (label, v) => `<div class="x-stat"><span class="small">${label}</span><span class="x-val">${v}</span></div>`;
+      return `
+        <div class="x-head"><span class="x-title">${w.town}</span>${close}</div>
+        <div class="x-weather"><span class="x-bigicon">${icon(w.icon, 64)}</span><span class="x-temp">${w.temp}°</span><span class="x-cond">${w.label}<span class="small">High ${w.high}°, low ${w.low}°</span></span></div>
+        ${e ? `<div class="x-stats">${stat('Feels like', `${e.feels}°`)}${stat('Wind', `${e.wind} mph`)}${stat('Humidity', `${e.humidity}%`)}</div>
+        <div class="x-hours">${e.hours.map((hr) => `<div class="x-hour"><span class="small">${hr.at}</span><span class="x-val">${hr.temp}°</span><span class="small">${hr.rain}%</span></div>`).join('')}</div>` : '<p class="small">More detail appears at the next refresh.</p>'}
+        <button class="btn lg" data-focus data-action="x-close">Done</button>`;
+    }
+    if (kind === 'music') {
+      const open = APP.ytmusic && (!NATIVE || /youtube music/i.test(track().source || ''));
+      return `
+        <div class="x-head"><span class="x-title">Now playing</span>${close}</div>
+        <div class="x-music">
+          <div class="x-art" data-np-art></div>
+          <div class="x-music-body">
+            <div class="x-song" data-np-title></div>
+            <div class="sub" data-np-artist></div>
+            ${nowPlayingControls()}
+            ${open ? '<button class="btn lg" data-focus data-app="ytmusic">Open YouTube Music</button>' : ''}
+          </div>
+        </div>`;
+    }
+    const c = kind === 'hero' ? { ...D.hero, meta: D.hero.subtitle, appId: D.hero.appId } : D.continueWatching[Number(xFrom?.dataset.i)] || D.continueWatching[0];
+    if (!c) return '';
+    return `
+      <div class="x-head"><span class="x-title">${c.title}</span>${close}</div>
+      <div class="x-cw"><div class="x-cw-art" style="background:${c.art}"></div>
+        <div class="x-cw-body"><span class="small">${c.app || ''}</span><span class="x-val">${c.meta || ''}</span>
+          <div class="track"><div class="fill" style="width:${c.progress}%"></div></div>
+          <span class="small">${c.left || ''}</span>
+          <button class="btn lg btn-primary" data-focus data-toast="Resuming ${c.title} on ${c.app}">Resume in ${c.app}</button>
+        </div></div>`;
+  }
+
+  function openExpand(card) {
+    xFrom = card;
+    refs.xpanel.innerHTML = xContent(card.dataset.expand);
+    refs.x.hidden = false;
+    refs.x.classList.remove('closing');
+    // Grow from the card: start at its size and place, ease to the panel's.
+    const from = card.getBoundingClientRect();
+    const to = refs.xpanel.getBoundingClientRect();
+    const k = userFitScale();
+    const dx = (from.left + from.width / 2 - (to.left + to.width / 2)) / k;
+    const dy = (from.top + from.height / 2 - (to.top + to.height / 2)) / k;
+    refs.xpanel.style.transition = 'none';
+    refs.xpanel.style.transform = `translate(${dx}px, ${dy}px) scale(${Math.max(0.3, from.width / to.width)}, ${Math.max(0.3, from.height / to.height)})`;
+    refs.xpanel.style.opacity = '0.4';
+    refs.xpanel.getBoundingClientRect();
+    refs.xpanel.style.transition = '';
+    refs.xpanel.style.transform = '';
+    refs.xpanel.style.opacity = '';
+    if (card.dataset.expand === 'music') { renderTrack(); renderPlayButtons(); updatePlayback(); }
+    applyState();
+    (refs.xpanel.querySelector('[data-focus]:not(.x-close)') || refs.xpanel.querySelector('[data-focus]'))?.focus();
+  }
+
+  function closeExpand() {
+    if (refs.x.hidden) return;
+    refs.x.classList.add('closing');
+    setTimeout(() => {
+      refs.x.hidden = true;
+      refs.x.classList.remove('closing');
+      refs.xpanel.innerHTML = '';
+      (xFrom && xFrom.isConnected ? xFrom : stage.querySelector('.dock-app'))?.focus();
+      xFrom = null;
+    }, 280);
+  }
+
+  // The page is drawn scaled to the screen; getBoundingClientRect reports screen pixels.
+  function userFitScale() {
+    const m = /scale\(([\d.]+)\)/.exec(stage.style.transform || '');
+    return m ? parseFloat(m[1]) || 1 : 1;
   }
 
   // ---------- Light roles ----------
@@ -894,13 +998,14 @@
         const ip = await getJson('https://get.geojs.io/v1/ip/geo.json');
         place = { lat: Number(ip.latitude), lon: Number(ip.longitude), name: ip.city || 'Your area' };
       }
-      const w = await getJson(`https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`);
+      const w = await getJson(`https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,wind_speed_10m&hourly=temperature_2m,precipitation_probability&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=2&wind_speed_unit=mph`);
       state.weather = {
         town: place.name,
         temp: Math.round(w.current.temperature_2m),
         high: Math.round(w.daily.temperature_2m_max[0]),
         low: Math.round(w.daily.temperature_2m_min[0]),
         ...describeWeather(w.current.weather_code, w.current.is_day),
+        extra: weatherExtra(w),
       };
       state.weatherNote = '';
       weatherAt = Date.now();
@@ -909,6 +1014,21 @@
       if (!state.weather) state.weatherNote = 'offline';
     }
     renderWeather();
+  }
+
+  // Feels like, wind, humidity and the next few hours, from the same reply.
+  function weatherExtra(w) {
+    try {
+      const now = w.current.time;
+      const i0 = Math.max(0, w.hourly.time.findIndex((t) => t > now));
+      const hours = [0, 1, 2, 3, 4, 5].map((k) => {
+        const i = i0 + k * 2 - 0;
+        return { at: String(w.hourly.time[i]).slice(11, 16), temp: Math.round(w.hourly.temperature_2m[i]), rain: Math.round(w.hourly.precipitation_probability[i] || 0) };
+      }).filter((h) => h.at.length === 5);
+      return { feels: Math.round(w.current.apparent_temperature), wind: Math.round(w.current.wind_speed_10m), humidity: Math.round(w.current.relative_humidity_2m), hours };
+    } catch {
+      return null;
+    }
   }
 
   async function placeName(lat, lon) {
@@ -1245,6 +1365,7 @@
       ${customizeSheet()}
       ${fitOverlay()}
       ${setupOverlay()}
+      <div class="xscrim" hidden><section class="xpanel" role="dialog" aria-modal="true" data-xpanel></section></div>
       <div class="ambient" hidden aria-hidden="true"><div class="amb-a"></div><div class="amb-b"></div><div class="amb-info"><div class="amb-clock" data-amb-clock></div><div class="amb-sub" data-amb-sub></div></div></div>
       <div class="toast glass" role="status" hidden></div>
     `;
@@ -1258,6 +1379,8 @@
       searchInput: stage.querySelector('#search-input'),
       townInput: stage.querySelector('#town-input'),
       overlay: stage.querySelector('.overlay'),
+      x: stage.querySelector('.xscrim'),
+      xpanel: stage.querySelector('[data-xpanel]'),
       switchCard: stage.querySelector('[data-switch-card]'),
       inputScreen: stage.querySelector('[data-input-screen]'),
       ring: stage.querySelector('[data-ring]'),
@@ -1734,11 +1857,21 @@
   // ---------- Input ----------
 
   stage.addEventListener('click', (e) => {
-    const b = e.target.closest('button');
+    const card = e.target.closest('[data-expand]');
+    const inner = e.target.closest('button');
+    if (card && (!inner || inner === card) && refs.x.hidden) {
+      if (card.dataset.expand === 'weather' && !state.weather && card.querySelector('.w-empty')) openView('settings');
+      else openExpand(card);
+      return;
+    }
+    if (e.target === refs.x) { closeExpand(); return; }
+    const b = inner;
     if (!b) return;
     const g = state.games;
     const act = b.dataset.action;
 
+    if (b.dataset.action === 'x-close') { closeExpand(); return; }
+    if ((b.dataset.nav || b.dataset.navTo) && !refs.x.hidden) { refs.x.hidden = true; refs.xpanel.innerHTML = ''; xFrom = null; }
     if (b.dataset.nav) openView(b.dataset.nav);
     else if (b.dataset.navTo) openView(b.dataset.navTo);
     else if (b.dataset.app) launchApp(b.dataset.app);
@@ -1998,7 +2131,7 @@
   }
 
   function moveFocus(dir) {
-    const scope = !refs.sheet.hidden ? refs.sheet : refs.overlay.hidden ? stage : refs.overlay;
+    const scope = !refs.x.hidden ? refs.xpanel : !refs.sheet.hidden ? refs.sheet : refs.overlay.hidden ? stage : refs.overlay;
     const candidates = focusables(scope);
     const cur = document.activeElement;
     if (!candidates.includes(cur)) {
@@ -2028,7 +2161,9 @@
   }
 
   function goBack() {
-    if (!refs.setup.hidden) {
+    if (!refs.x.hidden) {
+      closeExpand();
+    } else if (!refs.setup.hidden) {
       closeSetup();
     } else if (!refs.fit.hidden) {
       closeFit();
@@ -2051,6 +2186,11 @@
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') nudgeFit(e.key === 'ArrowUp' ? 1 : -1);
       if (BACK_KEYS.has(e.key)) closeFit();
       if (e.key.startsWith('Arrow') || BACK_KEYS.has(e.key)) e.preventDefault();
+      return;
+    }
+    if (e.key === 'Enter' && e.target.matches?.('[data-expand]:not(button)')) {
+      e.preventDefault();
+      e.target.click();
       return;
     }
     const inText = e.target.tagName === 'INPUT';
