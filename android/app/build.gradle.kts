@@ -12,8 +12,8 @@ android {
         // Android TV 8.0+. Google TV sets are Android 10 or later.
         minSdk = 26
         targetSdk = 34
-        versionCode = 7
-        versionName = "0.6"
+        versionCode = 8
+        versionName = "0.6.1"
     }
 
     buildTypes {
