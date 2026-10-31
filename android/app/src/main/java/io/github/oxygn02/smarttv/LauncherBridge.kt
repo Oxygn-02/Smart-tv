@@ -251,6 +251,8 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             pkg in homes -> "A home screen"
             pkg in inputs -> "TV input"
             pkg in PROTECTED_PKGS -> "Needed by the TV"
+            (pkg.startsWith("com.mediatek") || pkg.startsWith("mediatek.") || pkg.startsWith("com.mstar")) && pkg !in MAKER_OK -> "TV system service"
+            Regex("^uk\\.co\\.freeview\\.(fvpconfigauth|mdsclient|tifbridge|onnow|explore)$").matches(pkg) -> "Freeview Play service"
             Regex("update|\\.ota|setup|provision|permission|installer|webview|systemui|settings|bluetooth|keyboard|inputmethod|tvprovider|\\.gms|\\.gsf|vending").containsMatchIn(pkg.lowercase()) -> "Needed by the TV"
             KEEP_LABELS.any { key == it || key.startsWith(it) } -> "An app you use"
             else -> null
@@ -667,6 +669,8 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
 
         override fun appsJson(): String = appCatalog().toString()
 
+        override fun wallpaperBytes(name: String): ByteArray? = this@LauncherBridge.wallpaperBytes(name)
+
         override fun iconPng(pkg: String): ByteArray? = this@LauncherBridge.iconPng(pkg)
 
         override fun onCleanup(pkgs: List<String>) {
@@ -687,22 +691,6 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             .put("wallpapers", JSONArray(wallpapers()))
 
         override fun packagesText(): String = packageList()
-    }
-
-    /**
-     * Read-only check: is the TV's debugging port (5555) listening, on the TV
-     * itself or on its network address? Returns {local, lan, ip}. It only opens
-     * and closes a connection; it sends nothing.
-     */
-    @JavascriptInterface
-    fun debugPortOpen(): String {
-        fun open(host: String): Boolean = try {
-            java.net.Socket().use { it.connect(java.net.InetSocketAddress(host, 5555), 1200); true }
-        } catch (_: Exception) {
-            false
-        }
-        val ip = lanAddress()
-        return JSONObject().put("local", open("127.0.0.1")).put("lan", ip != null && open(ip)).put("ip", ip ?: "").toString()
     }
 
     private fun lanAddress(): String? = NetworkInterface.getNetworkInterfaces().toList()
@@ -892,6 +880,8 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             "com.google.android.leanbacklauncher", "com.google.android.tvrecommendations", "com.android.tv.settings",
             "com.google.android.permissioncontroller", "com.google.android.packageinstaller", "com.android.providers.tv",
         )
+        // Maker apps that are only for factory testing, retail demos or playing files from USB.
+        val MAKER_OK = setOf("com.mediatek.wwtv.mediaplayer", "com.mediatek.testpq", "mediatek.factorymenu.ui", "com.mediatek.mtc.factory")
         val KEEP_LABELS = setOf(
             "youtube", "youtubemusic", "bbciplayer", "itvx", "channel4", "my5", "primevideo", "disney", "crunchyroll",
             "googleplaystore", "playstore", "googletv", "netflix",

@@ -38,6 +38,8 @@
     spread: true, // a backlight scene also colours the lights that have a role
     ambient: 10, // minutes idle before the ambient screen; 0 = off
     sleepAt: 0, // when the sleep timer turns the lights off (ms), or 0
+    motion: 'smooth', // 'smooth' or 'fast' (no animations)
+    speed: '', // result of the last speed test
     settingsCat: null, // which Settings group is open
     cw: [], // Watch Next items read from the TV
     cwNote: '',
@@ -65,7 +67,7 @@
 
   // ---------- Saved settings ----------
   // Remembered on the TV between launches (browser storage inside the app).
-  const SAVED = ['roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
+  const SAVED = ['motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
 
   function loadSaved() {
     try {
@@ -196,10 +198,9 @@
           </section>
 
           <section class="widget hero w-hero" aria-label="Continue watching" ${NATIVE ? '' : 'data-focus data-expand="hero" tabindex="0"'}>
-            <div class="w-empty">
-              ${icon('live', 34)}
-              <span class="w-empty-title">Nothing to continue</span>
-              <span class="small">Shows you start appear here when the app shares them</span>
+            <div class="w-empty w-jump">
+              <span class="w-empty-title" data-jump-title>Jump back in</span>
+              <div class="jump-row" data-jump></div>
             </div>
             <div class="hero-art" style="background:${h.art}"></div>
             <div class="hero-shade"></div>
@@ -216,6 +217,13 @@
                 <div class="hero-track"><div style="width:${h.progress}%"></div></div>
                 <span class="hero-left">${h.left}</span>
               </div>
+            </div>
+          </section>
+
+          <section class="widget glass w-scenes" data-scenes hidden aria-label="Scenes">
+            <span class="w-label">Scenes</span>
+            <div class="scene-grid">
+              ${['movie', 'gaming', 'relax', 'night'].map((id) => `<button class="pillbtn" data-focus data-action="room-scene" data-id="${id}">${ROOM_SCENE[id]?.name || id}</button>`).join('')}
             </div>
           </section>
 
@@ -395,20 +403,6 @@
             </div>
           </div>
         </section>
-        <div class="games-info">
-          <button class="info glass" data-focus data-action="cycle-hdmi">
-            <span class="lg chip info-chip">${icon('hdmi')}</span>
-            <span><span class="small">Input</span><span class="info-val" data-val="hdmi"></span></span>
-          </button>
-          <button class="info glass" data-focus data-action="cycle-countdown">
-            <span class="lg chip info-chip">${icon('timer')}</span>
-            <span><span class="small">Countdown</span><span class="info-val" data-val="countdown"></span></span>
-          </button>
-          <div class="info glass">
-            <span class="lg chip info-chip">${icon('power')}</span>
-            <span><span class="small">Console</span><span class="info-val">Wakes over HDMI-CEC</span></span>
-          </div>
-        </div>
       </section>`;
   }
 
@@ -456,6 +450,29 @@
       </section>`;
   }
 
+  // ---------- Jump back in: the apps you opened last ----------
+  // Remembered when you open an app from here, so it needs no permission.
+  let recent = [];
+  try { recent = JSON.parse(localStorage.getItem('recent') || '[]'); } catch { recent = []; }
+
+  function noteLaunch(id) {
+    recent = [id, ...recent.filter((x) => x !== id)].slice(0, 8);
+    try { localStorage.setItem('recent', JSON.stringify(recent)); } catch { /* not remembered */ }
+  }
+
+  function renderJump() {
+    const el = stage.querySelector('[data-jump]');
+    if (!el) return;
+    const used = recent.map((id) => APP[id]).filter(Boolean);
+    const list = (used.length ? used : dockApps()).slice(0, 4);
+    stage.querySelector('[data-jump-title]').textContent = used.length ? 'Jump back in' : 'Your apps';
+    el.innerHTML = list.map((a) => `
+      <button class="jump" data-focus data-app="${a.id}" aria-label="Open ${esc(a.name)}">
+        ${appIcon(a, 64)}
+        <span class="small">${esc(a.short || a.name)}</span>
+      </button>`).join('');
+  }
+
   // ---------- Continue watching (the TV's Watch Next list) ----------
   const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const appByPkg = (pkg) => D.apps.find((a) => a.pkg === pkg);
@@ -497,12 +514,6 @@
     hero.toggleAttribute('data-expand', !!h);
     hero.setAttribute('tabindex', h ? '0' : '-1');
     hero.dataset.expand = h ? 'hero' : '';
-    const note = hero.querySelector('.w-empty .small');
-    if (note) {
-      note.textContent = state.cwNote === 'permission'
-        ? "Android doesn't let this launcher read the Watch Next list on your TV."
-        : state.cwNote ? `Couldn't read Watch Next (${state.cwNote}).` : 'Shows you start in other apps appear here when they share them.';
-    }
     if (h) {
       hero.querySelector('.hero-art').style.background = h.art;
       hero.querySelector('.hero-app').innerHTML = `<span class="dot" style="background:${esc(h.appColor)}"></span>${esc(h.app)}`;
@@ -573,7 +584,7 @@
           <div class="show-body"><div class="show-title">${esc(title)}</div><div class="small show-meta">${[year, h.media_type === 'tv' ? 'Series' : 'Film'].filter(Boolean).join(' · ')}<br>${esc(line)}</div></div>
         </button>`;
     }).join('');
-    if (rows.length === 0 && q && !note.textContent) note.textContent = `No shows found for “${q}”.`;
+
   }
 
   let tmdbTimer = 0;
@@ -592,7 +603,13 @@
       note.textContent = 'Searching...';
       try {
         const r = await tmdb('search/multi', { query: q, include_adult: 'false', language: 'en-GB' });
-        const hits = (r.results || []).filter((x) => x.media_type === 'movie' || x.media_type === 'tv').slice(0, 5);
+        const words = q.toLowerCase().normalize('NFKD').replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(Boolean);
+        const hasWords = (x) => {
+          const t = `${x.title || x.name || ''} ${x.original_title || x.original_name || ''}`.toLowerCase().normalize('NFKD').replace(/[^a-z0-9 ]/g, '');
+          return words.every((w) => t.includes(w));
+        };
+        // TMDB matches loosely: keep only titles that really contain what was typed.
+        const hits = (r.results || []).filter((x) => (x.media_type === 'movie' || x.media_type === 'tv') && hasWords(x)).slice(0, 10);
         const rows = await Promise.all(hits.map(async (h) => {
           try {
             const p = await tmdb(`${h.media_type}/${h.id}/watch/providers`);
@@ -602,8 +619,10 @@
           }
         }));
         if (seq !== tmdbSeq) return;
-        note.textContent = '';
-        renderTitles(rows, q);
+        // Only titles one of your installed apps carries.
+        const onYourApps = rows.filter(({ g }) => pickApp(g)).slice(0, 5);
+        note.textContent = onYourApps.length ? '' : `Nothing on your apps matches “${q}”.`;
+        renderTitles(onYourApps, q);
       } catch {
         if (seq === tmdbSeq) {
           note.textContent = "Couldn't reach TMDB. Check the key on the phone page and the connection.";
@@ -621,21 +640,85 @@
     return { x: (r.left - sr.left) / k, y: (r.top - sr.top) / k };
   }
 
-  let frostQueued = 0;
-  function alignFrost() {
-    if (frostQueued) return;
-    frostQueued = requestAnimationFrame(() => {
-      frostQueued = 0;
-      if (state.wallpaper !== 'photo') return;
-      const sr = stage.getBoundingClientRect();
-      const k = sr.width / 1280 || 1;
-      stage.querySelectorAll('.glass').forEach((el) => {
-        if (!el.offsetParent) return; // hidden
-        const p = stagePos(el, sr, k);
-        el.style.setProperty('--fx', `${-p.x}px`);
-        el.style.setProperty('--fy', `${-p.y}px`);
-      });
+  // Measured at most a few times a second, and only after the page really
+  // changes (cards added or removed, a view opening, scrolling), never on every
+  // focus move. All measuring happens first, then all writing, so it forces
+  // one layout and no more.
+  let frostTimer = 0;
+  function alignFrost(delay = 140) {
+    if (frostTimer) return;
+    frostTimer = setTimeout(() => {
+      frostTimer = 0;
+      requestAnimationFrame(measureFrost);
+    }, delay);
+  }
+
+  function measureFrost() {
+    if (state.wallpaper !== 'photo') return;
+    const sr = stage.getBoundingClientRect();
+    const k = sr.width / 1280 || 1;
+    const todo = [];
+    stage.querySelectorAll('.glass').forEach((el) => {
+      if (!el.offsetParent) return; // hidden
+      const r = el.getBoundingClientRect();
+      const x = Math.round((r.left - sr.left) / k);
+      const y = Math.round((r.top - sr.top) / k);
+      if (el.__fx !== x || el.__fy !== y) todo.push([el, x, y]);
     });
+    todo.forEach(([el, x, y]) => {
+      el.__fx = x;
+      el.__fy = y;
+      el.style.setProperty('--fx', `${-x}px`);
+      el.style.setProperty('--fy', `${-y}px`);
+    });
+  }
+
+  // ---------- Speed test ----------
+  // Moves focus around every tab by itself and times the frames, so the numbers
+  // come from this TV, not from a guess.
+  let speedRunning = false;
+  async function runSpeedTest() {
+    if (speedRunning) return;
+    speedRunning = true;
+    toast('Speed test. Keep your hands off the remote');
+    const frames = [];
+    const delays = [];
+    let last = performance.now();
+    let on = true;
+    const loop = (t) => {
+      frames.push(t - last);
+      last = t;
+      if (on) requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const frame2 = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const dirs = ['right', 'right', 'left', 'down', 'up', 'right', 'left', 'down'];
+    for (const tab of ['home', 'search', 'music', 'apps', 'room', 'settings', 'home']) {
+      stage.querySelector(`.topbar [data-nav="${tab}"]`)?.click();
+      await wait(350);
+      for (let round = 0; round < 2; round++) {
+        for (const d of dirs) {
+          const t0 = performance.now();
+          moveFocus(d);
+          await frame2();
+          delays.push(performance.now() - t0);
+          await wait(110);
+        }
+      }
+    }
+    on = false;
+    const f = frames.slice(5).sort((a, b) => a - b);
+    const avg = f.reduce((a, b) => a + b, 0) / (f.length || 1);
+    const slow = Math.round((100 * f.filter((x) => x > 34).length) / (f.length || 1));
+    const d = delays.slice().sort((a, b) => a - b);
+    const lag = d.length ? d[Math.floor(d.length * 0.9)] : 0;
+    const rating = avg <= 18 && slow <= 5 ? 'Smooth' : avg <= 28 && slow <= 20 ? 'OK' : 'Slow';
+    state.speed = `${rating}: ${Math.round(avg)} ms a frame, ${slow}% slow, ${Math.round(lag)} ms to react`;
+    speedRunning = false;
+    openView('settings');
+    applyState();
+    toast(state.speed);
   }
 
   // ---------- Cards that open into a window ----------
@@ -853,12 +936,15 @@
         row('open-wallpapers', icon('image'), 'Wallpaper photos', 'Choose one, or add your own', 'wp'),
         row('screen-fit', icon('live'), 'Screen size', 'Resize if the edges are cropped', 'fit'),
         row('cycle-ambient', icon('moon'), 'Ambient screen', 'Photos and clock when idle', 'ambient'),
+        row('cycle-motion', icon('live'), 'Animations', 'Fast turns them off, for a slow TV', 'motion'),
+        row('speed-test', icon('timer'), 'Speed test', 'Moves around by itself for about 20 seconds. Hands off', 'speed'),
         NATIVE ? '' : row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to see empty widgets', 'sample'),
       ] },
       { id: 'home', icon: icon('home'), title: 'Home and apps', help: 'Home button, clean up apps', rows: [
         row('home-role', icon('home'), 'Home button', 'Which app opens on Home', 'home'),
         row('open-cleanup', icon('power'), 'Clean up apps', 'Switch off apps you don\'t want', 'cleanup'),
         NATIVE ? row('grant-np', icon('music'), 'Now playing access', 'Show what is playing', 'np-access') : '',
+        NATIVE ? row('wn-check', icon('live'), 'Continue watching check', 'What the TV shares from your apps', 'wn') : '',
       ] },
       { id: 'lights', icon: icon('lamp'), title: 'Lights', help: 'Govee account, light roles', rows: [
         row('open-setup', icon('lamp'), 'Govee account', 'Lights and backlight', 'govee'),
@@ -955,7 +1041,7 @@
     const actions = ready ? `
       ${live ? `<button class="set-row" data-focus data-action="adb-disable">
         <span class="lg chip set-chip">${icon('power')}</span>
-        <span class="set-label">${state.adbConfirm ? 'Press OK again to switch off' : `Switch off ${live} chosen app${live === 1 ? '' : 's'}`}<span class="small">${state.adbConfirm ? 'Uses pm disable-user. You can switch them back on from this screen' : 'Reversible. You confirm once more first'}</span></span>
+        <span class="set-label">${state.adbConfirm ? 'Press OK again to switch off' : `Switch off ${live} chosen app${live === 1 ? '' : 's'}`}<span class="small">${state.adbConfirm ? 'You can switch them back on from this screen' : 'Reversible. You confirm once more first'}</span></span>
         <span class="set-val">${state.adbConfirm ? 'Confirm' : 'Press OK'}</span>
       </button>` : ''}
       ${a.ours ? `<button class="set-row" data-focus data-action="adb-restore">
@@ -1380,8 +1466,10 @@
       toast('That app isn\'t installed');
       return;
     }
+    noteLaunch(id);
     if (NATIVE && a.pkg) nativeCall('launch', a.pkg);
     else toast(`Opening ${a.name}`);
+    renderJump();
   }
 
   // ---------- Govee ----------
@@ -1652,6 +1740,7 @@
     showPhoto();
     applyState();
     renderTrack();
+    renderJump();
     renderSearch();
     renderLights();
     updateClock();
@@ -1671,6 +1760,7 @@
     stage.classList.toggle('light', !dark);
     stage.classList.toggle('photo', photo);
     stage.classList.toggle('animate', !!state.home.drift);
+    stage.classList.toggle('fast', state.motion === 'fast');
     all('[data-set-menu]').forEach((el) => { el.hidden = !!state.settingsCat; });
     all('[data-set-cat]').forEach((el) => { el.hidden = el.dataset.setCat !== state.settingsCat; });
     applyColors();
@@ -1718,6 +1808,9 @@
       sample: state.sampleData ? 'On' : 'Off',
       wp: wallpaperLabel(),
       ambient: state.ambient ? `After ${state.ambient} min` : 'Off',
+      motion: state.motion === 'fast' ? 'Fast' : 'Smooth',
+      wn: state.wnCheck || 'Press OK',
+      speed: state.speed || 'Press OK',
       guest: NATIVE ? (guestInfo().ssid || 'Add from your phone') : 'Sample',
       spread: state.spread ? 'On' : 'Off',
       setup: NATIVE ? 'Press OK' : 'On the TV',
@@ -1757,6 +1850,7 @@
     stage.querySelector('.w-hero').classList.toggle('is-empty', NATIVE ? !state.cw.length : !sample);
     stage.querySelector('.w-music .np-next').hidden = !!NATIVE;
     all('[data-cw]').forEach((el) => { el.hidden = NATIVE ? Number(el.dataset.i) >= state.cw.length - 1 : !sample; });
+    all('[data-scenes]').forEach((el) => { el.hidden = NATIVE ? state.cw.length >= 3 : sample; });
     all('[data-recent]').forEach((el) => { el.hidden = sample || (NATIVE && state.cw.length > 1); });
 
     stage.querySelector('[data-games-sub]').textContent = g.autoSwitch
@@ -2041,6 +2135,8 @@
     if (id === 'roles') renderRoles();
     if (id === 'guest') renderGuest();
     animateView(id);
+    alignFrost(100);
+    setTimeout(() => alignFrost(0), 900); // again once the entry animation has settled
     if (id === 'games' && state.games.autoSwitch) startSwitch();
   }
 
@@ -2170,14 +2266,18 @@
     else if (act === 'open-cleanup') openView('cleanup');
     else if (act === 'open-app-info') nativeCall('openAppInfo', b.dataset.pkg);
     else if (act === 'close-setup') closeSetup();
-    else if (act === 'debug-check') {
-      toast('Checking...');
-      setTimeout(() => {
-        const r = nativeJson('debugPortOpen') || {};
-        state.dbg = r.local || r.lan ? `Open${r.lan ? ` at ${r.ip}` : ' on this TV only'}` : 'Closed';
-        toast(`Debug port: ${state.dbg}`);
-        applyState();
-      }, 50);
+    else if (act === 'wn-check') {
+      const r = nativeJson('watchNext');
+      if (!r) state.wnCheck = "Couldn't check";
+      else if (!r.ok) state.wnCheck = r.error === 'permission' ? 'Android blocks this launcher' : `Error: ${r.error}`;
+      else if (!(r.items || []).length) state.wnCheck = 'Allowed, but your apps have shared nothing';
+      else state.wnCheck = `${r.items.length} shared by ${[...new Set(r.items.map((i) => (appByPkg(i.pkg) || {}).name || i.pkg))].join(', ')}`;
+      toast(state.wnCheck);
+      applyState();
+    } else if (act === 'cycle-motion') {
+      state.motion = state.motion === 'fast' ? 'smooth' : 'fast';
+    } else if (act === 'speed-test') {
+      runSpeedTest();
     } else if (act === 'settings-cat') {
       state.settingsCat = b.dataset.cat;
       applyState();
@@ -2355,6 +2455,7 @@
   // lands where you left off.
   const lastFocus = {};
   stage.addEventListener('focusin', (e) => {
+    stage.querySelector('.search-bar')?.classList.toggle('typing', e.target.id === 'search-input');
     const view = e.target.closest('[data-view]');
     if (view) lastFocus[view.dataset.view] = e.target;
     stage.querySelector('.dock')?.classList.toggle('active', !!e.target.closest('.dock'));
@@ -2747,11 +2848,9 @@
   }
   build();
   ensureGlyphs();
-  new MutationObserver(alignFrost).observe(stage, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'class'] });
-  stage.addEventListener('scroll', alignFrost, true);
-  window.addEventListener('resize', alignFrost);
-  stage.addEventListener('animationend', alignFrost, true);
-  stage.addEventListener('transitionend', alignFrost, true);
+  new MutationObserver(() => alignFrost()).observe(stage, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+  stage.addEventListener('scroll', () => alignFrost(60), true);
+  window.addEventListener('resize', () => alignFrost());
   alignFrost();
   let glyphTimer = 0;
   new MutationObserver(() => {
