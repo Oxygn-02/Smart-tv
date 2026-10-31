@@ -38,6 +38,7 @@
     spread: true, // a backlight scene also colours the lights that have a role
     ambient: 10, // minutes idle before the ambient screen; 0 = off
     sleepAt: 0, // when the sleep timer turns the lights off (ms), or 0
+    clock24: false, // false: 2:45 pm; true: 14:45
     motion: 'smooth', // 'smooth' or 'fast' (no animations)
     speed: '', // result of the last speed test
     settingsCat: null, // which Settings group is open
@@ -67,7 +68,7 @@
 
   // ---------- Saved settings ----------
   // Remembered on the TV between launches (browser storage inside the app).
-  const SAVED = ['motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
+  const SAVED = ['clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
 
   function loadSaved() {
     try {
@@ -936,6 +937,7 @@
         row('open-wallpapers', icon('image'), 'Wallpaper photos', 'Choose one, or add your own', 'wp'),
         row('screen-fit', icon('live'), 'Screen size', 'Resize if the edges are cropped', 'fit'),
         row('cycle-ambient', icon('moon'), 'Ambient screen', 'Photos and clock when idle', 'ambient'),
+        row('cycle-clock', icon('timer'), 'Clock', '12-hour or 24-hour', 'clock'),
         row('cycle-motion', icon('live'), 'Animations', 'Fast turns them off, for a slow TV', 'motion'),
         row('speed-test', icon('timer'), 'Speed test', 'Moves around by itself for about 20 seconds. Hands off', 'speed'),
         NATIVE ? '' : row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to see empty widgets', 'sample'),
@@ -1808,6 +1810,7 @@
       sample: state.sampleData ? 'On' : 'Off',
       wp: wallpaperLabel(),
       ambient: state.ambient ? `After ${state.ambient} min` : 'Off',
+      clock: state.clock24 ? '24-hour' : '12-hour',
       motion: state.motion === 'fast' ? 'Fast' : 'Smooth',
       wn: state.wnCheck || 'Press OK',
       speed: state.speed || 'Press OK',
@@ -2037,12 +2040,18 @@
       : 'Suggested for you';
   }
 
+  // "2:45 pm" (12-hour, the default) or "14:45", and "Sat 31 Oct" with no comma.
+  function clockText(n) {
+    if (state.clock24) return `${pad(n.getHours())}:${pad(n.getMinutes())}`;
+    return `${n.getHours() % 12 || 12}:${pad(n.getMinutes())} ${n.getHours() < 12 ? 'am' : 'pm'}`;
+  }
+
   function updateClock() {
     const n = new Date();
-    const time = `${pad(n.getHours())}:${pad(n.getMinutes())}`;
+    const time = clockText(n);
     if (refs.clock.textContent === time) return;
     refs.clock.textContent = time;
-    refs.date.textContent = n.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    refs.date.textContent = n.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '');
   }
 
   // Built-in wallpapers plus photos added from a phone (app storage).
@@ -2275,6 +2284,10 @@
       else state.wnCheck = `${r.items.length} shared by ${[...new Set(r.items.map((i) => (appByPkg(i.pkg) || {}).name || i.pkg))].join(', ')}`;
       toast(state.wnCheck);
       applyState();
+    } else if (act === 'cycle-clock') {
+      state.clock24 = !state.clock24;
+      refs.clock.textContent = '';
+      updateClock();
     } else if (act === 'cycle-motion') {
       state.motion = state.motion === 'fast' ? 'smooth' : 'fast';
     } else if (act === 'speed-test') {
@@ -2764,7 +2777,7 @@
     prev.classList.remove('on');
     ambientPic++;
     const n = new Date();
-    el.querySelector('[data-amb-clock]').textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}`;
+    el.querySelector('[data-amb-clock]').textContent = clockText(n);
     const w = state.weather;
     el.querySelector('[data-amb-sub]').textContent = n.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + (w ? `  ·  ${w.temp}°  ${w.label}` : '');
   }

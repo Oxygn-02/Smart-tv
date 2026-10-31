@@ -1,9 +1,9 @@
-/* Geist (SIL Open Font License, see fonts/OFL.txt), bundled so the launcher
-   never waits on the network for its type. Named "Geist Local" so the hosted
+/* Inter (SIL Open Font License, see fonts/OFL.txt), bundled so the launcher
+   never waits on the network for its type. Named "Inter Local" so the hosted
    copy on the preview page can still take precedence. */
 @font-face {
-  font-family: "Geist Local";
-  src: url("fonts/geist-latin.woff2") format("woff2");
+  font-family: "Inter Local";
+  src: url("fonts/inter-latin.woff2") format("woff2");
   font-weight: 100 900;
   font-display: swap;
 }
@@ -121,7 +121,7 @@ input {
   flex: none;
   overflow: hidden;
   transform-origin: center center;
-  font-family: Geist, "Geist Local", system-ui, sans-serif;
+  font-family: Inter, "Inter Local", system-ui, sans-serif;
   font-weight: 300;
   color: var(--ink);
   background: var(--bg);
@@ -1396,7 +1396,7 @@ button.info {
    ===================================================================== */
 
 #stage {
-  font-family: Geist, "Geist Local", system-ui, sans-serif;
+  font-family: Inter, "Inter Local", system-ui, sans-serif;
   font-optical-sizing: auto;
   font-weight: 400;
   letter-spacing: -0.01em;
@@ -2334,7 +2334,7 @@ button.w-empty {
    The one bold idea: the backlight bleed. The screen edges glow in the
    room's light colour, like the strip spilling onto the wall, and focus is
    lit the same way. In "Sync to TV" mode the glow follows whatever you're
-   on. Everything else stays quiet: Geist on a 1.25 scale (16 / 20 / 25 /
+   on. Everything else stays quiet: Inter on one scale (16 / 20 / 25 /
    31 / 39 / 49), sentence case, no dot-joined strings, posters straight on
    the wallpaper, radius set by size, one power-on moment instead of
    entrance effects everywhere.
@@ -2342,7 +2342,7 @@ button.w-empty {
 
 
 #stage {
-  font-family: Geist, "Geist Local", "Helvetica Neue", Arial, sans-serif;
+  font-family: Inter, "Inter Local", system-ui, sans-serif;
   letter-spacing: 0;
 
   /* Focus is lit in the room's light colour (set by applyColors in app.js) */
@@ -2405,7 +2405,7 @@ button.w-empty {
   background: var(--glowc);
 }
 
-/* ---------- Type: Geist on a 1.25 scale ---------- */
+/* ---------- Type: Inter on one scale ---------- */
 
 .small { font-size: 16px; }
 .sub { font-size: 20px; }
@@ -2801,7 +2801,7 @@ button.w-empty {
    v6: one type voice, a dock that fits its icons, sliders, tidy-up
    ===================================================================== */
 
-/* The date ("Fri 30 Oct") sets the type for the whole page: Geist at medium
+/* The date ("Fri 30 Oct") sets the type for the whole page: Inter at medium
    weight, normal spacing, no thin or light cuts anywhere. */
 #stage,
 .eyebrow,
@@ -4020,4 +4020,17 @@ button.w-empty {
 
 .w-jump .jump-row {
   gap: 8px;
+}
+
+
+/* The clock and date, set like the system clock on a phone: firm, tight, in one weight */
+.status-time,
+.status-date,
+.amb-clock {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.status-time {
+  margin-right: 2px;
 }
