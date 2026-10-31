@@ -119,6 +119,74 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         return JSONArray(recent).toString()
     }
 
+    // ---------- Continue watching: the system's Watch Next list ----------
+
+    /**
+     * What apps have put on the TV's Watch Next list, as
+     * {ok, error, items:[{title, sub, pkg, uri, poster, pos, dur}]}. Android
+     * may refuse (error "permission") or the list may be empty; both are
+     * reported rather than hidden.
+     */
+    @JavascriptInterface
+    fun watchNext(): String {
+        val out = JSONObject()
+        val items = JSONArray()
+        try {
+            val cols = arrayOf(
+                TvContract.WatchNextPrograms.COLUMN_TITLE,
+                TvContract.WatchNextPrograms.COLUMN_SHORT_DESCRIPTION,
+                TvContract.WatchNextPrograms.COLUMN_PACKAGE_NAME,
+                TvContract.WatchNextPrograms.COLUMN_INTENT_URI,
+                TvContract.WatchNextPrograms.COLUMN_POSTER_ART_URI,
+                TvContract.WatchNextPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS,
+                TvContract.WatchNextPrograms.COLUMN_DURATION_MILLIS,
+                TvContract.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS,
+            )
+            activity.contentResolver.query(
+                TvContract.WatchNextPrograms.CONTENT_URI, cols, null, null,
+                TvContract.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS + " DESC",
+            )?.use { c ->
+                while (c.moveToNext() && items.length() < 6) {
+                    items.put(
+                        JSONObject()
+                            .put("title", c.getString(0).orEmpty())
+                            .put("sub", c.getString(1).orEmpty())
+                            .put("pkg", c.getString(2).orEmpty())
+                            .put("uri", c.getString(3).orEmpty())
+                            .put("poster", c.getString(4).orEmpty())
+                            .put("pos", c.getLong(5))
+                            .put("dur", c.getLong(6)),
+                    )
+                }
+            }
+            out.put("ok", true)
+        } catch (e: SecurityException) {
+            out.put("ok", false).put("error", "permission")
+        } catch (e: Exception) {
+            out.put("ok", false).put("error", e.javaClass.simpleName)
+        }
+        return out.put("items", items).toString()
+    }
+
+    /** Opens a Watch Next item in the app that published it. */
+    @JavascriptInterface
+    fun watchNextOpen(uri: String, pkg: String): Boolean {
+        return try {
+            val intent = Intent.parseUri(uri, Intent.URI_INTENT_SCHEME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            activity.runOnUiThread { runCatching { activity.startActivity(intent) } }
+            true
+        } catch (_: Exception) {
+            launch(pkg)
+        }
+    }
+
+    // ---------- Show search: the TMDB key saved from the phone page ----------
+
+    private val lookup = activity.getSharedPreferences("lookup", Context.MODE_PRIVATE)
+
+    @JavascriptInterface
+    fun tmdbKey(): String = lookup.getString("tmdb", "").orEmpty()
+
     // ---------- Now playing: whatever is coming out of the speakers ----------
 
     private class Playing(
@@ -414,6 +482,11 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             if (key.isEmpty()) govee.forgetKey() else govee.connect(key)
         }
 
+        override fun onTmdb(key: String) {
+            lookup.edit().putString("tmdb", key).apply()
+            host.emit("setup", "{}")
+        }
+
         override fun onWifi(ssid: String, password: String, security: String) {
             guest.edit().putString("ssid", ssid).putString("password", password).putString("security", security).apply()
             host.emit("setup", "{}")
@@ -427,6 +500,7 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             .put("govee", JSONObject(govee.status()))
             .put("town", "")
             .put("wifi", guest.getString("ssid", "").orEmpty())
+            .put("tmdb", lookup.getString("tmdb", "").orEmpty().isNotEmpty())
             .put("wallpapers", JSONArray(wallpapers()))
 
         override fun packagesText(): String = packageList()

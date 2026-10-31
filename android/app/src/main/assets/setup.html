@@ -52,6 +52,14 @@
     </section>
 
     <section>
+      <h2>Show search (TMDB)</h2>
+      <p class="help">A free key from themoviedb.org (Settings, API) lets the TV search shows and films and say which of your apps carry them. It shows free or subscription, and rent or buy, but not prices.</p>
+      <input id="tmdb" type="password" autocomplete="off" placeholder="Paste the TMDB key here">
+      <button id="saveTmdb">Save</button>
+      <div class="status" id="tmdbStatus"></div>
+    </section>
+
+    <section>
       <h2>Guest Wi-Fi</h2>
       <p class="help">Shown on the TV as a QR code that guests scan to join. The password stays on the TV and is only in the code.</p>
       <input id="ssid" type="text" autocomplete="off" placeholder="Network name">
@@ -123,6 +131,14 @@
       say('keyStatus', 'Saved. The TV is checking with Govee.', true);
       setTimeout(refresh, 3500);
     } catch (e) { say('keyStatus', e.message); }
+  };
+
+  $('saveTmdb').onclick = async () => {
+    try {
+      await api('/api/tmdb', { key: $('tmdb').value });
+      $('tmdb').value = '';
+      say('tmdbStatus', 'Saved. Search on the TV now includes shows.', true);
+    } catch (e) { say('tmdbStatus', e.message); }
   };
 
   $('saveWifi').onclick = async () => {

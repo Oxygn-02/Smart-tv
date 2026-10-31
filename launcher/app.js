@@ -38,6 +38,8 @@
     spread: true, // a backlight scene also colours the lights that have a role
     ambient: 10, // minutes idle before the ambient screen; 0 = off
     sleepAt: 0, // when the sleep timer turns the lights off (ms), or 0
+    cw: [], // Watch Next items read from the TV
+    cwNote: '',
     matchLights: false, // wallpaper gradient follows the backlight colours
     home: {
       backlight: NATIVE ? 'none' : D.smartHome.backlights.start, // scene id, 'none' (not chosen yet), 'sync' or 'off'
@@ -207,7 +209,7 @@
                   <div class="hero-title">${h.title}</div>
                   <div class="hero-sub">${h.subtitle}</div>
                 </div>
-                <button class="resume" data-focus data-toast="Resuming ${h.title} on ${h.app}">${filledIcon('play', 14)} Resume</button>
+                <button class="resume" data-focus data-wn="0" data-toast="Resuming ${h.title} on ${h.app}">${filledIcon('play', 14)} Resume</button>
               </div>
               <div class="hero-progress">
                 <div class="hero-track"><div style="width:${h.progress}%"></div></div>
@@ -222,6 +224,7 @@
               <span class="small">Recently used</span>
               <span class="w-mini-title">${APP[id].name}</span>
             </button>`).join('')}
+          ${NATIVE ? [0, 1].map((i) => `<button class="widget glass w-mini" data-cw data-i="${i}" hidden data-focus data-expand="cw"></button>`).join('') : ''}
           ${D.continueWatching.map((c) => `
             <button class="widget glass w-mini" data-cw data-focus data-expand="cw" data-i="${D.continueWatching.indexOf(c)}" aria-label="Continue ${c.title} on ${c.app}">
               <span class="w-mini-art" style="background:${c.art}">${appIcon(APP[c.appId], 30)}</span>
@@ -273,9 +276,12 @@
         </label>
         ${NATIVE ? `
         <div class="search-section">
+          <div class="eyebrow" data-titles-head hidden>Shows and films</div>
+          <div class="shows" data-shows="titles"></div>
+          <p class="small" data-titles-note></p>
           <div class="eyebrow" data-apps-head>Apps on this TV</div>
           <div class="shows" data-shows="apps"></div>
-          <p class="small search-hint">For shows and films, where to watch and prices, use Search with Google TV.</p>
+          <p class="small search-hint" data-search-hint></p>
         </div>` : `
         <div class="search-section">
           <div class="eyebrow">Free on your apps</div>
@@ -457,6 +463,163 @@
       </section>`;
   }
 
+  // ---------- Continue watching (the TV's Watch Next list) ----------
+  const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const appByPkg = (pkg) => D.apps.find((a) => a.pkg === pkg);
+
+  function leftText(pos, dur) {
+    if (!(dur > 0)) return '';
+    const m = Math.max(0, Math.round((dur - pos) / 60000));
+    return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m left` : `${m} min left`;
+  }
+
+  function cwShape(it) {
+    const app = appByPkg(it.pkg);
+    const poster = /^https?:/.test(it.poster) ? `url("${it.poster}") center / cover no-repeat, ` : '';
+    return {
+      title: it.title,
+      subtitle: it.sub,
+      meta: it.sub,
+      app: app ? app.name : '',
+      appId: app ? app.id : null,
+      appColor: app ? app.color : '#8e8e9a',
+      art: `${poster}linear-gradient(135deg, #2a2a38, #14141c)`,
+      progress: it.dur > 0 ? Math.min(100, Math.round((it.pos / it.dur) * 100)) : 0,
+      left: leftText(it.pos, it.dur),
+      uri: it.uri,
+      pkg: it.pkg,
+    };
+  }
+
+  function renderContinue() {
+    if (!NATIVE) return;
+    const r = nativeJson('watchNext') || { ok: false, error: 'unavailable', items: [] };
+    state.cw = (r.items || []).filter((i) => i.title).map(cwShape);
+    state.cwNote = r.ok ? '' : r.error === 'permission' ? 'permission' : r.error;
+    D.hero = state.cw[0] || D.hero;
+    D.continueWatching = state.cw.slice(1, 3);
+    const hero = stage.querySelector('.w-hero');
+    const h = state.cw[0];
+    hero.toggleAttribute('data-focus', !!h);
+    hero.toggleAttribute('data-expand', !!h);
+    hero.setAttribute('tabindex', h ? '0' : '-1');
+    hero.dataset.expand = h ? 'hero' : '';
+    const note = hero.querySelector('.w-empty .small');
+    if (note) {
+      note.textContent = state.cwNote === 'permission'
+        ? "Android doesn't let this launcher read the Watch Next list on your TV."
+        : state.cwNote ? `Couldn't read Watch Next (${state.cwNote}).` : 'Shows you start in other apps appear here when they share them.';
+    }
+    if (h) {
+      hero.querySelector('.hero-art').style.background = h.art;
+      hero.querySelector('.hero-app').innerHTML = `<span class="dot" style="background:${esc(h.appColor)}"></span>${esc(h.app)}`;
+      hero.querySelector('.hero-title').textContent = h.title;
+      hero.querySelector('.hero-sub').textContent = h.subtitle;
+      hero.querySelector('.hero-track > div').style.width = `${h.progress}%`;
+      hero.querySelector('.hero-left').textContent = h.left;
+    }
+    all('[data-cw]').forEach((el) => {
+      const c = state.cw[Number(el.dataset.i) + 1];
+      el.dataset.wn = String(Number(el.dataset.i) + 1);
+      if (!c) { el.innerHTML = ''; return; }
+      const app = APP[c.appId] || { name: c.app || '?', color: '#8e8e9a', mark: (c.app || '?').slice(0, 1) };
+      el.setAttribute('aria-label', `Continue ${c.title}`);
+      el.innerHTML = `<span class="w-mini-art" style="background:${c.art}">${appIcon(app, 30)}</span><span class="w-mini-title">${esc(c.title)}</span><span class="small">${esc(c.meta || c.left)}</span><span class="track"><span class="fill" style="width:${c.progress}%"></span></span>`;
+    });
+    applyState();
+  }
+
+  // ---------- Show search (TMDB) ----------
+  // Titles come from TMDB, and which services carry them from its watch
+  // provider data (supplied by JustWatch). Only services you have installed
+  // are offered. TMDB gives no prices.
+  let tmdbKey = '';
+  const tmdbReady = () => NATIVE && !!tmdbKey;
+
+  function tmdb(path, params = {}) {
+    const url = new URL(`https://api.themoviedb.org/3/${path}`);
+    const bearer = tmdbKey.length > 40;
+    if (!bearer) url.searchParams.set('api_key', tmdbKey);
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    return getJson(url.toString(), bearer ? { Authorization: `Bearer ${tmdbKey}` } : undefined);
+  }
+
+  const normName = (t) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const ALIAS = { amazonvideo: 'primevideo', amazonprimevideo: 'primevideo', amazonprimevideowithads: 'primevideo' };
+
+  function appForProvider(name) {
+    let n = normName(name);
+    n = ALIAS[n] || n;
+    return D.apps.find((a) => normName(a.name) === n)
+      || D.apps.find((a) => { const m = normName(a.name); return m.length > 3 && n.includes(m); });
+  }
+
+  function pickApp(g) {
+    const first = (kinds) => (kinds || []).map((p) => appForProvider(p.provider_name)).find(Boolean);
+    const stream = first(g.flatrate) || first(g.free) || first(g.ads);
+    if (stream) return { app: stream, how: 'Watch on' };
+    const pay = first(g.rent) || first(g.buy);
+    return pay ? { app: pay, how: 'Rent or buy on' } : null;
+  }
+
+  function renderTitles(rows, q) {
+    const el = stage.querySelector('[data-shows="titles"]');
+    const head = stage.querySelector('[data-titles-head]');
+    const note = stage.querySelector('[data-titles-note]');
+    if (!el) return;
+    head.hidden = !rows.length && !note.textContent;
+    el.innerHTML = rows.map(({ h, g }) => {
+      const pick = pickApp(g);
+      const title = h.title || h.name || '';
+      const year = (h.release_date || h.first_air_date || '').slice(0, 4);
+      const poster = h.poster_path ? `background:url("https://image.tmdb.org/t/p/w342${h.poster_path}") center / cover` : 'background:linear-gradient(135deg,#2a2a38,#14141c)';
+      const line = pick ? `${pick.how} ${pick.app.name}` : 'Not on your apps';
+      return `
+        <button class="show glass" data-focus ${pick ? `data-app="${pick.app.id}"` : 'data-toast="That title isn\'t on any of your apps"'} aria-label="${esc(title)}. ${esc(line)}">
+          <div class="show-art" style="${poster}">${pick ? `<span class="show-app">${appIcon(pick.app, 34)}</span>` : ''}</div>
+          <div class="show-body"><div class="show-title">${esc(title)}</div><div class="small show-meta">${[year, h.media_type === 'tv' ? 'Series' : 'Film'].filter(Boolean).join(' · ')}<br>${esc(line)}</div></div>
+        </button>`;
+    }).join('');
+    if (rows.length === 0 && q && !note.textContent) note.textContent = `No shows found for “${q}”.`;
+  }
+
+  let tmdbTimer = 0;
+  let tmdbSeq = 0;
+  function queueTmdb(q) {
+    clearTimeout(tmdbTimer);
+    const note = stage.querySelector('[data-titles-note]');
+    if (!note) return;
+    note.textContent = '';
+    if (!tmdbReady() || q.length < 2) {
+      renderTitles([], '');
+      return;
+    }
+    tmdbTimer = setTimeout(async () => {
+      const seq = ++tmdbSeq;
+      note.textContent = 'Searching...';
+      try {
+        const r = await tmdb('search/multi', { query: q, include_adult: 'false', language: 'en-GB' });
+        const hits = (r.results || []).filter((x) => x.media_type === 'movie' || x.media_type === 'tv').slice(0, 5);
+        const rows = await Promise.all(hits.map(async (h) => {
+          try {
+            const p = await tmdb(`${h.media_type}/${h.id}/watch/providers`);
+            return { h, g: (p.results || {}).GB || {} };
+          } catch {
+            return { h, g: {} };
+          }
+        }));
+        if (seq !== tmdbSeq) return;
+        note.textContent = '';
+        renderTitles(rows, q);
+      } catch {
+        if (seq === tmdbSeq) {
+          note.textContent = "Couldn't reach TMDB. Check the key on the phone page and the connection.";
+          renderTitles([], q);
+        }
+      }
+    }, 600);
+  }
+
   // ---------- Cards that open into a window ----------
   // Selecting a Home card grows it into a panel with quick actions or details.
   let xFrom = null;
@@ -516,7 +679,7 @@
         <div class="x-cw-body"><span class="small">${c.app || ''}</span><span class="x-val">${c.meta || ''}</span>
           <div class="track"><div class="fill" style="width:${c.progress}%"></div></div>
           <span class="small">${c.left || ''}</span>
-          <button class="btn lg btn-primary" data-focus data-toast="Resuming ${c.title} on ${c.app}">Resume in ${c.app}</button>
+          <button class="btn lg btn-primary" data-focus ${NATIVE ? `data-wn="${kind === 'hero' ? 0 : Number(xFrom?.dataset.i) + 1}"` : ''} data-toast="Resuming ${c.title} on ${c.app}">Resume${c.app ? ` in ${c.app}` : ''}</button>
         </div></div>`;
   }
 
@@ -952,11 +1115,11 @@
     return sky('Cloudy', 'wCloud', 'cloud');
   }
 
-  async function getJson(url) {
+  async function getJson(url, headers) {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 10000);
     try {
-      const r = await fetch(url, { signal: ctl.signal });
+      const r = await fetch(url, { signal: ctl.signal, headers });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return await r.json();
     } finally {
@@ -1101,6 +1264,7 @@
   // Messages from the Android side: the phone page was used, Govee answered.
   window.onNative = (name, data) => {
     if (name === 'setup') {
+      tmdbKey = nativeCall('tmdbKey') || '';
       refreshWallpapers();
       if (state.view === 'wallpapers') renderWallpapers();
       if (data?.town !== undefined) {
@@ -1492,10 +1656,10 @@
       stage.querySelector('.music-grid').hidden = !state.live;
       stage.querySelector('.music-mixes').hidden = true;
     }
-    stage.querySelector('.w-hero').classList.toggle('is-empty', !sample);
+    stage.querySelector('.w-hero').classList.toggle('is-empty', NATIVE ? !state.cw.length : !sample);
     stage.querySelector('.w-music .np-next').hidden = !!NATIVE;
-    all('[data-cw]').forEach((el) => { el.hidden = !sample; });
-    all('[data-recent]').forEach((el) => { el.hidden = sample; });
+    all('[data-cw]').forEach((el) => { el.hidden = NATIVE ? Number(el.dataset.i) >= state.cw.length - 1 : !sample; });
+    all('[data-recent]').forEach((el) => { el.hidden = sample || (NATIVE && state.cw.length > 1); });
 
     stage.querySelector('[data-games-sub]').textContent = g.autoSwitch
       ? `Opening Games switches the TV to HDMI ${g.hdmiPort}${g.countdownSec ? ` after a ${g.countdownSec} second countdown` : ' straight away'}.`
@@ -1642,8 +1806,14 @@
     const list = D.apps.filter((a) => !q || a.name.toLowerCase().includes(q));
     const el = stage.querySelector('[data-shows="apps"]');
     el.innerHTML = list.slice(0, 10).map((a) => appTile(a, 'app-card glass', 68)).join('');
-    if (!list.length) el.innerHTML = `<div class="empty small">No app called “${state.query.trim()}”. Try Search with Google TV.</div>`;
+    if (!list.length) el.innerHTML = tmdbReady() ? '' : `<div class="empty small">No app called “${state.query.trim()}”. Try Search with Google TV.</div>`;
     stage.querySelector('[data-search-count]').textContent = q ? `${list.length} app${list.length === 1 ? '' : 's'}` : '';
+    const hint = stage.querySelector('[data-search-hint]');
+    if (hint) {
+      hint.innerHTML = tmdbReady()
+        ? 'Show data from TMDB; where to watch from JustWatch. This product uses the TMDB API but is not endorsed or certified by TMDB.'
+        : 'To search shows and films here, add a TMDB key on the phone setup page. Search with Google TV also works.';
+    }
   }
 
   function renderSearch() {
@@ -1872,6 +2042,10 @@
     const g = state.games;
     const act = b.dataset.action;
 
+    if (b.dataset.wn !== undefined && NATIVE) {
+      const it = state.cw[Number(b.dataset.wn)];
+      if (it) { nativeCall('watchNextOpen', it.uri, it.pkg); return; }
+    }
     if (b.dataset.action === 'x-close') { closeExpand(); return; }
     if ((b.dataset.nav || b.dataset.navTo) && !refs.x.hidden) { refs.x.hidden = true; refs.xpanel.innerHTML = ''; xFrom = null; }
     if (b.dataset.nav) openView(b.dataset.nav);
@@ -2032,6 +2206,7 @@
     if (e.target.id === 'search-input') {
       state.query = e.target.value;
       renderSearch();
+      if (NATIVE) queueTmdb(state.query.trim());
     } else if (e.target.id === 'town-input') {
       state.town = e.target.value.trim();
       applyState();
@@ -2398,6 +2573,8 @@
     syncVolume();
     readBacklight();
     leaveGaming();
+    renderContinue();
+    tmdbKey = nativeCall('tmdbKey') || '';
     pollNowPlaying();
     refreshNativeStatus();
     if (state.view === 'cleanup') renderCleanup(); // back from the TV's Settings
@@ -2439,6 +2616,8 @@
   if (NATIVE) {
     try {
       syncVolume();
+      tmdbKey = nativeCall('tmdbKey') || '';
+      renderContinue();
       pollNowPlaying();
       applyGovee(nativeJson('goveeStatus'));
       nativeCall('goveeConnect', ''); // reads the saved key; the answer arrives as an event
