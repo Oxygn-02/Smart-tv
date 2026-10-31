@@ -74,3 +74,7 @@ Real logos come from Simple Icons (CC0) where available. BBC iPlayer, My5 and Go
 - **Good night** scene and a **sleep timer** (15, 30 or 60 minutes) that turns every light off, even while another app is open.
 - **Ambient screen:** after 5, 10 or 20 idle minutes (Settings), photos, the clock and weather; the ceiling lights go off and come back on the first key press.
 - **Guest Wi-Fi:** save the network name and password on the phone setup page; Settings > Guest Wi-Fi shows a QR code guests scan. The password is stored in the launcher's private app storage and is only in the code.
+
+## Continue watching and show search (v0.7)
+- **Continue watching** reads the TV's Watch Next list (what apps such as YouTube or iPlayer choose to publish). Android may refuse a normal app access to it. If so, Home says that, instead of showing fake cards. Resume opens the show in the app that published it.
+- **Show search** uses TMDB (key pasted on the phone setup page, never in chat). Results say whether one of your installed apps streams a title, or has it to rent or buy. TMDB gives no prices. Data: TMDB; availability: JustWatch. This product uses the TMDB API but is not endorsed or certified by TMDB.

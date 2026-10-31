@@ -31,6 +31,7 @@ class SetupServer(
     interface Events {
         fun onGoveeKey(key: String)
         fun onTown(town: String)
+        fun onTmdb(key: String)
         fun onWifi(ssid: String, password: String, security: String)
         fun onWallpapersChanged()
         fun stateJson(): JSONObject
@@ -73,6 +74,10 @@ class SetupServer(
             "/api/state" -> json(Response.Status.OK, events.stateJson())
             "/api/govee" -> {
                 events.onGoveeKey(param("key").trim())
+                ok()
+            }
+            "/api/tmdb" -> {
+                events.onTmdb(param("key").trim())
                 ok()
             }
             "/api/wifi" -> {

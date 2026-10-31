@@ -21,6 +21,12 @@
     <!-- Weather for where the TV is. Optional: a town can be typed in Settings. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <!-- Continue watching: the TV's Watch Next list. Android may refuse this to a
+         normal app; the launcher then says so on Home. -->
+    <uses-permission
+        android:name="com.android.providers.tv.permission.READ_EPG_DATA"
+        tools:ignore="ProtectedPermissions" />
+
     <uses-feature android:name="android.software.leanback" android:required="true" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
