@@ -16,7 +16,10 @@ const LAUNCHER_DATA = {
     { id: 'room', label: 'Room' },
   ],
 
-  // Installed apps, in "All apps" order. `pinned` apps make the Home row.
+  // The apps on the Home dock, in order (only those installed on the TV show).
+  dock: ['youtube', 'prime', 'disney', 'crunchyroll', 'ytmusic'],
+
+  // Installed apps, in "All apps" order.
   // `logo` names a real logo in icons.js; `mark` is a lettermark used until
   // the device supplies the real icon.
   apps: [
@@ -26,6 +29,8 @@ const LAUNCHER_DATA = {
     { id: 'c4', name: 'Channel 4', color: '#47c98f', logo: 'channel4', pinned: true },
     { id: 'my5', name: 'My5', color: '#4f8fff', glyph: 'my5', mark: '5', pinned: true },
     { id: 'prime', name: 'Prime Video', color: '#38b6f0', logo: 'primevideo', pinned: true },
+    { id: 'disney', name: 'Disney+', color: '#1b3fd1', mark: 'D+' },
+    { id: 'crunchyroll', name: 'Crunchyroll', short: 'Crunchyroll', color: '#f47521', mark: 'CR' },
     { id: 'ytmusic', name: 'YouTube Music', short: 'YT Music', color: '#ff5a5a', logo: 'youtubemusic', pinned: true },
     { id: 'playstore', name: 'Google Play Store', short: 'Play Store', color: '#5bb974', logo: 'googleplay' },
     { id: 'playmovies', name: 'Google TV', color: '#8ab4f8', glyph: 'googletv', mark: 'TV' },

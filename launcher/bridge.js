@@ -56,13 +56,6 @@ if (NATIVE) {
     });
   }
 
-  // Continue watching can't read other apps' Watch Next rows, so Home shows
-  // the most recently used apps instead.
-  const recent = nativeJson('recentApps', 4) || [];
-  D.recentApps = recent
-    .map((pkg) => D.apps.find((a) => a.pkg === pkg))
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((a) => a.id);
+  // Continue watching comes from the TV's Watch Next list (see app.js).
   D.continueWatching = [];
 }
