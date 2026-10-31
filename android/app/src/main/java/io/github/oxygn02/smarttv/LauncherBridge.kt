@@ -667,6 +667,8 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
 
         override fun appsJson(): String = appCatalog().toString()
 
+        override fun wallpaperBytes(name: String): ByteArray? = this@LauncherBridge.wallpaperBytes(name)
+
         override fun iconPng(pkg: String): ByteArray? = this@LauncherBridge.iconPng(pkg)
 
         override fun onCleanup(pkgs: List<String>) {

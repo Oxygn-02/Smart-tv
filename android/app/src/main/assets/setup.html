@@ -112,6 +112,7 @@
       <p class="help" style="margin-top:14px">The plain list of every app and service on the TV: <a id="packages" href="#">open</a></p>
     </section>
   </div>
+  <p class="help" style="text-align:center">Setup page version 0.9.2</p>
 </main>
 
 <script src="/qrcode.js"></script>
@@ -138,7 +139,7 @@
     loadApps();
     if (s.wifi) $('ssid').value = s.wifi;
     $('packages').href = '/packages.txt?pin=' + encodeURIComponent(pin);
-    $('photoList').innerHTML = s.wallpapers.map((w) => `<li><img src="${w.url}" alt=""><span>${w.name}</span><button class="quiet" data-name="${w.name}">Remove</button></li>`).join('');
+    $('photoList').innerHTML = s.wallpapers.map((w) => `<li><img src="/api/wall?pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(w.name)}" alt=""><span>${w.name}</span><button class="quiet" data-name="${w.name}">Remove</button></li>`).join('');
   }
 
   $('go').onclick = async () => {

@@ -34,6 +34,7 @@ class SetupServer(
         fun onTmdb(key: String)
         fun onWifi(ssid: String, password: String, security: String, hidden: Boolean)
         fun appsJson(): String
+        fun wallpaperBytes(name: String): ByteArray?
         fun iconPng(pkg: String): ByteArray?
         fun onCleanup(pkgs: List<String>)
         fun onWallpapersChanged()
@@ -54,7 +55,9 @@ class SetupServer(
         val uri = session.uri
         if (session.method == Method.GET && (uri == "/" || uri == "/index.html")) {
             val page = context.assets.open("setup.html").bufferedReader().use { it.readText() }
+            // Never cached, so a phone that kept an old tab open loads the new page on reload.
             return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", page)
+                .also { it.addHeader("Cache-Control", "no-store") }
         }
 
         if (session.method == Method.GET && uri == "/qrcode.js") {
@@ -116,6 +119,9 @@ class SetupServer(
                 ok()
             }
             "/api/apps" -> NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "application/json", events.appsJson())
+            "/api/wall" -> events.wallpaperBytes(param("name"))?.let {
+                NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "image/jpeg", it.inputStream(), it.size.toLong())
+            } ?: json(Response.Status.NOT_FOUND, JSONObject().put("error", "No photo"))
             "/api/icon" -> events.iconPng(param("pkg"))?.let {
                 NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "image/png", it.inputStream(), it.size.toLong())
             } ?: json(Response.Status.NOT_FOUND, JSONObject().put("error", "No icon"))
