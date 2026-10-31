@@ -21,3 +21,9 @@ Settings > **Home button** asks Android to make Smart TV Launcher the home app. 
 
 ## Choosing apps from the phone (v0.9)
 On the phone setup page, **Apps to switch off** lists the apps that show an icon on the TV. Tick the ones you don't want and send the choice. Apps the TV needs (home screens, TV inputs, system and Google services, the update service) and the apps you use are locked and can't be ticked. In the launcher, Settings > Home and apps > Clean up apps shows the choice. After **Connect to the TV** (see android/README.md) the launcher switches the chosen apps off with `pm disable-user --user 0`, after a second confirmation, and keeps a list so **Switch back on** undoes it with `pm enable`. The stock launcher is never offered.
+
+## The deeper clean-up and the home screen (v0.11)
+After **Connect to the TV**, Settings > Home and apps > Clean up apps shows **Make this my home screen** (runs `cmd package set-home-activity`; the previous home screen is remembered and **Put Google's home screen back** undoes it) and **Clean up the TV**. The list is in `disabled-packages.txt` with a reason for each package. Recommended items switch off together after a second confirmation; careful items one at a time; Google's home screen and recommendations only once this launcher is the home screen. Nothing is uninstalled, and **Switch back on what I switched off** reverses everything.
+
+## Updates
+Settings > Home and apps > **Updates** reads `version.json` in this repository, and if a newer launcher is there, downloads `tv.apk` and hands it to Android's installer (Android asks you to confirm; the first time it asks you to allow this app to install apps). Downloader stays installed and is never offered for switching off, as a second route.

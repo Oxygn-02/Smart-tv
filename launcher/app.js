@@ -25,6 +25,8 @@
     // Tinted icons (Customize): colour from the room light or a hue of your own,
     // warmth 0 (cool) to 100 (warm), opacity 10 to 100.
     tint: { source: 'room', hue: 200, warmth: 50, opacity: 60 },
+    edge: 'lights', // the glow round the screen: 'lights' (follows the backlight), 'custom' (your colour) or 'off'
+    edgeHue: 330,
     view: 'home',
     playing: true,
     track: 0,
@@ -68,7 +70,7 @@
 
   // ---------- Saved settings ----------
   // Remembered on the TV between launches (browser storage inside the app).
-  const SAVED = ['clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
+  const SAVED = ['edge', 'edgeHue', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
 
   function loadSaved() {
     try {
@@ -106,6 +108,8 @@
     const set = (k, v) => stage.style.setProperty(k, v);
 
     set('--glowc', glow);
+    // The glow round the screen: the lights' colour, or one you pick.
+    set('--edge-a', withAlpha(state.edge === 'custom' ? hslToHex(state.edgeHue, 0.85, dark ? 0.58 : 0.5) : glow, dark ? 0.8 : 0.55));
     set('--glow-a', withAlpha(glow, dark ? 0.8 : 0.55));
     set('--focus', dark ? mixHex(glow, '#ffffff', 0.45) : mixHex(glow, '#15151d', 0.55));
     set('--focus-glow', withAlpha(glow, dark ? 0.5 : 0.35));
@@ -674,6 +678,31 @@
     });
   }
 
+  // ---------- Updates ----------
+  // version.json in the repository says what the newest launcher is.
+  const UPDATE_BASE = 'https://raw.githubusercontent.com/Oxygn-02/Smart-tv/main/';
+  async function checkUpdate() {
+    if (state.updateFound) {
+      nativeCall('installUpdate', `${UPDATE_BASE}${state.updateFound.apk || 'tv.apk'}?t=${Date.now()}`);
+      return;
+    }
+    state.update = 'Checking...';
+    applyState();
+    try {
+      const mine = nativeJson('appVersion') || { code: 0, name: '' };
+      const r = await getJson(`${UPDATE_BASE}version.json?t=${Date.now()}`);
+      if (r.versionCode > mine.code) {
+        state.updateFound = r;
+        state.update = `Update to ${r.versionName}. Press OK`;
+      } else {
+        state.update = `Up to date (${mine.name})`;
+      }
+    } catch {
+      state.update = "Couldn't check. Is the TV online?";
+    }
+    applyState();
+  }
+
   // ---------- Speed test ----------
   // Moves focus around every tab by itself and times the frames, so the numbers
   // come from this TV, not from a guess.
@@ -946,6 +975,7 @@
         row('home-role', icon('home'), 'Home button', 'Which app opens on Home', 'home'),
         row('open-cleanup', icon('power'), 'Clean up apps', 'Switch off apps you don\'t want', 'cleanup'),
         NATIVE ? row('grant-np', icon('music'), 'Now playing access', 'Show what is playing', 'np-access') : '',
+        NATIVE ? row('update-check', icon('wifi'), 'Updates', 'Check for a newer launcher', 'update') : '',
         NATIVE ? row('wn-check', icon('live'), 'Continue watching check', 'What the TV shares from your apps', 'wn') : '',
       ] },
       { id: 'lights', icon: icon('lamp'), title: 'Lights', help: 'Govee account, light roles', rows: [
@@ -1025,11 +1055,73 @@
     return items;
   }
 
+  // Rows shown once the launcher is connected to the TV: the home screen and the deeper clean-up.
+  function homeRows() {
+    const isHome = nativeCall('isDefaultHome') === true;
+    const left = (nativeJson('deepCleanList') || []).filter((d) => d.tier !== 'google' && d.installed && d.enabled).length;
+    return `
+      <button class="set-row" data-focus data-action="adb-sethome">
+        <span class="lg chip set-chip">${icon('home')}</span>
+        <span class="set-label">${state.homeConfirm ? 'Press OK again to switch' : 'Make this my home screen'}<span class="small">${isHome ? 'It already is. The Home button opens this launcher' : state.homeConfirm ? 'You can put Google\'s home screen back from here' : 'The Home button will open this launcher'}</span></span>
+        <span class="set-val">${isHome ? 'Done' : state.homeConfirm ? 'Confirm' : 'Press OK'}</span>
+      </button>
+      ${nativeCall('hasPrevHome') === true ? `<button class="set-row" data-focus data-action="adb-restorehome">
+        <span class="lg chip set-chip">${icon('home')}</span>
+        <span class="set-label">Put Google's home screen back<span class="small">Undoes the switch above</span></span>
+        <span class="set-val">Press OK</span>
+      </button>` : ''}
+      <button class="set-row" data-focus data-action="open-deepclean">
+        <span class="lg chip set-chip">${icon('power')}</span>
+        <span class="set-label">Clean up the TV<span class="small">${left ? `${left} background items you can switch off, each with a reason` : 'Everything on the list is already switched off'}</span></span>
+        <span class="set-val">Open</span>
+      </button>`;
+  }
+
+  // The deeper clean-up: background packages with no icon, grouped by how careful to be.
+  function deepView() {
+    return `
+      <section class="view view-deep" data-view="deepclean" hidden>
+        <section class="card glass cleanup" data-deep-list aria-label="Clean up the TV"></section>
+      </section>`;
+  }
+
+  function renderDeep() {
+    const list = stage.querySelector('[data-deep-list]');
+    const items = nativeJson('deepCleanList') || [];
+    const a = state.adb || {};
+    const ready = ['ready', 'done'].includes(a.state);
+    const isHome = nativeCall('isDefaultHome') === true;
+    const confirm = state.deepConfirm;
+    const group = (tier, title, note) => {
+      const rows = items.filter((d) => d.tier === tier && d.installed);
+      if (!rows.length) return '';
+      const on = rows.filter((d) => d.enabled);
+      const head = tier === 'safe'
+        ? `<button class="set-row" data-focus data-action="adb-deep" data-tier="safe" ${on.length && ready ? '' : 'disabled'}>
+            <span class="lg chip set-chip">${icon('power')}</span>
+            <span class="set-label">${confirm === 'safe' ? 'Press OK again to switch off' : `Switch off all ${on.length} recommended`}<span class="small">${ready ? (on.length ? 'Reversible. Switch them back on from Clean up apps' : 'All switched off') : 'Connect to the TV first'}</span></span>
+            <span class="set-val">${confirm === 'safe' ? 'Confirm' : on.length ? 'Press OK' : 'Done'}</span>
+          </button>` : '';
+      const locked = tier === 'google' && !isHome;
+      return `<div class="set-head deep-head">${title}</div><p class="small cleanup-note">${note}${locked ? ' Not available until this launcher is your home screen.' : ''}</p>${head}`
+        + rows.map((d) => `
+          <button class="set-row" data-focus data-action="adb-deep" data-tier="${tier}" data-pkg="${d.pkg}" ${tier === 'safe' || locked || !ready || !d.enabled ? 'disabled' : ''}>
+            <span class="lg chip set-chip">${icon('power')}</span>
+            <span class="set-label">${esc(d.label)}<span class="small">${esc(d.reason)}</span></span>
+            <span class="set-val">${d.enabled ? (tier === 'safe' ? 'On' : confirm === d.pkg ? 'Confirm' : 'Switch off') : 'Off'}</span>
+          </button>`).join('');
+    };
+    list.innerHTML = adbRow()
+      + group('safe', 'Recommended', 'Leftovers from the factory and the shop. Nothing you use depends on them.')
+      + group('careful', 'Careful, one at a time', 'Switch off one, then test the TV.')
+      + group('google', 'Google\'s home screen', 'Where the ads come from. Switch off only once this launcher is working as your home screen.');
+  }
+
   function renderCleanup() {
     const list = stage.querySelector('[data-cleanup-list]');
     const items = cleanupItems();
     if (!items.length) {
-      list.innerHTML = adbRow() + `
+      list.innerHTML = adbRow() + ((NATIVE && ['ready', 'done'].includes((state.adb || {}).state)) ? homeRows() : '') + `
         <div class="cleanup-empty">
           <span class="w-empty-title">No apps chosen</span>
           <span class="small">Open Set up from your phone, go to Apps to switch off, tick the apps you don't want and send them over. They are listed here, and you switch them off from this screen.</span>
@@ -1040,6 +1132,7 @@
     const a = state.adb || {};
     const live = states.filter((st) => st.installed && st.enabled).length;
     const ready = ['ready', 'done'].includes(a.state);
+    const home = NATIVE && ready ? homeRows() : '';
     const actions = ready ? `
       ${live ? `<button class="set-row" data-focus data-action="adb-disable">
         <span class="lg chip set-chip">${icon('power')}</span>
@@ -1051,7 +1144,7 @@
         <span class="set-label">Switch back on what I switched off<span class="small">${a.ours} app${a.ours === 1 ? '' : 's'}</span></span>
         <span class="set-val">Press OK</span>
       </button>` : ''}` : '';
-    list.innerHTML = adbRow() + actions + '<p class="small cleanup-note">Press OK on an app to open its page. Disable switches it off; Enable brings it back, so nothing here is permanent.</p>' + items.map((c) => {
+    list.innerHTML = adbRow() + home + actions + '<p class="small cleanup-note">Press OK on an app to open its page. Disable switches it off; Enable brings it back, so nothing here is permanent.</p>' + items.map((c) => {
       const st = states.find((x) => x.pkg === c.pkg);
       const value = !NATIVE ? 'On the TV' : !st || !st.installed ? 'Not on this TV' : st.enabled ? 'On' : 'Off';
       return `
@@ -1171,6 +1264,7 @@
   // Slider positions are 0 to 100 for all three; hue is 0 to 360 underneath.
   const sliderValue = {
     hue: () => state.tint.hue / 3.6,
+    edgehue: () => state.edgeHue / 3.6,
     warmth: () => state.tint.warmth,
     opacity: () => state.tint.opacity,
   };
@@ -1192,7 +1286,10 @@
   function setSlider(id, value) {
     const t = state.tint;
     const v = clamp(Math.round(value), id === 'opacity' ? 10 : 0, 100);
-    if (id === 'hue') {
+    if (id === 'edgehue') {
+      state.edgeHue = v * 3.6;
+      state.edge = 'custom';
+    } else if (id === 'hue') {
       t.hue = v * 3.6;
       t.source = 'custom';
     } else {
@@ -1250,6 +1347,14 @@
           <div class="sheet-row">
             <span class="sheet-label">Appearance<span class="sheet-help">Auto follows the TV</span></span>
             ${seg('appearance', [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto']])}
+          </div>
+          <div class="sheet-row">
+            <span class="sheet-label">Edge glow<span class="sheet-help">Round the screen</span></span>
+            ${seg('edge-mode', [['lights', 'Match lights'], ['custom', 'My colour'], ['off', 'Off']])}
+          </div>
+          <div class="sheet-row" data-edge-hue hidden>
+            <span class="sheet-label">Glow colour</span>
+            <span class="slider-wrap">${sliderMarkup('edgehue', 'Glow colour')}</span>
           </div>
           <div class="sheet-row">
             <span class="sheet-label">Wallpaper</span>
@@ -1450,9 +1555,16 @@
       }
     }
     if (name === 'govee') applyGovee(data);
+    if (name === 'update') {
+      state.update = { downloading: 'Downloading...', installing: 'Installing. Confirm on the TV', permission: 'Allow installs, then press OK again', error: data.message || "Couldn't update" }[data.state] || '';
+      applyState();
+    }
     if (name === 'adb') {
       state.adb = { ...(state.adb || {}), ...data };
       state.adbConfirm = false;
+      state.homeConfirm = false;
+      state.deepConfirm = null;
+      if (state.view === 'deepclean') renderDeep();
       if (state.view === 'cleanup') {
         renderCleanup();
         stage.querySelector('[data-action="adb-connect"]')?.focus();
@@ -1708,7 +1820,7 @@
       </header>
 
       <div class="views">
-        ${homeView()}${searchView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}${wallpapersView()}${cleanupView()}${rolesView()}${guestView()}
+        ${homeView()}${searchView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}${wallpapersView()}${cleanupView()}${rolesView()}${guestView()}${deepView()}
       </div>
 
       ${overlay()}
@@ -1782,6 +1894,8 @@
     const wp = state.matchLights ? 'lights' : state.wallpaper;
     pressed('[data-action="icon-style"]', (id) => id === state.iconStyle);
     stage.querySelector('[data-tint-block]').hidden = state.iconStyle !== 'tinted';
+    stage.querySelector('[data-edge-hue]').hidden = state.edge !== 'custom';
+    pressed('[data-action="edge-mode"]', (id) => id === state.edge);
     renderSliders();
     pressed('[data-action="appearance"]', (id) => id === state.appearance);
     pressed('[data-action="wallpaper-set"]', (id) => id === wp);
@@ -1813,6 +1927,7 @@
       clock: state.clock24 ? '24-hour' : '12-hour',
       motion: state.motion === 'fast' ? 'Fast' : 'Smooth',
       wn: state.wnCheck || 'Press OK',
+      update: state.update || 'Press OK',
       speed: state.speed || 'Press OK',
       guest: NATIVE ? (guestInfo().ssid || 'Add from your phone') : 'Sample',
       spread: state.spread ? 'On' : 'Off',
@@ -1890,7 +2005,7 @@
     // TV" mode the focused item's colour takes over (see syncGlow below).
     if ((h.backlight !== 'sync' || NATIVE) && !h.drift) state.glow = null;
     applyColors();
-    stage.querySelector('.edge').classList.toggle('off', h.backlight === 'off');
+    stage.querySelector('.edge').classList.toggle('off', state.edge === 'off' || (state.edge === 'lights' && h.backlight === 'off'));
     stage.classList.toggle('lights', state.matchLights && h.backlight !== 'off');
     const matchBtn = stage.querySelector('.tool[data-action="match-lights"]');
     matchBtn.classList.toggle('on', state.matchLights);
@@ -2143,6 +2258,7 @@
     if (id === 'wallpapers') renderWallpapers();
     if (id === 'cleanup') renderCleanup();
     if (id === 'roles') renderRoles();
+    if (id === 'deepclean') renderDeep();
     if (id === 'guest') renderGuest();
     animateView(id);
     alignFrost(100);
@@ -2307,6 +2423,31 @@
       }
     } else if (act === 'adb-restore') {
       nativeCall('adbRestore');
+    } else if (act === 'adb-sethome') {
+      if (!state.homeConfirm) {
+        state.homeConfirm = true;
+        renderCleanup();
+        stage.querySelector('[data-action="adb-sethome"]')?.focus();
+      } else {
+        state.homeConfirm = false;
+        nativeCall('adbSetHome');
+      }
+    } else if (act === 'adb-restorehome') {
+      nativeCall('adbRestoreHome');
+    } else if (act === 'open-deepclean') {
+      openView('deepclean');
+    } else if (act === 'adb-deep') {
+      const key = b.dataset.pkg || b.dataset.tier;
+      if (state.deepConfirm !== key) {
+        state.deepConfirm = key;
+        renderDeep();
+        stage.querySelector(`[data-action="adb-deep"]${b.dataset.pkg ? `[data-pkg="${b.dataset.pkg}"]` : '[data-tier="safe"]'}`)?.focus();
+      } else {
+        state.deepConfirm = null;
+        nativeCall('adbDeepClean', b.dataset.tier, b.dataset.pkg || '');
+      }
+    } else if (act === 'update-check') {
+      checkUpdate();
     } else if (act === 'adb-connect') {
       state.adb = { state: 'connecting' };
       renderCleanup();
@@ -2327,6 +2468,7 @@
     }
     else if (act === 'appearance') state.appearance = b.dataset.id;
     else if (act === 'wallpaper-set') setWallpaper(b.dataset.id);
+    else if (act === 'edge-mode') state.edge = b.dataset.id;
     else if (act === 'wallpaper') {
       const cur = state.matchLights ? 'lights' : state.wallpaper;
       setWallpaper({ photo: 'gradient', gradient: 'lights', lights: 'photo' }[cur]);
@@ -2487,7 +2629,7 @@
   const visible = (el) => el.getClientRects().length > 0;
 
   function focusables(scope) {
-    return [...scope.querySelectorAll('[data-focus]')].filter(visible);
+    return [...scope.querySelectorAll('[data-focus]:not([disabled])')].filter(visible);
   }
 
   function centre(el) {
@@ -2596,6 +2738,8 @@
       state.settingsCat = null;
       applyState();
       stage.querySelector(`[data-action="settings-cat"][data-cat="${was}"]`)?.focus();
+    } else if (state.view === 'deepclean') {
+      openView('cleanup');
     } else if (state.view === 'roles') {
       openView(state.rolesFrom || 'room');
     } else if (state.view === 'wallpapers' || state.view === 'cleanup' || state.view === 'guest') {

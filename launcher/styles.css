@@ -3899,10 +3899,10 @@ button.w-empty {
 .edge {
   box-shadow: none;
   background:
-    linear-gradient(to right, var(--glow-a), transparent 80px),
-    linear-gradient(to left, var(--glow-a), transparent 80px),
-    linear-gradient(to bottom, var(--glow-a), transparent 80px),
-    linear-gradient(to top, var(--glow-a), transparent 80px);
+    linear-gradient(to right, var(--edge-a, var(--glow-a)), transparent 80px),
+    linear-gradient(to left, var(--edge-a, var(--glow-a)), transparent 80px),
+    linear-gradient(to bottom, var(--edge-a, var(--glow-a)), transparent 80px),
+    linear-gradient(to top, var(--edge-a, var(--glow-a)), transparent 80px);
 }
 
 /* The search bar's ring, without :has() (which makes every focus change re-check the page) */

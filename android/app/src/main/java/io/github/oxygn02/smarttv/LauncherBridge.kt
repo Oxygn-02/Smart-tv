@@ -353,6 +353,163 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         }
     }
 
+    // ---------- The deeper clean-up and the home screen ----------
+
+    private fun tierList(tier: String) = when (tier) {
+        "safe" -> DEEP_SAFE
+        "careful" -> DEEP_CAREFUL
+        "google" -> DEEP_GOOGLE
+        else -> emptyList()
+    }
+
+    /** [{pkg, label, reason, tier, installed, enabled}] for all three groups. */
+    @JavascriptInterface
+    fun deepCleanList(): String {
+        val out = JSONArray()
+        listOf("safe" to DEEP_SAFE, "careful" to DEEP_CAREFUL, "google" to DEEP_GOOGLE).forEach { (tier, list) ->
+            list.forEach { (pkg, reason) ->
+                val info = runCatching { pm.getApplicationInfo(pkg, 0) }.getOrNull()
+                out.put(
+                    JSONObject().put("pkg", pkg).put("tier", tier).put("reason", reason)
+                        .put("label", info?.let { pm.getApplicationLabel(it).toString() } ?: pkg)
+                        .put("installed", info != null).put("enabled", info?.enabled == true),
+                )
+            }
+        }
+        return out.toString()
+    }
+
+    /**
+     * Switches off a group of the listed packages (or just [only], if given) with
+     * `pm disable-user --user 0`. Reversible with the same restore as the rest.
+     * Google's home screen is refused unless this launcher is already the home screen.
+     */
+    @JavascriptInterface
+    fun adbDeepClean(tier: String, only: String) {
+        adbIo.execute {
+            try {
+                if (!adb.connected) throw AdbClient.AdbException("Connect to the TV first")
+                if (tier == "google" && !isDefaultHome()) throw AdbClient.AdbException("Make this launcher the home screen first")
+                val todo = tierList(tier).map { it.first }.filter { (only.isEmpty() || it == only) && pkgName.matches(it) }
+                    .filter { runCatching { pm.getApplicationInfo(it, 0) }.getOrNull()?.enabled == true }
+                val done = mutableListOf<String>()
+                val failed = JSONArray()
+                todo.forEachIndexed { i, pkg ->
+                    adbEvent("working", "Switching off ${i + 1} of ${todo.size}")
+                    val out = adb.shell("pm disable-user --user 0 $pkg")
+                    if (out.contains("disabled-user") || out.contains("new state: disabled")) done.add(pkg)
+                    else failed.put(JSONObject().put("pkg", pkg).put("why", out.trim().take(120)))
+                }
+                setSwitchedOff(switchedOffByUs() + done)
+                adbEvent("done", "Switched off ${done.size} of ${todo.size}", JSONObject().put("failed", failed).put("ours", switchedOffByUs().size))
+            } catch (e: Exception) {
+                adbEvent("error", e.message ?: "That didn't work")
+            }
+        }
+    }
+
+    /** The home screen that answers Home now: {pkg, component, isThis}. */
+    private fun currentHome(): ComponentName? =
+        pm.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)
+            ?.activityInfo?.let { ComponentName(it.packageName, it.name) }
+
+    /**
+     * Makes this launcher answer the Home button, with `cmd package set-home-activity`.
+     * The previous home screen is remembered so it can be put back.
+     */
+    @JavascriptInterface
+    fun adbSetHome() {
+        adbIo.execute {
+            try {
+                if (!adb.connected) throw AdbClient.AdbException("Connect to the TV first")
+                val mine = ComponentName(activity.packageName, MainActivity::class.java.name)
+                val before = currentHome()
+                if (before != null && before.packageName != activity.packageName) {
+                    adbLog.edit().putString("prevHome", before.flattenToString()).apply()
+                }
+                adb.shell("cmd package set-home-activity ${mine.flattenToString()}")
+                val now = currentHome()
+                val ok = now?.packageName == activity.packageName
+                adbEvent(if (ok) "done" else "error", if (ok) "This launcher is now the home screen" else "The TV kept its own home screen")
+            } catch (e: Exception) {
+                adbEvent("error", e.message ?: "That didn't work")
+            }
+        }
+    }
+
+    /** Puts back the home screen that was there before [adbSetHome]. */
+    @JavascriptInterface
+    fun adbRestoreHome() {
+        adbIo.execute {
+            try {
+                if (!adb.connected) throw AdbClient.AdbException("Connect to the TV first")
+                val prev = adbLog.getString("prevHome", null) ?: throw AdbClient.AdbException("No earlier home screen was saved")
+                adb.shell("cmd package set-home-activity $prev")
+                adbEvent("done", "The TV's own home screen is back")
+            } catch (e: Exception) {
+                adbEvent("error", e.message ?: "That didn't work")
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun hasPrevHome(): Boolean = adbLog.getString("prevHome", null) != null
+
+    // ---------- Updates ----------
+
+    /** {code, name} of the installed launcher. */
+    @JavascriptInterface
+    fun appVersion(): String {
+        val info = pm.getPackageInfo(activity.packageName, 0)
+        val code = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
+        return JSONObject().put("code", code).put("name", info.versionName ?: "").toString()
+    }
+
+    /**
+     * Downloads the newest tv.apk from GitHub and hands it to Android's installer,
+     * which asks you to confirm. The first time, Android asks you to allow this
+     * app to install apps. Progress arrives as "update" events.
+     */
+    @JavascriptInterface
+    fun installUpdate(url: String) {
+        if (!url.startsWith("https://raw.githubusercontent.com/Oxygn-02/Smart-tv/")) return
+        adbIo.execute {
+            try {
+                if (Build.VERSION.SDK_INT >= 26 && !activity.packageManager.canRequestPackageInstalls()) {
+                    host.emit("update", JSONObject().put("state", "permission").toString())
+                    activity.runOnUiThread {
+                        runCatching {
+                            activity.startActivity(
+                                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, android.net.Uri.parse("package:${activity.packageName}"))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        }
+                    }
+                    return@execute
+                }
+                host.emit("update", JSONObject().put("state", "downloading").toString())
+                val dir = File(activity.cacheDir, "updates").apply { mkdirs() }
+                val file = File(dir, "tv.apk")
+                java.net.URL(url).openConnection().let { c ->
+                    c.connectTimeout = 10_000
+                    c.readTimeout = 30_000
+                    c.getInputStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+                }
+                if (file.length() < 100_000) throw java.io.IOException("The download was incomplete")
+                val uri = androidx.core.content.FileProvider.getUriForFile(activity, "${activity.packageName}.files", file)
+                host.emit("update", JSONObject().put("state", "installing").toString())
+                activity.runOnUiThread {
+                    activity.startActivity(
+                        Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            } catch (e: Exception) {
+                host.emit("update", JSONObject().put("state", "error").put("message", e.message ?: "Couldn't update").toString())
+            }
+        }
+    }
+
     // ---------- Show search: the TMDB key saved from the phone page ----------
 
     private val lookup = activity.getSharedPreferences("lookup", Context.MODE_PRIVATE)
@@ -882,7 +1039,34 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         )
         // Maker apps that are only for factory testing, retail demos or playing files from USB.
         val MAKER_OK = setOf("com.mediatek.wwtv.mediaplayer", "com.mediatek.testpq", "mediatek.factorymenu.ui", "com.mediatek.mtc.factory")
+        /** Every package the launcher may switch off without being ticked on the phone, with the reason. */
+        val DEEP_SAFE = listOf(
+            "com.google.android.feedback" to "Sends feedback and crash data to Google",
+            "com.google.android.partnersetup" to "Only used during first-time setup",
+            "com.google.android.onetimeinitializer" to "Runs once at setup",
+            "android.autoinstalls.config.JVC" to "The maker's retail auto-install settings",
+            "com.google.android.leanbacklauncher.partnercustomizer" to "Lets the maker add promoted rows to Google's home",
+            "fusion.android.tv.demo" to "Shop demo mode",
+            "mediatek.factorymenu.ui" to "Technician menu",
+            "com.mediatek.testpq" to "Factory picture test",
+            "com.mediatek.mtc.factory" to "Factory test service",
+            "com.mstar.android.tv.disclaimercustomization" to "First-run legal screens",
+            "com.google.android.sss.authbridge" to "Phone-to-TV setup helper",
+            "com.google.android.backdrop" to "Google's screensaver, which the ambient screen replaces",
+            "com.google.android.syncadapters.calendar" to "Calendar sync, which a TV does not use",
+            "com.android.dynsystem" to "A developer feature",
+        )
+        val DEEP_CAREFUL = listOf(
+            "com.mediatek.network" to "Wi-Fi monitor. Test the Wi-Fi after switching it off",
+            "com.google.android.katniss" to "The Google app, with voice search and Assistant. Keep it if you use the remote's voice button",
+        )
+        /** Only after this launcher is the home screen. */
+        val DEEP_GOOGLE = listOf(
+            "com.google.android.tvlauncher" to "Google's home screen, where the ads come from",
+            "com.google.android.tvrecommendations" to "Google's recommendations for its home screen",
+        )
         val KEEP_LABELS = setOf(
+            "downloader",
             "youtube", "youtubemusic", "bbciplayer", "itvx", "channel4", "my5", "primevideo", "disney", "crunchyroll",
             "googleplaystore", "playstore", "googletv", "netflix",
         )
