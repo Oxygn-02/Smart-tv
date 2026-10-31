@@ -22,7 +22,7 @@ body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  transition: background 0.4s;
+  transition: background 0.5s;
 }
 
 /* Letterbox around the 16:9 stage follows the theme */
@@ -121,11 +121,11 @@ input {
   flex: none;
   overflow: hidden;
   transform-origin: center center;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: Geist, "Geist Local", system-ui, sans-serif;
   font-weight: 300;
   color: var(--ink);
   background: var(--bg);
-  transition: background 0.4s;
+  transition: background 0.5s;
 }
 
 .glass {
@@ -166,7 +166,7 @@ input {
 
 .mark {
   font-weight: 500;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 
@@ -177,12 +177,12 @@ input {
 }
 
 .sub {
-  font-size: 15px;
+  font-size: 16px;
   color: var(--sub);
 }
 
 .small {
-  font-size: 13px;
+  font-size: 16px;
   color: var(--sub);
 }
 
@@ -194,23 +194,23 @@ input {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 400;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.06em;
   color: var(--sub);
 }
 
 .track {
   display: block;
   height: 3px;
-  border-radius: 3px;
+  border-radius: 12px;
   background: var(--track);
 }
 
 .fill {
   display: block;
   height: 3px;
-  border-radius: 3px;
+  border-radius: 12px;
   background: var(--ink);
 }
 
@@ -232,7 +232,7 @@ input {
 .info,
 .queue-row,
 .set-row {
-  transition: transform 0.5s var(--gentle, ease-out), box-shadow 0.3s, background 0.3s;
+  transition: transform 0.5s var(--gentle, ease-out), box-shadow 0.25s, background 0.25s;
 }
 
 .mini:focus-visible,
@@ -253,8 +253,8 @@ button {
   height: 44px;
   padding: 0 22px;
   border: 0;
-  border-radius: 999px;
-  font-size: 14px;
+  border-radius: 48px;
+  font-size: 16px;
   font-weight: 400;
   color: var(--ink);
   cursor: pointer;
@@ -295,22 +295,14 @@ button {
   gap: 20px;
 }
 
-.np-left {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
 .np-art {
   width: 184px;
   height: 184px;
   flex: none;
   align-self: center;
-  border-radius: 18px;
+  border-radius: 20px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  transition: background 0.4s;
+  transition: background 0.5s;
 }
 
 .np-meta {
@@ -327,7 +319,7 @@ button {
 }
 
 .np-title {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 400;
 }
 
@@ -382,7 +374,7 @@ button {
   font-size: 64px;
   font-weight: 200;
   line-height: 1;
-  letter-spacing: -2px;
+  letter-spacing: -0.02em;
 }
 
 .hero {
@@ -402,16 +394,6 @@ button {
   background: linear-gradient(to top, rgba(4, 4, 8, 0.85) 0%, rgba(4, 4, 8, 0.2) 60%, rgba(4, 4, 8, 0) 100%);
 }
 
-.hero-label {
-  position: absolute;
-  left: 24px;
-  top: 20px;
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0.4px;
-  color: rgba(255, 255, 255, 0.8);
-}
-
 .hero-body {
   position: absolute;
   left: 24px;
@@ -427,7 +409,7 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 16px;
   color: rgba(255, 255, 255, 0.75);
 }
 
@@ -445,23 +427,23 @@ button {
 }
 
 .hero-title {
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 300;
 }
 
 .hero-sub {
-  font-size: 14px;
+  font-size: 16px;
   color: rgba(255, 255, 255, 0.75);
 }
 
 .resume {
   height: 44px;
   padding: 0 20px;
-  border-radius: 999px;
+  border-radius: 48px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
-  font-size: 14px;
+  font-size: 16px;
   cursor: pointer;
 }
 
@@ -471,13 +453,13 @@ button {
 
 .hero-track {
   height: 3px;
-  border-radius: 3px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.2);
 }
 
 .hero-track > div {
   height: 3px;
-  border-radius: 3px;
+  border-radius: 12px;
   background: #fff;
 }
 
@@ -490,7 +472,7 @@ button {
 }
 
 .app-name {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 400;
 }
 
@@ -506,7 +488,7 @@ button {
   box-sizing: border-box;
   height: 60px;
   flex: none;
-  border-radius: 999px;
+  border-radius: 48px;
   padding: 0 22px 0 9px;
   display: flex;
   align-items: center;
@@ -527,7 +509,7 @@ button {
   border: 0;
   background: transparent;
   color: var(--ink);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 300;
 }
 
@@ -553,7 +535,7 @@ button {
 }
 
 .show {
-  border-radius: 22px;
+  border-radius: 20px;
   padding: 8px;
   cursor: pointer;
   display: flex;
@@ -566,7 +548,7 @@ button {
 .show-art {
   position: relative;
   height: 122px;
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
 }
 
@@ -597,19 +579,19 @@ button {
   align-items: baseline;
   gap: 5px;
   padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 14px;
+  border-radius: 48px;
+  font-size: 16px;
   font-weight: 500;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
 .price-kind {
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 400;
   color: var(--sub);
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.06em;
 }
 
 .show-body {
@@ -621,7 +603,7 @@ button {
 }
 
 .show-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 400;
 }
 
@@ -665,7 +647,7 @@ button {
   flex: none;
   border-radius: 20px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
-  transition: background 0.4s;
+  transition: background 0.5s;
 }
 
 .music-meta {
@@ -707,7 +689,7 @@ button {
   gap: 12px;
   padding: 7px 8px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 12px;
   background: transparent;
   cursor: pointer;
   text-align: left;
@@ -722,7 +704,7 @@ button {
   width: 38px;
   height: 38px;
   flex: none;
-  border-radius: 9px;
+  border-radius: 12px;
 }
 
 .queue-text {
@@ -734,7 +716,7 @@ button {
 }
 
 .queue-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 400;
 }
 
@@ -751,7 +733,7 @@ button {
 }
 
 .mix {
-  border-radius: 22px;
+  border-radius: 20px;
   padding: 8px 8px 12px;
   cursor: pointer;
   display: flex;
@@ -762,12 +744,12 @@ button {
 
 .mix-art {
   height: 96px;
-  border-radius: 16px;
+  border-radius: 12px;
   margin-bottom: 6px;
 }
 
 .mix-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 400;
   padding: 0 4px;
 }
@@ -796,7 +778,7 @@ button {
   --accent: transparent;
   --glow: transparent;
   height: 168px;
-  border-radius: 24px;
+  border-radius: 28px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -835,9 +817,9 @@ button {
 }
 
 .games-title {
-  font-size: 44px;
+  font-size: 48px;
   font-weight: 200;
-  letter-spacing: -1px;
+  letter-spacing: -0.02em;
 }
 
 .games-actions {
@@ -846,16 +828,10 @@ button {
   margin-top: 14px;
 }
 
-.games-info {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
 .info {
   height: 120px;
   box-sizing: border-box;
-  border-radius: 24px;
+  border-radius: 28px;
   padding: 0 20px;
   display: flex;
   align-items: center;
@@ -874,17 +850,6 @@ button.info {
   gap: 3px;
 }
 
-.info-chip {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
-}
-
-.info-val {
-  font-size: 17px;
-  font-weight: 400;
-}
-
 /* ---------- Settings ---------- */
 
 .settings {
@@ -899,7 +864,7 @@ button.info {
   box-sizing: border-box;
   padding: 0 18px 0 12px;
   border: 0;
-  border-radius: 18px;
+  border-radius: 20px;
   background: transparent;
   display: flex;
   align-items: center;
@@ -918,7 +883,7 @@ button.info {
 .set-chip {
   width: 42px;
   height: 42px;
-  border-radius: 13px;
+  border-radius: 12px;
 }
 
 .set-label {
@@ -931,7 +896,7 @@ button.info {
 }
 
 .set-val {
-  font-size: 15px;
+  font-size: 16px;
   color: var(--sub);
 }
 
@@ -944,7 +909,7 @@ button.info {
   border: 1px solid var(--border);
   background: var(--glass);
   color: var(--ink);
-  font-size: 15px;
+  font-size: 16px;
   text-align: right;
 }
 
@@ -1002,7 +967,7 @@ button.info {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 200;
 }
 
@@ -1027,7 +992,7 @@ button.info {
   position: absolute;
   left: 48px;
   top: 40px;
-  font-size: 15px;
+  font-size: 16px;
   color: rgba(236, 236, 241, 0.62);
 }
 
@@ -1039,7 +1004,7 @@ button.info {
   align-items: center;
   justify-content: center;
   gap: 18px;
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .input-screen .btn {
@@ -1061,8 +1026,8 @@ button.info {
   transform: translateX(-50%);
   z-index: 6;
   padding: 12px 22px;
-  border-radius: 999px;
-  font-size: 15px;
+  border-radius: 48px;
+  font-size: 16px;
   font-weight: 400;
   box-shadow: var(--shadow);
   white-space: nowrap;
@@ -1104,7 +1069,7 @@ button.info {
   background:
     radial-gradient(80% 110% at 88% 10%, var(--t0a, var(--t0)), transparent 65%),
     linear-gradient(135deg, var(--t1), var(--t2));
-  transition: opacity 0.6s, filter 0.6s;
+  transition: opacity 0.5s, filter 0.5s;
 }
 
 /* Soft darkening at the bottom keeps text and controls legible on light art */
@@ -1166,7 +1131,7 @@ button.info {
 .room-chip {
   width: 48px;
   height: 48px;
-  border-radius: 15px;
+  border-radius: 12px;
 }
 
 .room-title {
@@ -1175,7 +1140,7 @@ button.info {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 400;
 }
 
@@ -1188,7 +1153,7 @@ button.info {
 .swatch {
   border: 0;
   padding: 6px 0;
-  border-radius: 18px;
+  border-radius: 20px;
   background: transparent;
   cursor: pointer;
   display: flex;
@@ -1200,9 +1165,9 @@ button.info {
 .swatch-dot {
   width: 56px;
   height: 56px;
-  border-radius: 18px;
+  border-radius: 20px;
   box-shadow: 0 6px 16px -6px var(--lg-drop);
-  transition: transform 0.5s var(--gentle, ease-out), outline-color 0.3s;
+  transition: transform 0.5s var(--gentle, ease-out), outline-color 0.25s;
   outline: 2px solid transparent;
   outline-offset: 3px;
 }
@@ -1228,14 +1193,14 @@ button.info {
 .pillbtn {
   height: 40px;
   padding: 0 18px;
-  border-radius: 999px;
+  border-radius: 48px;
   border: 1px solid var(--border);
   background: var(--glass);
   color: var(--ink);
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 400;
   cursor: pointer;
-  transition: background 0.3s, color 0.3s;
+  transition: background 0.25s, color 0.25s;
 }
 
 .pillbtn.on {
@@ -1253,7 +1218,7 @@ button.info {
   height: 46px;
   padding: 0 12px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 12px;
   background: transparent;
   display: flex;
   align-items: center;
@@ -1272,7 +1237,7 @@ button.info {
   height: 10px;
   border-radius: 50%;
   background: var(--track);
-  transition: background 0.3s, box-shadow 0.3s;
+  transition: background 0.25s, box-shadow 0.25s;
 }
 
 .light-row.on .light-dot {
@@ -1282,7 +1247,7 @@ button.info {
 
 .light-name {
   flex: 1;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 400;
 }
 
@@ -1303,7 +1268,7 @@ button.info {
 
 .vol-num {
   min-width: 46px;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--sub);
   text-align: center;
 }
@@ -1339,7 +1304,7 @@ button.info {
 .ctrl,
 .play,
 .chip {
-  transition: transform 0.5s var(--gentle), color 0.3s, background 0.3s, box-shadow 0.3s, filter 0.3s;
+  transition: transform 0.5s var(--gentle), color 0.25s, background 0.25s, box-shadow 0.25s, filter 0.25s;
 }
 
 .ib:is(:focus-visible, :hover),
@@ -1431,7 +1396,7 @@ button.info {
    ===================================================================== */
 
 #stage {
-  font-family: Inter, system-ui, sans-serif;
+  font-family: Geist, "Geist Local", system-ui, sans-serif;
   font-optical-sizing: auto;
   font-weight: 400;
   letter-spacing: -0.01em;
@@ -1457,7 +1422,7 @@ button.info {
 }
 
 .card {
-  border-radius: 32px;
+  border-radius: 36px;
 }
 
 /* ---------- Top bar ---------- */
@@ -1508,7 +1473,7 @@ button.info {
   display: flex;
   gap: 2px;
   padding: 6px;
-  border-radius: 999px;
+  border-radius: 48px;
 }
 
 .tab {
@@ -1516,16 +1481,16 @@ button.info {
   padding: 0 15px;
   white-space: nowrap;
   border: 0;
-  border-radius: 999px;
+  border-radius: 48px;
   background: transparent;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
   color: var(--sub);
   cursor: pointer;
-  transition: color 0.3s, background 0.3s, transform 0.5s var(--gentle);
+  transition: color 0.25s, background 0.25s, transform 0.5s var(--gentle);
 }
 
 .tab.on {
@@ -1558,14 +1523,14 @@ button.info {
   width: 44px;
   height: 44px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 48px;
   background: transparent;
   color: var(--sub);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: color 0.3s, background 0.3s, transform 0.5s var(--gentle);
+  transition: color 0.25s, background 0.25s, transform 0.5s var(--gentle);
 }
 
 .tool.on {
@@ -1618,7 +1583,7 @@ button.info {
 }
 
 .w-label {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   min-width: 0;
   overflow: hidden;
@@ -1633,9 +1598,9 @@ button.info {
 }
 
 .w-weather .temp {
-  font-size: 60px;
+  font-size: 64px;
   font-weight: 400;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 
@@ -1643,7 +1608,7 @@ button.info {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
 }
 
@@ -1673,9 +1638,9 @@ button.info {
 }
 
 .w-music .np-title {
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 600;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
   line-height: 1.1;
   margin-top: 6px;
 }
@@ -1683,7 +1648,7 @@ button.info {
 .w-music .np-art {
   width: 196px;
   height: 196px;
-  border-radius: 24px;
+  border-radius: 28px;
   align-self: auto;
 }
 
@@ -1698,7 +1663,7 @@ button.info {
 }
 
 .w-music .np-row .small {
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .w-hero.hero {
@@ -1707,13 +1672,8 @@ button.info {
   box-shadow: var(--shadow);
 }
 
-.hero-label {
-  font-size: 14px;
-  font-weight: 600;
-}
-
 .hero-title {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
@@ -1734,7 +1694,7 @@ button.info {
   text-align: left;
   cursor: pointer;
   font: inherit;
-  transition: transform 0.5s var(--gentle), box-shadow 0.3s;
+  transition: transform 0.5s var(--gentle), box-shadow 0.25s;
 }
 
 .w-mini:focus-visible {
@@ -1745,7 +1705,7 @@ button.info {
 .w-mini-art {
   height: 98px;
   flex: none;
-  border-radius: 22px;
+  border-radius: 20px;
   margin-bottom: 9px;
   padding: 8px;
   box-sizing: border-box;
@@ -1754,9 +1714,9 @@ button.info {
 }
 
 .w-mini-title {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
 }
 
 .w-mini .track {
@@ -1775,7 +1735,7 @@ button.info {
   height: 116px;
   box-sizing: border-box;
   padding: 16px 22px 0;
-  border-radius: 38px;
+  border-radius: 36px;
   display: flex;
   align-items: flex-start;
   gap: 18px;
@@ -1807,12 +1767,12 @@ button.info {
 
 /* The label shows only for the focused app, as tvOS does */
 .dock-label {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   white-space: nowrap;
   opacity: 0;
   transform: translateY(-4px);
-  transition: opacity 0.3s, transform 0.5s var(--gentle);
+  transition: opacity 0.25s, transform 0.5s var(--gentle);
 }
 
 .dock-app:is(:focus-visible, :hover) .dock-label {
@@ -1820,18 +1780,11 @@ button.info {
   transform: none;
 }
 
-.dock-divider {
-  width: 1px;
-  height: 58px;
-  margin: 3px 2px 0;
-  background: var(--track);
-}
-
 /* ---------- App icon styles (Default / Dark / Clear / Tinted) ---------- */
 
 .app-ic {
   --glyph: var(--brand);
-  transition: transform 0.5s var(--gentle), box-shadow 0.3s, background 0.4s;
+  transition: transform 0.5s var(--gentle), box-shadow 0.25s, background 0.5s;
 }
 
 .app-ic.s-default {
@@ -1870,7 +1823,7 @@ button.info {
   width: 580px;
   box-sizing: border-box;
   padding: 26px 30px 30px;
-  border-radius: 40px;
+  border-radius: 36px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1890,7 +1843,7 @@ button.info {
 }
 
 .sheet-label {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--sub);
   text-transform: uppercase;
@@ -1929,10 +1882,10 @@ button.info {
 }
 
 .opt-label {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   padding: 4px 12px;
-  border-radius: 999px;
+  border-radius: 48px;
 }
 
 .opt.on .opt-label {
@@ -1951,7 +1904,7 @@ button.info {
   display: flex;
   gap: 2px;
   padding: 4px;
-  border-radius: 999px;
+  border-radius: 48px;
   background: var(--onbtn);
 }
 
@@ -1959,13 +1912,13 @@ button.info {
   height: 38px;
   padding: 0 20px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 48px;
   background: transparent;
   color: var(--sub);
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.3s, color 0.3s;
+  transition: background 0.25s, color 0.25s;
 }
 
 .seg.on {
@@ -1989,7 +1942,7 @@ button.info {
 .music-title,
 .games-title {
   font-weight: 600;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
 }
 
 .np-title,
@@ -2035,7 +1988,7 @@ button.info {
   width: 40px;
   height: 40px;
   flex: none;
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.4);
 }
 
@@ -2046,7 +1999,7 @@ button.info {
 }
 
 .np-next-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
 }
 
@@ -2145,29 +2098,25 @@ button.info {
 }
 
 .sub {
-  font-size: 17px;
+  font-size: 16px;
 }
 
 .eyebrow {
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .status-date {
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .tab {
-  font-size: 17px;
-  padding: 0 14px;
-}
-
-.hero-label {
   font-size: 16px;
+  padding: 0 14px;
 }
 
 .hero-app,
 .hero-sub {
-  font-size: 17px;
+  font-size: 16px;
 }
 
 .resume,
@@ -2194,15 +2143,15 @@ button.info {
 }
 
 .price-kind {
-  font-size: 12px;
+  font-size: 16px;
 }
 
 .toast {
-  font-size: 17px;
+  font-size: 16px;
 }
 
 .sheet-label {
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .dock-label {
@@ -2211,18 +2160,7 @@ button.info {
 
 /* Section headings sit on the wallpaper: full-contrast text with a soft halo */
 :is(.search-section, .music-mixes, .view-apps, .live-head, .view-games) > .eyebrow,
-.live-head .small {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--ink);
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.55);
-}
-
 #stage.light :is(.search-section, .music-mixes, .view-apps, .live-head, .view-games) > .eyebrow,
-#stage.light .live-head .small {
-  text-shadow: 0 0 14px rgba(255, 255, 255, 0.9);
-}
-
 /* A steadier scrim, so text holds up on any photo you add */
 #stage {
   --photo-scrim: linear-gradient(rgba(5, 5, 8, 0.3), rgba(5, 5, 8, 0.5));
@@ -2244,10 +2182,6 @@ button.info {
   gap: 20px;
 }
 
-.dock-divider {
-  height: 70px;
-}
-
 /* Room status widget (replaces the clock) */
 .w-room {
   grid-area: 1 / 1;
@@ -2265,7 +2199,7 @@ button.info {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 500;
   color: var(--ink);
 }
@@ -2279,21 +2213,11 @@ button.info {
   width: 20px;
   height: 20px;
   flex: none;
-  border-radius: 7px;
+  border-radius: 12px;
   box-shadow: 0 0 12px -2px rgba(0, 0, 0, 0.3);
 }
 
 /* Recently used apps stand in for Continue watching when there's no data */
-.w-recent {
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 4px;
-}
-
-.w-recent .app-ic {
-  margin-bottom: auto;
-}
-
 /* ---------- Empty states ---------- */
 
 .w-empty {
@@ -2331,7 +2255,7 @@ button.w-empty {
 }
 
 .w-empty-title {
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 600;
 }
 
@@ -2351,10 +2275,10 @@ button.w-empty {
   width: 46px;
   height: 28px;
   flex: none;
-  border-radius: 999px;
+  border-radius: 48px;
   background: var(--track);
   position: relative;
-  transition: background 0.3s;
+  transition: background 0.25s;
 }
 
 .switch > span {
@@ -2366,7 +2290,7 @@ button.w-empty {
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  transition: transform 0.35s var(--gentle);
+  transition: transform 0.5s var(--gentle);
 }
 
 .light-row.on .switch {
@@ -2382,7 +2306,7 @@ button.w-empty {
 }
 
 .opt-desc {
-  font-size: 14px;
+  font-size: 16px;
   color: var(--sub);
   margin-top: -6px;
 }
@@ -2394,7 +2318,7 @@ button.w-empty {
 }
 
 .sheet-help {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
@@ -2477,7 +2401,7 @@ button.w-empty {
   width: 18px;
   height: 3px;
   margin-left: -9px;
-  border-radius: 2px;
+  border-radius: 12px;
   background: var(--glowc);
 }
 
@@ -2486,28 +2410,26 @@ button.w-empty {
 .small { font-size: 16px; }
 .sub { font-size: 20px; }
 
-.status-time { font-size: 25px; font-weight: 600; letter-spacing: -0.01em; }
+.status-time { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
 .status-date { font-size: 20px; }
 
 .w-music .np-title,
 .hero-title,
 .music-title {
-  font-size: 31px;
+  font-size: 32px;
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.1;
 }
 
-.games-title { font-size: 49px; font-weight: 500; letter-spacing: -0.025em; }
-.w-weather .temp { font-size: 61px; font-weight: 400; letter-spacing: -0.03em; }
+.games-title { font-size: 48px; font-weight: 500; letter-spacing: -0.02em; }
+.w-weather .temp { font-size: 64px; font-weight: 400; letter-spacing: -0.02em; }
 .w-empty-title { font-size: 20px; }
 .w-mini-title,
 .show-title,
 .np-next-title,
 .mix-title,
 .room-title,
-.channel-title { font-size: 20px; font-weight: 500; letter-spacing: -0.005em; }
-
 /* Sentence case everywhere; labels say what they are, quietly */
 .sheet-label,
 .price-kind {
@@ -2521,7 +2443,7 @@ button.w-empty {
 }
 
 .price-kind {
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .eyebrow {
@@ -2556,12 +2478,6 @@ button.w-empty {
   position: relative;
 }
 
-.art-app {
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-}
-
 .hero-progress {
   display: flex;
   align-items: center;
@@ -2587,7 +2503,7 @@ button.w-empty {
 }
 
 .w-mini-art {
-  border-radius: 18px;
+  border-radius: 20px;
 }
 
 /* ---------- Posters sit on the wallpaper, not in cards ---------- */
@@ -2641,7 +2557,7 @@ button.w-empty {
 
 .show-art,
 .mix-art {
-  transition: transform 0.5s var(--gentle), box-shadow 0.3s;
+  transition: transform 0.5s var(--gentle), box-shadow 0.25s;
 }
 
 /* Captions on the wallpaper need a firmer shadow over bright photos */
@@ -2752,7 +2668,7 @@ button.w-empty {
 
 .ic-mask.ready {
   opacity: 1;
-  transition: opacity 0.3s;
+  transition: opacity 0.25s;
 }
 
 .app-ic .ic-img {
@@ -2841,7 +2757,7 @@ button.w-empty {
   width: 560px;
   box-sizing: border-box;
   padding: 32px 36px;
-  border-radius: 32px;
+  border-radius: 36px;
   background: rgba(20, 22, 28, 0.94);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
   display: flex;
@@ -2852,7 +2768,7 @@ button.w-empty {
 }
 
 .fit-title {
-  font-size: 31px;
+  font-size: 32px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
@@ -2864,7 +2780,7 @@ button.w-empty {
 }
 
 .fit-size {
-  font-size: 49px;
+  font-size: 48px;
   font-weight: 500;
   margin-top: 4px;
 }
@@ -2928,12 +2844,7 @@ button.w-empty {
   padding: 12px 20px;
   gap: 18px;
   align-items: center;
-  border-radius: 34px;
-}
-
-.dock-divider {
-  height: 56px;
-  margin: 0 2px;
+  border-radius: 36px;
 }
 
 .dock-app {
@@ -2941,7 +2852,7 @@ button.w-empty {
 }
 
 .dock {
-  transition: padding 0.45s var(--gentle), bottom 0.45s var(--gentle);
+  transition: padding 0.5s var(--gentle), bottom 0.5s var(--gentle);
 }
 
 /* On the dock: it deepens a little and the name sits inside its border,
@@ -2958,14 +2869,14 @@ button.w-empty {
   padding: 0;
   background: none;
   color: var(--ink);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
   opacity: 0;
   transform: translate(-50%, -4px);
   pointer-events: none;
-  transition: opacity 0.25s, transform 0.4s var(--gentle);
+  transition: opacity 0.25s, transform 0.5s var(--gentle);
 }
 
 .dock-app:is(:focus-visible, :hover) .dock-label {
@@ -2995,7 +2906,7 @@ button.w-empty {
   padding: 0 14px;
   border: 1px solid var(--border);
   background: var(--glass);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .slider {
@@ -3012,7 +2923,7 @@ button.w-empty {
   left: 0;
   right: 0;
   height: 10px;
-  border-radius: 6px;
+  border-radius: 12px;
   background: var(--track);
 }
 
@@ -3165,7 +3076,7 @@ button.w-empty {
   aspect-ratio: 16 / 9;
   padding: 0;
   border: 0;
-  border-radius: 22px;
+  border-radius: 20px;
   overflow: hidden;
   background: var(--track);
   color: #fff;
@@ -3255,7 +3166,7 @@ button.w-empty {
   width: 640px;
   box-sizing: border-box;
   padding: 34px 40px;
-  border-radius: 34px;
+  border-radius: 36px;
   background: var(--solid-panel);
   color: var(--ink);
   box-shadow: var(--shadow);
@@ -3265,7 +3176,7 @@ button.w-empty {
 }
 
 .setup-title {
-  font-size: 31px;
+  font-size: 32px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -3282,12 +3193,12 @@ button.w-empty {
 }
 
 .setup-pin {
-  font-size: 40px;
-  letter-spacing: 0.25em;
+  font-size: 48px;
+  letter-spacing: 0.06em;
 }
 
 .setup-status {
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1.6;
   color: var(--sub);
 }
@@ -3335,7 +3246,7 @@ button.w-empty {
   gap: 14px;
   padding: 12px 14px;
   border: 1px dashed var(--border);
-  border-radius: 16px;
+  border-radius: 12px;
   background: transparent;
   color: var(--ink);
   text-align: left;
@@ -3415,13 +3326,13 @@ button.w-empty {
 .swatch-dot {
   width: 44px;
   height: 44px;
-  border-radius: 15px;
+  border-radius: 12px;
 }
 
 .room-head .btn {
   flex: none;
   height: 38px;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .light-list {
@@ -3564,12 +3475,12 @@ button.w-empty {
   font-size: 96px;
   font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 .amb-sub {
   margin-top: 8px;
-  font-size: 22px;
+  font-size: 20px;
   opacity: 0.85;
 }
 
@@ -3587,7 +3498,7 @@ button.w-empty {
   width: 360px;
   height: 360px;
   flex: none;
-  border-radius: 24px;
+  border-radius: 28px;
   overflow: hidden;
   box-shadow: var(--shadow);
 }
@@ -3636,7 +3547,7 @@ button.w-empty {
 
 /* Hover and focus on a card: a slow lift and a soft glow in the room colour */
 .widget {
-  transition: transform 0.6s var(--gentle), box-shadow 0.5s;
+  transition: transform 0.5s var(--gentle), box-shadow 0.5s;
 }
 
 .widget:is(:focus-visible, :hover) {
@@ -3662,7 +3573,7 @@ button.w-empty {
 
 .xscrim.closing {
   opacity: 0;
-  transition: opacity 0.28s;
+  transition: opacity 0.25s;
 }
 
 .xpanel {
@@ -3670,7 +3581,7 @@ button.w-empty {
   max-height: 600px;
   box-sizing: border-box;
   padding: 26px 30px 28px;
-  border-radius: 40px;
+  border-radius: 36px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -3678,13 +3589,13 @@ button.w-empty {
   color: var(--ink);
   background: var(--solid-panel, rgba(26, 28, 34, 0.97));
   box-shadow: inset 0 1px 0 var(--glass-hi), 0 40px 90px rgba(0, 0, 0, 0.5), 0 0 60px -10px var(--focus-glow);
-  transition: transform 0.6s var(--gentle), opacity 0.4s;
+  transition: transform 0.5s var(--gentle), opacity 0.5s;
   overflow: hidden;
 }
 
 .xscrim.closing .xpanel {
   transform: scale(0.97);
-  transition: transform 0.28s;
+  transition: transform 0.25s;
 }
 
 .x-head {
@@ -3694,7 +3605,7 @@ button.w-empty {
 }
 
 .x-title {
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 500;
   letter-spacing: -0.02em;
 }
@@ -3714,7 +3625,7 @@ button.w-empty {
 .x-swatches .swatch-dot {
   width: 40px;
   height: 40px;
-  border-radius: 14px;
+  border-radius: 12px;
 }
 
 .x-lights {
@@ -3734,7 +3645,7 @@ button.w-empty {
 .x-temp {
   font-size: 96px;
   font-weight: 500;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 
@@ -3813,7 +3724,7 @@ button.w-empty {
   width: 300px;
   height: 180px;
   flex: none;
-  border-radius: 22px;
+  border-radius: 20px;
 }
 
 .x-cw-body {
@@ -3885,7 +3796,7 @@ button.w-empty {
 }
 
 .widget {
-  transition: transform 0.6s var(--gentle);
+  transition: transform 0.5s var(--gentle);
 }
 
 .widget:is(:focus-visible, :hover) {
@@ -3916,14 +3827,14 @@ button.w-empty {
 
 .set-head {
   padding: 8px 12px 10px;
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 500;
   letter-spacing: -0.02em;
   text-align: left;
 }
 
 .set-more {
-  font-size: 30px;
+  font-size: 32px;
   opacity: 0.6;
 }
 
@@ -3967,7 +3878,7 @@ button.w-empty {
 .lg,
 .resume,
 .dock-label {
-  transition: transform 0.45s var(--gentle), opacity 0.3s;
+  transition: transform 0.5s var(--gentle), opacity 0.25s;
 }
 
 #stage :is(.tab, .tool):focus-visible svg {
@@ -4032,11 +3943,11 @@ button.w-empty {
   min-width: 84px;
   padding: 8px 6px;
   border: 0;
-  border-radius: 18px;
+  border-radius: 20px;
   background: transparent;
   color: var(--ink);
   cursor: pointer;
-  transition: transform 0.45s var(--gentle);
+  transition: transform 0.5s var(--gentle);
 }
 
 .jump:is(:focus-visible, :hover) {
@@ -4060,9 +3971,53 @@ button.w-empty {
 
 .scene-grid .pillbtn {
   height: 52px;
-  font-size: 17px;
+  font-size: 16px;
 }
 
 .games-hero {
   flex: 1;
+}
+
+
+/* =====================================================================
+   One scale for the whole launcher
+   Type:    16 / 20 / 24 / 32 / 48 / 64 / 96 px (nothing smaller than 16: 24 px on a 1080p TV)
+   Corners: 12 / 20 / 28 / 36 / 48 px, and a pill only for the tab bar, search bar, switches and chips
+   Motion:  0.25 s for small changes, 0.5 s for movement
+   Letter-spacing: 0, -0.01em, -0.02em, and 0.06em for small capitals
+   ===================================================================== */
+
+.btn,
+.pillbtn,
+.resume,
+.price {
+  border-radius: 20px;
+}
+
+/* A label and a switch, instead of "Name: On" */
+.tog {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tog .switch {
+  width: 46px;
+  height: 28px;
+}
+
+.tog.on .switch {
+  background: #34c759;
+}
+
+.tog.on .switch > span {
+  transform: translateX(18px);
+}
+
+.jump .small {
+  white-space: nowrap;
+}
+
+.w-jump .jump-row {
+  gap: 8px;
 }
