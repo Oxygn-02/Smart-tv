@@ -262,7 +262,7 @@
       <section class="view view-search" data-view="search" hidden>
         <label class="search-bar glass">
           <span class="lg chip" style="width:40px;height:40px;border-radius:50%">${icon('search', 18)}</span>
-          <input id="search-input" data-focus type="search" autocomplete="off" spellcheck="false"
+          <input id="search-input" data-focus type="search" enterkeyhint="search" inputmode="search" autocomplete="off" spellcheck="false"
             placeholder="${NATIVE ? 'Search apps on this TV (press OK to type)' : 'Search shows and films (press OK to type)'}" aria-label="Search">
           <span class="small" data-search-count></span>
           <button class="btn lg google-search" data-focus data-action="google-search">Search with Google TV</button>
@@ -2503,6 +2503,16 @@
       e.target.click();
       return;
     }
+    if (e.key === 'Enter' && e.target.id === 'search-input') {
+      // Search: close the keyboard and move to the first result, or hand the words to Google TV.
+      e.preventDefault();
+      e.target.blur();
+      const first = stage.querySelector('[data-shows="titles"] .show, [data-shows="apps"] .app-card, [data-shows="free"] .show');
+      if (first) first.focus();
+      else if (NATIVE && state.query.trim()) nativeCall('googleSearch', state.query.trim());
+      else stage.querySelector('[data-action="google-search"]')?.focus();
+      return;
+    }
     const inText = e.target.tagName === 'INPUT';
 
     if (BACK_KEYS.has(e.key) && !(inText && e.key === 'Backspace')) {
@@ -2567,11 +2577,21 @@
 
   let userFit = readFit();
 
+  let fitSize = { w: 0, h: 0 };
   function fit() {
     const root = document.documentElement;
-    const w = innerWidth || root.clientWidth;
-    const h = innerHeight || root.clientHeight;
+    let w = innerWidth || root.clientWidth;
+    let h = innerHeight || root.clientHeight;
     if (!w || !h) return; // not laid out yet; the timers below try again
+    // The on-screen keyboard can shrink the window. Keep the size the page had
+    // before it opened, so the page doesn't zoom out to fit what is left.
+    const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
+    if (typing && fitSize.h && h < fitSize.h) {
+      w = fitSize.w;
+      h = fitSize.h;
+    } else {
+      fitSize = { w, h };
+    }
     stage.style.transform = `scale(${Math.min(w / 1280, h / 720) * (userFit || 1)})`;
     const diag = stage.querySelector('[data-fit-diag]');
     if (diag) diag.textContent = `Screen ${w} x ${h} at ${devicePixelRatio}x`;

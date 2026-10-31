@@ -3932,3 +3932,16 @@ button.w-empty {
   font-size: 30px;
   opacity: 0.6;
 }
+
+
+/* Search: no gap where results would go */
+.shows:empty,
+[data-titles-note]:empty,
+.search-hint:empty {
+  display: none;
+}
+
+.view-search [data-shows="titles"],
+.view-search [data-shows="apps"] {
+  min-height: 0;
+}
