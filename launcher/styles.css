@@ -3834,3 +3834,101 @@ button.w-empty {
 .settings .set-row {
   height: 52px;
 }
+
+
+/* =====================================================================
+   v0.9: frost that lines up, clearer empty cards, fewer costly effects
+   ===================================================================== */
+
+/* The blurred wallpaper behind each panel is placed with --fx/--fy (set in
+   app.js, alignFrost) so a panel shows the part of the photo that is really
+   behind it. */
+#stage.photo .glass {
+  background:
+    var(--glass-sheen),
+    linear-gradient(var(--glass), var(--glass)),
+    var(--photo-scrim),
+    var(--frost) var(--fx, 0px) var(--fy, 0px) / 1280px 720px no-repeat;
+}
+
+/* Cards with nothing to show are clearer: the wallpaper itself shows through */
+#stage.photo .glass.is-empty,
+#stage.photo .music-empty-card {
+  background: var(--glass-sheen), linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+}
+
+#stage.photo.light .glass.is-empty,
+#stage.photo.light .music-empty-card {
+  background: var(--glass-sheen), linear-gradient(rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.18));
+}
+
+/* Costly effects removed, for a TV chip:
+   - the colour drift behind everything only runs when Animate is on
+   - the card glow no longer animates (only the lift does)
+   - the dock keeps one size instead of resizing as focus enters it
+   - the apps list has no scroll mask */
+.aurora {
+  display: none;
+}
+
+#stage.animate .aurora {
+  display: block;
+}
+
+.aurora i {
+  animation: none;
+  will-change: auto;
+}
+
+#stage.animate .aurora i:first-child {
+  animation: drift-a 38s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+#stage.animate .aurora i:last-child {
+  animation: drift-b 46s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.widget {
+  transition: transform 0.6s var(--gentle);
+}
+
+.widget:is(:focus-visible, :hover) {
+  box-shadow: 0 18px 40px -14px var(--focus-glow), 0 0 0 1px var(--glass-hi), inset 0 1px 0 var(--glass-hi);
+}
+
+.dock,
+.dock.active {
+  transition: none;
+  padding-bottom: 36px;
+  bottom: 8px;
+}
+
+.view-apps {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+
+/* ---------- Settings: a short menu, each group opens its own rows ---------- */
+.settings {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.settings .set-row {
+  height: 66px;
+}
+
+.set-head {
+  padding: 8px 12px 10px;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  text-align: left;
+}
+
+.set-more {
+  font-size: 30px;
+  opacity: 0.6;
+}

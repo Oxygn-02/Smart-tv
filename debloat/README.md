@@ -18,3 +18,6 @@ Settings > **Home button** asks Android to make Smart TV Launcher the home app. 
 ## With a computer (optional)
 
 `backup-tv.sh` saves the TV's app list and settings before any change, and `restore.sh` re-enables anything switched off since. They need adb; see `../android/README.md`.
+
+## Choosing apps from the phone (v0.9)
+On the phone setup page, **Apps to switch off** lists the apps that show an icon on the TV. Tick the ones you don't want and send the choice. Apps the TV needs (home screens, TV inputs, system and Google services, the update service) and the apps you use are locked and can't be ticked. In the launcher, Settings > Home and apps > Clean up apps shows the choice. After **Connect to the TV** (see android/README.md) the launcher switches the chosen apps off with `pm disable-user --user 0`, after a second confirmation, and keeps a list so **Switch back on** undoes it with `pm enable`. The stock launcher is never offered.

@@ -32,7 +32,10 @@ class SetupServer(
         fun onGoveeKey(key: String)
         fun onTown(town: String)
         fun onTmdb(key: String)
-        fun onWifi(ssid: String, password: String, security: String)
+        fun onWifi(ssid: String, password: String, security: String, hidden: Boolean)
+        fun appsJson(): String
+        fun iconPng(pkg: String): ByteArray?
+        fun onCleanup(pkgs: List<String>)
         fun onWallpapersChanged()
         fun stateJson(): JSONObject
         fun packagesText(): String
@@ -52,6 +55,11 @@ class SetupServer(
         if (session.method == Method.GET && (uri == "/" || uri == "/index.html")) {
             val page = context.assets.open("setup.html").bufferedReader().use { it.readText() }
             return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", page)
+        }
+
+        if (session.method == Method.GET && uri == "/qrcode.js") {
+            val js = context.assets.open("web/qrcode.js").bufferedReader().use { it.readText() }
+            return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "application/javascript; charset=utf-8", js)
         }
 
         val files = HashMap<String, String>()
@@ -81,7 +89,11 @@ class SetupServer(
                 ok()
             }
             "/api/wifi" -> {
-                events.onWifi(param("ssid").trim(), param("password"), if (param("security") == "nopass") "nopass" else "WPA")
+                events.onWifi(
+                    param("ssid").trim(), param("password"),
+                    when (param("security")) { "nopass" -> "nopass"; "WEP" -> "WEP"; else -> "WPA" },
+                    param("hidden") == "true",
+                )
                 ok()
             }
             "/api/town" -> {
@@ -101,6 +113,14 @@ class SetupServer(
                 val name = File(param("name")).name // no folders
                 File(wallpaperDir(context), name).delete()
                 events.onWallpapersChanged()
+                ok()
+            }
+            "/api/apps" -> NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "application/json", events.appsJson())
+            "/api/icon" -> events.iconPng(param("pkg"))?.let {
+                NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "image/png", it.inputStream(), it.size.toLong())
+            } ?: json(Response.Status.NOT_FOUND, JSONObject().put("error", "No icon"))
+            "/api/cleanup" -> {
+                events.onCleanup(param("pkgs").split(",").map { it.trim() }.filter { it.isNotEmpty() })
                 ok()
             }
             "/packages.txt" -> NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "text/plain; charset=utf-8", events.packagesText())

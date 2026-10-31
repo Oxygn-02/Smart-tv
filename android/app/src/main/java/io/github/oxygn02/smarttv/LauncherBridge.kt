@@ -217,7 +217,7 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
                 val off = adb.shell("pm list packages -d").lines().count { it.startsWith("package:") }
                 adbEvent(
                     "ready", "Connected",
-                    JSONObject().put("model", model).put("android", android).put("off", off),
+                    JSONObject().put("model", model).put("android", android).put("off", off).put("ours", switchedOffByUs().size),
                 )
             } catch (e: Exception) {
                 adb.close()
@@ -229,6 +229,126 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
     @JavascriptInterface
     fun adbDisconnect() {
         adbIo.execute { adb.close() }
+    }
+
+    // ---------- Apps you can choose to switch off (picked on the phone page) ----------
+
+    private class Entry(val pkg: String, val label: String, val system: Boolean, val enabled: Boolean, val protectedApp: Boolean, val why: String)
+
+    private val cleanupPrefs = activity.getSharedPreferences("cleanup", Context.MODE_PRIVATE)
+
+    private var chosen: List<String>
+        get() = runCatching {
+            JSONArray(cleanupPrefs.getString("chosen", "[]")).let { a -> (0 until a.length()).map { a.getString(it) } }
+        }.getOrDefault(emptyList())
+        set(v) { cleanupPrefs.edit().putString("chosen", JSONArray(v).toString()).apply() }
+
+    /** What must never be switched off from here: the stock launcher, TV inputs, system services, apps you use. */
+    private fun protectionFor(pkg: String, label: String, inputs: Set<String>, homes: Set<String>): String? {
+        val key = label.lowercase().filter { it.isLetterOrDigit() }
+        return when {
+            pkg == activity.packageName -> "This launcher"
+            pkg in homes -> "A home screen"
+            pkg in inputs -> "TV input"
+            pkg in PROTECTED_PKGS -> "Needed by the TV"
+            Regex("update|\\.ota|setup|provision|permission|installer|webview|systemui|settings|bluetooth|keyboard|inputmethod|tvprovider|\\.gms|\\.gsf|vending").containsMatchIn(pkg.lowercase()) -> "Needed by the TV"
+            KEEP_LABELS.any { key == it || key.startsWith(it) } -> "An app you use"
+            else -> null
+        }
+    }
+
+    private fun catalog(): List<Entry> {
+        val inputs = (activity.getSystemService(TvInputManager::class.java)?.tvInputList ?: emptyList())
+            .map { it.serviceInfo.packageName }.toSet()
+        val homes = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
+            .map { it.activityInfo.packageName }.toSet()
+        val launchable = (
+            pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER), 0) +
+                pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+            ).map { it.activityInfo.packageName }.toSet()
+        return launchable.mapNotNull { pkg ->
+            val info = runCatching { pm.getApplicationInfo(pkg, 0) }.getOrNull() ?: return@mapNotNull null
+            val label = pm.getApplicationLabel(info).toString()
+            val why = protectionFor(pkg, label, inputs, homes)
+            Entry(pkg, label, info.flags and ApplicationInfo.FLAG_SYSTEM != 0, info.enabled, why != null, why.orEmpty())
+        }.sortedBy { it.label.lowercase() }
+    }
+
+    /** For the phone page: [{pkg, label, system, enabled, protected, why, chosen}]. */
+    private fun appCatalog(): JSONArray {
+        val picked = chosen.toSet()
+        val out = JSONArray()
+        catalog().forEach {
+            out.put(
+                JSONObject().put("pkg", it.pkg).put("label", it.label).put("system", it.system)
+                    .put("enabled", it.enabled).put("protected", it.protectedApp).put("why", it.why)
+                    .put("chosen", it.pkg in picked),
+            )
+        }
+        return out
+    }
+
+    /** The apps picked on the phone: [{pkg, label, enabled, installed}]. */
+    @JavascriptInterface
+    fun chosenApps(): String = packageStates(JSONArray(chosen).toString())
+
+    private val adbLog = activity.getSharedPreferences("adblog", Context.MODE_PRIVATE)
+
+    private fun switchedOffByUs(): List<String> = runCatching {
+        JSONArray(adbLog.getString("off", "[]")).let { a -> (0 until a.length()).map { a.getString(it) } }
+    }.getOrDefault(emptyList())
+
+    private fun setSwitchedOff(v: List<String>) = adbLog.edit().putString("off", JSONArray(v.distinct()).toString()).apply()
+
+    private val pkgName = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
+
+    /**
+     * Switches off the apps picked on the phone with `pm disable-user --user 0`
+     * (reversible). Apps that are protected are refused. Needs the connection
+     * from Connect to the TV. Progress arrives as "adb" events.
+     */
+    @JavascriptInterface
+    fun adbDisable() {
+        adbIo.execute {
+            try {
+                if (!adb.connected) throw AdbClient.AdbException("Connect to the TV first")
+                val allowed = catalog().filter { !it.protectedApp }.map { it.pkg }.toSet()
+                val todo = chosen.filter { it in allowed && pkgName.matches(it) }
+                val done = mutableListOf<String>()
+                val failed = JSONArray()
+                todo.forEachIndexed { i, pkg ->
+                    adbEvent("working", "Switching off ${i + 1} of ${todo.size}")
+                    val out = adb.shell("pm disable-user --user 0 $pkg")
+                    if (out.contains("disabled-user") || out.contains("new state: disabled")) done.add(pkg)
+                    else failed.put(JSONObject().put("pkg", pkg).put("why", out.trim().take(120)))
+                }
+                setSwitchedOff(switchedOffByUs() + done)
+                adbEvent("done", "Switched off ${done.size} of ${todo.size}", JSONObject().put("failed", failed).put("ours", switchedOffByUs().size))
+            } catch (e: Exception) {
+                adbEvent("error", e.message ?: "That didn't work")
+            }
+        }
+    }
+
+    /** Switches back on everything this launcher switched off. */
+    @JavascriptInterface
+    fun adbRestore() {
+        adbIo.execute {
+            try {
+                if (!adb.connected) throw AdbClient.AdbException("Connect to the TV first")
+                val todo = switchedOffByUs().filter { pkgName.matches(it) }
+                val back = mutableListOf<String>()
+                todo.forEachIndexed { i, pkg ->
+                    adbEvent("working", "Switching on ${i + 1} of ${todo.size}")
+                    val out = adb.shell("pm enable $pkg")
+                    if (out.contains("enabled")) back.add(pkg)
+                }
+                setSwitchedOff(switchedOffByUs() - back.toSet())
+                adbEvent("done", "Switched back on ${back.size} of ${todo.size}", JSONObject().put("ours", switchedOffByUs().size))
+            } catch (e: Exception) {
+                adbEvent("error", e.message ?: "That didn't work")
+            }
+        }
     }
 
     // ---------- Show search: the TMDB key saved from the phone page ----------
@@ -515,8 +635,9 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         fun esc(v: String) = v.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace(":", "\\:").replace("\"", "\\\"")
         val security = guest.getString("security", "WPA")
         val pass = guest.getString("password", "").orEmpty()
-        val payload = if (security == "nopass" || pass.isEmpty()) "WIFI:T:nopass;S:${esc(ssid)};;"
-        else "WIFI:T:WPA;S:${esc(ssid)};P:${esc(pass)};;"
+        val hide = if (guest.getBoolean("hidden", false)) "H:true;" else ""
+        val payload = if (security == "nopass" || pass.isEmpty()) "WIFI:T:nopass;S:${esc(ssid)};${hide};"
+        else "WIFI:T:${if (security == "WEP") "WEP" else "WPA"};S:${esc(ssid)};P:${esc(pass)};${hide};"
         return JSONObject().put("ssid", ssid).put("payload", payload).toString()
     }
 
@@ -538,8 +659,19 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             host.emit("setup", "{}")
         }
 
-        override fun onWifi(ssid: String, password: String, security: String) {
-            guest.edit().putString("ssid", ssid).putString("password", password).putString("security", security).apply()
+        override fun onWifi(ssid: String, password: String, security: String, hidden: Boolean) {
+            guest.edit().putString("ssid", ssid).putString("password", password)
+                .putString("security", security).putBoolean("hidden", hidden).apply()
+            host.emit("setup", "{}")
+        }
+
+        override fun appsJson(): String = appCatalog().toString()
+
+        override fun iconPng(pkg: String): ByteArray? = this@LauncherBridge.iconPng(pkg)
+
+        override fun onCleanup(pkgs: List<String>) {
+            val allowed = catalog().filter { !it.protectedApp }.map { it.pkg }.toSet()
+            chosen = pkgs.filter { it in allowed }
             host.emit("setup", "{}")
         }
 
@@ -754,6 +886,17 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
     private fun hex(color: Int) = String.format("#%06x", color and 0xFFFFFF)
 
     companion object {
+        val PROTECTED_PKGS = setOf(
+            "android", "com.android.settings", "com.android.systemui", "com.google.android.gms", "com.google.android.gsf",
+            "com.android.vending", "com.google.android.tvlauncher", "com.google.android.apps.tv.launcherx",
+            "com.google.android.leanbacklauncher", "com.google.android.tvrecommendations", "com.android.tv.settings",
+            "com.google.android.permissioncontroller", "com.google.android.packageinstaller", "com.android.providers.tv",
+        )
+        val KEEP_LABELS = setOf(
+            "youtube", "youtubemusic", "bbciplayer", "itvx", "channel4", "my5", "primevideo", "disney", "crunchyroll",
+            "googleplaystore", "playstore", "googletv", "netflix",
+        )
+    
         /** Where the page and its images are served from inside the app. */
         const val ORIGIN = "https://appassets.androidplatform.net"
         private const val WEEK_MS = 7L * 24 * 60 * 60 * 1000
