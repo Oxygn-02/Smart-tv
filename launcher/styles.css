@@ -3829,3 +3829,8 @@ button.w-empty {
   gap: 10px;
   min-width: 0;
 }
+
+/* Ten rows a side on the TV: one notch tighter */
+.settings .set-row {
+  height: 52px;
+}

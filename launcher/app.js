@@ -680,6 +680,7 @@
             ${row('open-setup', icon('phone'), 'Set up from your phone', 'Govee key, wallpapers, town', 'setup')}
             ${row('open-setup', icon('lamp'), 'Govee account', 'Lights and backlight', 'govee')}
             ${row('home-role', icon('home'), 'Home button', 'Which app opens on Home', 'home')}
+            ${NATIVE ? row('debug-check', icon('wifi'), 'Debugging check', 'Is the TV debug port open? (read only)', 'dbg') : ''}
             ${row('cycle-hdmi', icon('hdmi'), 'Games input', `Where the ${state.games.device} is plugged in`, 'hdmi')}
             ${row('toggle-auto', icon('games'), 'Switch input for Games', 'Turn off to stay here', 'auto')}
             ${row('cycle-countdown', icon('timer'), 'Switch countdown', 'Time to cancel first', 'countdown')}
@@ -1462,6 +1463,7 @@
       govee: !NATIVE ? 'On the TV'
         : state.govee.connected ? `Connected, ${state.govee.devices.length} devices`
           : state.govee.hasKey ? (state.govee.error || 'Connecting') : 'Not connected',
+      dbg: state.dbg || 'Press OK',
       home: !NATIVE ? 'On the TV' : state.homeDefault ? 'This launcher' : 'Google TV. Press OK',
       fit: `${Math.round((userFit || 1) * 100)}%`,
       'np-access': access.nowPlaying ? 'Allowed' : 'Off. Press OK to allow',
@@ -1895,7 +1897,15 @@
     else if (act === 'open-cleanup') openView('cleanup');
     else if (act === 'open-app-info') nativeCall('openAppInfo', b.dataset.pkg);
     else if (act === 'close-setup') closeSetup();
-    else if (act === 'home-role') {
+    else if (act === 'debug-check') {
+      toast('Checking...');
+      setTimeout(() => {
+        const r = nativeJson('debugPortOpen') || {};
+        state.dbg = r.local || r.lan ? `Open${r.lan ? ` at ${r.ip}` : ' on this TV only'}` : 'Closed';
+        toast(`Debug port: ${state.dbg}`);
+        applyState();
+      }, 50);
+    } else if (act === 'home-role') {
       if (NATIVE) toast(nativeCall('requestDefaultHome') === 'started' ? 'Choose Smart TV Launcher on the next screen' : 'This TV does not offer that choice. Ask me for the other way');
       else toast('Works on the TV');
     }

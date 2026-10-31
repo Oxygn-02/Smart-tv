@@ -432,6 +432,22 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         override fun packagesText(): String = packageList()
     }
 
+    /**
+     * Read-only check: is the TV's debugging port (5555) listening, on the TV
+     * itself or on its network address? Returns {local, lan, ip}. It only opens
+     * and closes a connection; it sends nothing.
+     */
+    @JavascriptInterface
+    fun debugPortOpen(): String {
+        fun open(host: String): Boolean = try {
+            java.net.Socket().use { it.connect(java.net.InetSocketAddress(host, 5555), 1200); true }
+        } catch (_: Exception) {
+            false
+        }
+        val ip = lanAddress()
+        return JSONObject().put("local", open("127.0.0.1")).put("lan", ip != null && open(ip)).put("ip", ip ?: "").toString()
+    }
+
     private fun lanAddress(): String? = NetworkInterface.getNetworkInterfaces().toList()
         .flatMap { it.inetAddresses.toList() }
         .firstOrNull { it is Inet4Address && !it.isLoopbackAddress && it.isSiteLocalAddress }
