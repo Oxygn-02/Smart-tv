@@ -38,6 +38,7 @@
     spread: true, // a backlight scene also colours the lights that have a role
     ambient: 10, // minutes idle before the ambient screen; 0 = off
     sleepAt: 0, // when the sleep timer turns the lights off (ms), or 0
+    clock24: false, // false: 2:45 pm; true: 14:45
     motion: 'smooth', // 'smooth' or 'fast' (no animations)
     speed: '', // result of the last speed test
     settingsCat: null, // which Settings group is open
@@ -60,14 +61,14 @@
   const H = D.smartHome;
   const BACKLIGHT = Object.fromEntries(H.backlights.scenes.map((s) => [s.id, s]));
   BACKLIGHT.live = { id: 'live', name: 'Following your lights', colors: ['#8e8e9a', '#6b6b78', '#4a4a55'] };
-  BACKLIGHT.none = { id: 'none', name: 'Not chosen yet', colors: ['#8e8e9a', '#6b6b78', '#4a4a55'] };
+  BACKLIGHT.none = { id: 'none', name: 'Pick a scene', colors: ['#8e8e9a', '#6b6b78', '#4a4a55'] };
   const ROOM_SCENE = Object.fromEntries(H.scenes.map((s) => [s.id, s]));
 
   const pad = (n) => String(n).padStart(2, '0');
 
   // ---------- Saved settings ----------
   // Remembered on the TV between launches (browser storage inside the app).
-  const SAVED = ['motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
+  const SAVED = ['clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
 
   function loadSaved() {
     try {
@@ -271,7 +272,7 @@
         <label class="search-bar glass">
           <span class="lg chip" style="width:40px;height:40px;border-radius:50%">${icon('search', 18)}</span>
           <input id="search-input" data-focus type="search" enterkeyhint="search" inputmode="search" autocomplete="off" spellcheck="false"
-            placeholder="${NATIVE ? 'Search apps on this TV (press OK to type)' : 'Search shows and films (press OK to type)'}" aria-label="Search">
+            placeholder="Search apps and shows" aria-label="Search">
           <span class="small" data-search-count></span>
           <button class="btn lg google-search" data-focus data-action="google-search">Search with Google TV</button>
         </label>
@@ -415,9 +416,9 @@
               <span class="lg chip room-chip">${icon('room')}</span>
               <span class="room-title">${H.backlights.name}<span class="small" data-backlight-status></span></span>
               <button class="btn lg" data-focus data-action="open-roles">Light roles</button>
-              <button class="btn lg" data-focus data-action="spread">Spread to room: <span data-val="spread"></span></button>
-              <button class="btn lg" data-focus data-action="drift">Animate: <span data-val="drift"></span></button>
-              <button class="btn lg" data-focus data-action="match-lights">Wallpaper follows lights: <span data-val="match"></span></button>
+              <button class="btn lg tog" data-focus data-action="spread"><span>Spread to room</span><span class="switch" aria-hidden="true"><span></span></span><span data-val="spread" hidden></span></button>
+              <button class="btn lg tog" data-focus data-action="drift"><span>Animate</span><span class="switch" aria-hidden="true"><span></span></span><span data-val="drift" hidden></span></button>
+              <button class="btn lg tog" data-focus data-action="match-lights"><span>Wallpaper follows lights</span><span class="switch" aria-hidden="true"><span></span></span><span data-val="match" hidden></span></button>
             </div>
             <div class="swatches">
               <button class="swatch" data-focus data-action="backlight" data-id="sync">
@@ -936,6 +937,7 @@
         row('open-wallpapers', icon('image'), 'Wallpaper photos', 'Choose one, or add your own', 'wp'),
         row('screen-fit', icon('live'), 'Screen size', 'Resize if the edges are cropped', 'fit'),
         row('cycle-ambient', icon('moon'), 'Ambient screen', 'Photos and clock when idle', 'ambient'),
+        row('cycle-clock', icon('timer'), 'Clock', '12-hour or 24-hour', 'clock'),
         row('cycle-motion', icon('live'), 'Animations', 'Fast turns them off, for a slow TV', 'motion'),
         row('speed-test', icon('timer'), 'Speed test', 'Moves around by itself for about 20 seconds. Hands off', 'speed'),
         NATIVE ? '' : row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to see empty widgets', 'sample'),
@@ -1029,7 +1031,7 @@
     if (!items.length) {
       list.innerHTML = adbRow() + `
         <div class="cleanup-empty">
-          <span class="w-empty-title">Nothing chosen yet</span>
+          <span class="w-empty-title">No apps chosen</span>
           <span class="small">Open Set up from your phone, go to Apps to switch off, tick the apps you don't want and send them over. They are listed here, and you switch them off from this screen.</span>
         </div>`;
       return;
@@ -1385,7 +1387,7 @@
       const msg = {
         loading: ['Getting the weather', 'One moment'],
         permission: ['Allow location', 'Turn on location for this app, or add your town in Settings'],
-        offline: ['No weather yet', 'Check the TV is online, or add your town in Settings'],
+        offline: ['Add your town', 'Set it in Settings, or turn on location'],
         notfound: ['Town not found', `Couldn't find "${state.town}". Check the spelling in Settings`],
       }[state.weatherNote] || ['Add your town', 'Set it in Settings to see the weather'];
       stage.querySelector('[data-w-empty-title]').textContent = msg[0];
@@ -1808,6 +1810,7 @@
       sample: state.sampleData ? 'On' : 'Off',
       wp: wallpaperLabel(),
       ambient: state.ambient ? `After ${state.ambient} min` : 'Off',
+      clock: state.clock24 ? '24-hour' : '12-hour',
       motion: state.motion === 'fast' ? 'Fast' : 'Smooth',
       wn: state.wnCheck || 'Press OK',
       speed: state.speed || 'Press OK',
@@ -1825,6 +1828,7 @@
       'usage-access': access.recentApps ? 'Allowed' : 'Off. Press OK to allow',
     };
     all('[data-val]').forEach((el) => { el.textContent = values[el.dataset.val]; });
+    all('.tog').forEach((el) => el.classList.toggle('on', el.querySelector('[data-val]').textContent === 'On'));
     renderWeather();
 
     renderRoom();
@@ -1834,11 +1838,11 @@
     stage.querySelector('.w-music').classList.toggle('is-empty', NATIVE ? !state.live : !sample);
     if (NATIVE) {
       const noAccess = !access.nowPlaying;
-      all('[data-np-empty-title]').forEach((el) => { el.textContent = noAccess ? 'Allow Now playing' : 'Nothing playing'; });
+      all('[data-np-empty-title]').forEach((el) => { el.textContent = noAccess ? 'Show what is playing' : 'Nothing playing'; });
       all('[data-np-empty-text]').forEach((el) => {
         el.textContent = noAccess
-          ? 'Turn on access to show what is playing, from any app or cast from a phone'
-          : 'Anything playing on the TV shows up here, including music cast from a phone';
+          ? 'Let the launcher see what plays on the TV, including casts from your phone.'
+          : 'Music from any app, or cast from your phone, shows up here.';
       });
       all('[data-np-allow]').forEach((el) => { el.hidden = !noAccess; });
       all('[data-np-open]').forEach((el) => { el.hidden = noAccess || !APP.ytmusic; });
@@ -1905,7 +1909,7 @@
     if (NATIVE) state.sleepAt = Number(nativeCall('goveeSleepAt')) || 0;
     const sl = stage.querySelector('[data-sleep-label]');
     if (sl) sl.textContent = state.sleepAt > Date.now() ? `Lights off in ${Math.max(1, Math.round((state.sleepAt - Date.now()) / 60000))} min` : 'Sleep timer: Off';
-    stage.querySelector('[data-room-lights]').textContent = roomList.length ? `${lightsOn} of ${roomList.length} lights on` : 'No lights yet';
+    stage.querySelector('[data-room-lights]').textContent = roomList.length ? `${lightsOn} of ${roomList.length} lights on` : 'Add your lights';
     stage.querySelector('[data-room-sound]').textContent = !h.sound.on ? 'Soundbar off'
       : h.sound.muted ? 'Soundbar muted' : `Volume ${h.sound.volume}`;
 
@@ -2036,12 +2040,18 @@
       : 'Suggested for you';
   }
 
+  // "2:45 pm" (12-hour, the default) or "14:45", and "Sat 31 Oct" with no comma.
+  function clockText(n) {
+    if (state.clock24) return `${pad(n.getHours())}:${pad(n.getMinutes())}`;
+    return `${n.getHours() % 12 || 12}:${pad(n.getMinutes())} ${n.getHours() < 12 ? 'am' : 'pm'}`;
+  }
+
   function updateClock() {
     const n = new Date();
-    const time = `${pad(n.getHours())}:${pad(n.getMinutes())}`;
+    const time = clockText(n);
     if (refs.clock.textContent === time) return;
     refs.clock.textContent = time;
-    refs.date.textContent = n.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    refs.date.textContent = n.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '');
   }
 
   // Built-in wallpapers plus photos added from a phone (app storage).
@@ -2274,6 +2284,10 @@
       else state.wnCheck = `${r.items.length} shared by ${[...new Set(r.items.map((i) => (appByPkg(i.pkg) || {}).name || i.pkg))].join(', ')}`;
       toast(state.wnCheck);
       applyState();
+    } else if (act === 'cycle-clock') {
+      state.clock24 = !state.clock24;
+      refs.clock.textContent = '';
+      updateClock();
     } else if (act === 'cycle-motion') {
       state.motion = state.motion === 'fast' ? 'smooth' : 'fast';
     } else if (act === 'speed-test') {
@@ -2763,7 +2777,7 @@
     prev.classList.remove('on');
     ambientPic++;
     const n = new Date();
-    el.querySelector('[data-amb-clock]').textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}`;
+    el.querySelector('[data-amb-clock]').textContent = clockText(n);
     const w = state.weather;
     el.querySelector('[data-amb-sub]').textContent = n.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + (w ? `  ·  ${w.temp}°  ${w.label}` : '');
   }

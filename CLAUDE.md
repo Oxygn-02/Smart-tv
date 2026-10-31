@@ -10,5 +10,5 @@ Read `HANDOFF.md` for full context and the design spec.
 - **Never disable** the apps listed under "Apps I actually use" in HANDOFF.md, or the system update service, without asking.
 - **Never disable the stock launcher** until the custom launcher is installed, set as default, and confirmed working.
 - Launcher work: we build our own launcher (decided 30 Oct 2026, replacing the plan to reskin FLauncher). `android/` is a native shell that hosts the UI from `launcher/` in a WebView and gives it `window.Android` for real data. D-pad focus is our own spatial navigation in `launcher/app.js`. Test in an Android TV emulator before the real TV.
-- The design lives in `launcher/` (iPadOS-inspired, Liquid Glass, Geist type, backlight-bleed glow in the room's light colour). Earlier designs are kept in `designs/`; `mockup/` is the original brief.
+- The design lives in `launcher/` (iPadOS-inspired, Liquid Glass, Inter type, backlight-bleed glow in the room's light colour). Earlier designs are kept in `designs/`; `mockup/` is the original brief.
 - Photos for wallpaper mode will be supplied by me in `wallpapers/`.
