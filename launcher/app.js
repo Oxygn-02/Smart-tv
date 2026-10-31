@@ -218,12 +218,6 @@
             </div>
           </section>
 
-          ${D.recentApps.map((id) => `
-            <button class="widget glass w-mini w-recent" data-recent hidden data-focus data-app="${id}" aria-label="Open ${APP[id].name}">
-              ${appIcon(APP[id], 64)}
-              <span class="small">Recently used</span>
-              <span class="w-mini-title">${APP[id].name}</span>
-            </button>`).join('')}
           ${NATIVE ? [0, 1].map((i) => `<button class="widget glass w-mini" data-cw data-i="${i}" hidden data-focus data-expand="cw"></button>`).join('') : ''}
           ${D.continueWatching.map((c) => `
             <button class="widget glass w-mini" data-cw data-focus data-expand="cw" data-i="${D.continueWatching.indexOf(c)}" aria-label="Continue ${c.title} on ${c.app}">
@@ -236,7 +230,7 @@
 
         <nav class="dock glass" aria-label="Apps">
           ${dockApps().map((a, i, list) => `
-            ${!a.pinned && list[i - 1]?.pinned ? '<span class="dock-divider"></span>' : ''}
+            
             <button class="dock-app" data-focus data-app="${a.id}" aria-label="${a.name}" style="--accent:${a.color}">
               ${appIcon(a, 76)}
               <span class="dock-label">${a.short || a.name}</span>
@@ -245,14 +239,12 @@
       </section>`;
   }
 
-  // The dock keeps the apps you use, plus the three you opened last. The
-  // rest are in the Apps tab.
+  // The dock shows the apps listed in data.js (dock), in that order, if installed.
+  // If fewer than three of them are installed, other apps fill it so it is never bare.
   function dockApps() {
-    const recent = (D.recentApps || []).slice(0, 3);
-    const keep = D.apps.filter((a) => a.pinned || (NATIVE && recent.includes(a.id)));
-    // Never leave the dock bare (no recent apps known yet): fill it up to six.
-    D.apps.forEach((a) => { if (keep.length < 6 && !keep.includes(a)) keep.push(a); });
-    return D.apps.filter((a) => keep.includes(a));
+    const list = D.dock.map((id) => D.apps.find((a) => a.id === id)).filter(Boolean);
+    D.apps.forEach((a) => { if (list.length < 3 && !list.includes(a)) list.push(a); });
+    return list;
   }
 
   function appTile(a, cls, size) {
@@ -849,7 +841,7 @@
             ${row('cycle-countdown', icon('timer'), 'Switch countdown', 'Time to cancel first', 'countdown')}
             ${NATIVE ? `
               ${row('grant-np', icon('music'), 'Now playing access', 'Show what is playing', 'np-access')}
-              ${row('grant-usage', icon('apps'), 'Recent apps access', 'Show the apps you used last', 'usage-access')}`
+`
             : row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to see empty widgets', 'sample')}
           </div>
         </section>
