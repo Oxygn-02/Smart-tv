@@ -84,3 +84,7 @@ Ask before each step that changes the TV (see `../CLAUDE.md`).
    or `../debloat/restore.sh --launcher-only`. Record it in `../debloat/disabled-packages.txt`.
 
 After a firmware update, check that the TV hasn't switched the stock home screen back on.
+
+## Clean-up over the TV's own debugging port (v0.8)
+Settings > Clean up apps > Connect to the TV lets the launcher open a connection to this TV's network debugging port (5555) and read three facts: the model, the Android version, and how many apps are already switched off. The first time, the TV asks on screen to allow the launcher; press OK. It changes nothing. Switching apps off will use `pm disable-user` from the agreed list, with a matching restore (see debloat/README.md).
+The ADB client is `AdbClient.kt`. Unit tests (`./gradlew testDebugUnitTest`) check its public key against a key made by the real `adb keygen`, and run a full connect, approve and shell round trip against a stand-in for the TV's adbd.

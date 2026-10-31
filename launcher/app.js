@@ -38,6 +38,7 @@
     spread: true, // a backlight scene also colours the lights that have a role
     ambient: 10, // minutes idle before the ambient screen; 0 = off
     sleepAt: 0, // when the sleep timer turns the lights off (ms), or 0
+    settingsCat: null, // which Settings group is open
     cw: [], // Watch Next items read from the TV
     cwNote: '',
     matchLights: false, // wallpaper gradient follows the backlight colours
@@ -261,7 +262,7 @@
       <section class="view view-search" data-view="search" hidden>
         <label class="search-bar glass">
           <span class="lg chip" style="width:40px;height:40px;border-radius:50%">${icon('search', 18)}</span>
-          <input id="search-input" data-focus type="search" autocomplete="off" spellcheck="false"
+          <input id="search-input" data-focus type="search" enterkeyhint="search" inputmode="search" autocomplete="off" spellcheck="false"
             placeholder="${NATIVE ? 'Search apps on this TV (press OK to type)' : 'Search shows and films (press OK to type)'}" aria-label="Search">
           <span class="small" data-search-count></span>
           <button class="btn lg google-search" data-focus data-action="google-search">Search with Google TV</button>
@@ -612,6 +613,31 @@
     }, 600);
   }
 
+  // ---------- Frost that lines up with the wallpaper ----------
+  // Each glass panel paints the blurred wallpaper offset by where it sits on
+  // screen, so it shows the part of the photo that is really behind it.
+  function stagePos(el, sr, k) {
+    const r = el.getBoundingClientRect();
+    return { x: (r.left - sr.left) / k, y: (r.top - sr.top) / k };
+  }
+
+  let frostQueued = 0;
+  function alignFrost() {
+    if (frostQueued) return;
+    frostQueued = requestAnimationFrame(() => {
+      frostQueued = 0;
+      if (state.wallpaper !== 'photo') return;
+      const sr = stage.getBoundingClientRect();
+      const k = sr.width / 1280 || 1;
+      stage.querySelectorAll('.glass').forEach((el) => {
+        if (!el.offsetParent) return; // hidden
+        const p = stagePos(el, sr, k);
+        el.style.setProperty('--fx', `${-p.x}px`);
+        el.style.setProperty('--fy', `${-p.y}px`);
+      });
+    });
+  }
+
   // ---------- Cards that open into a window ----------
   // Selecting a Home card grows it into a panel with quick actions or details.
   let xFrom = null;
@@ -815,35 +841,55 @@
       <button class="set-row" data-focus data-action="${action}">
         ${settingsRow(chip, label, help, `<span class="set-val" data-val="${val}"></span>`)}
       </button>`;
+    const town = `
+      <label class="set-row">
+        ${settingsRow(icon('location'), 'Weather town', 'Leave empty to use the TV location', '<input id="town-input" class="set-input" data-focus autocomplete="off" spellcheck="false" placeholder="TV location">')}
+      </label>`;
+    // Settings are grouped: a short list of categories, each opening its own rows.
+    const cats = [
+      { id: 'display', icon: icon('image'), title: 'Display', help: 'Appearance, wallpaper, screen size, ambient screen', rows: [
+        row('theme', '<span data-theme-icon></span>', 'Appearance', 'Light, dark, or follow the TV', 'theme'),
+        row('wallpaper', icon('image'), 'Wallpaper', 'Photo, gradient, or your light colours', 'wallpaper'),
+        row('open-wallpapers', icon('image'), 'Wallpaper photos', 'Choose one, or add your own', 'wp'),
+        row('screen-fit', icon('live'), 'Screen size', 'Resize if the edges are cropped', 'fit'),
+        row('cycle-ambient', icon('moon'), 'Ambient screen', 'Photos and clock when idle', 'ambient'),
+        NATIVE ? '' : row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to see empty widgets', 'sample'),
+      ] },
+      { id: 'home', icon: icon('home'), title: 'Home and apps', help: 'Home button, clean up apps', rows: [
+        row('home-role', icon('home'), 'Home button', 'Which app opens on Home', 'home'),
+        row('open-cleanup', icon('power'), 'Clean up apps', 'Switch off apps you don\'t want', 'cleanup'),
+        NATIVE ? row('grant-np', icon('music'), 'Now playing access', 'Show what is playing', 'np-access') : '',
+      ] },
+      { id: 'lights', icon: icon('lamp'), title: 'Lights', help: 'Govee account, light roles', rows: [
+        row('open-setup', icon('lamp'), 'Govee account', 'Lights and backlight', 'govee'),
+        row('open-roles', icon('room'), 'Light roles', 'Where each light is in the room', 'roles'),
+      ] },
+      { id: 'games', icon: icon('games'), title: 'Games', help: 'Console input and switching', rows: [
+        row('cycle-hdmi', icon('hdmi'), 'Games input', `Where the ${state.games.device} is plugged in`, 'hdmi'),
+        row('toggle-auto', icon('games'), 'Switch input for Games', 'Turn off to stay here', 'auto'),
+        row('cycle-countdown', icon('timer'), 'Switch countdown', 'Time to cancel first', 'countdown'),
+      ] },
+      { id: 'connect', icon: icon('phone'), title: 'Network and phone', help: 'Phone setup, guest Wi-Fi, weather town, Wi-Fi', rows: [
+        row('open-setup', icon('phone'), 'Set up from your phone', 'Govee key, wallpapers, apps, Wi-Fi code', 'setup'),
+        row('open-guest', icon('wifi'), 'Guest Wi-Fi', 'A code guests scan to join', 'guest'),
+        town,
+        row('wifi', icon('wifi'), 'Wi-Fi', 'Opens the TV network settings', 'wifi'),
+      ] },
+    ];
     return `
       <section class="view view-settings" data-view="settings" hidden>
         <section class="card glass settings" aria-label="Settings">
-          <div class="set-col">
-            ${row('theme', '<span data-theme-icon></span>', 'Appearance', 'Light, dark, or follow the TV', 'theme')}
-            ${row('wallpaper', icon('image'), 'Wallpaper', 'Photo, gradient, or your light colours', 'wallpaper')}
-            ${row('open-wallpapers', icon('image'), 'Wallpaper photos', 'Choose one, or add your own', 'wp')}
-            ${row('screen-fit', icon('live'), 'Screen size', 'Resize if the edges are cropped', 'fit')}
-            <label class="set-row">
-              ${settingsRow(icon('location'), 'Weather town', 'Leave empty to use the TV location', '<input id="town-input" class="set-input" data-focus autocomplete="off" spellcheck="false" placeholder="TV location">')}
-            </label>
-            ${row('wifi', icon('wifi'), 'Wi-Fi', 'Opens the TV network settings', 'wifi')}
-            ${row('cycle-ambient', icon('moon'), 'Ambient screen', 'Photos and clock when idle', 'ambient')}
-            ${row('open-cleanup', icon('power'), 'Clean up apps', 'Switch off apps you don\'t want', 'cleanup')}
+          <div class="set-col" data-set-menu>
+            ${cats.map((c) => `
+              <button class="set-row" data-focus data-action="settings-cat" data-cat="${c.id}">
+                ${settingsRow(c.icon, c.title, c.help, '<span class="set-val set-more">&rsaquo;</span>')}
+              </button>`).join('')}
           </div>
-          <div class="set-col">
-            ${row('open-guest', icon('wifi'), 'Guest Wi-Fi', 'A code guests scan to join', 'guest')}
-            ${row('open-setup', icon('phone'), 'Set up from your phone', 'Govee key, wallpapers, town', 'setup')}
-            ${row('open-setup', icon('lamp'), 'Govee account', 'Lights and backlight', 'govee')}
-            ${row('home-role', icon('home'), 'Home button', 'Which app opens on Home', 'home')}
-            ${NATIVE ? row('debug-check', icon('wifi'), 'Debugging check', 'Is the TV debug port open? (read only)', 'dbg') : ''}
-            ${row('cycle-hdmi', icon('hdmi'), 'Games input', `Where the ${state.games.device} is plugged in`, 'hdmi')}
-            ${row('toggle-auto', icon('games'), 'Switch input for Games', 'Turn off to stay here', 'auto')}
-            ${row('cycle-countdown', icon('timer'), 'Switch countdown', 'Time to cancel first', 'countdown')}
-            ${NATIVE ? `
-              ${row('grant-np', icon('music'), 'Now playing access', 'Show what is playing', 'np-access')}
-`
-            : row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to see empty widgets', 'sample')}
-          </div>
+          ${cats.map((c) => `
+            <div class="set-col" data-set-cat="${c.id}" hidden>
+              <div class="set-head">${c.title}</div>
+              ${c.rows.join('')}
+            </div>`).join('')}
         </section>
       </section>`;
   }
@@ -857,24 +903,73 @@
       </section>`;
   }
 
+  // The launcher's own link to this TV's debugging port. It only reads facts
+  // for now; apps are switched off from the list below once it is agreed.
+  function adbRow() {
+    if (!NATIVE) return '';
+    const a = state.adb || { state: 'idle' };
+    const help = {
+      idle: 'Lets the launcher switch apps off for you. Changes nothing yet',
+      connecting: 'Connecting to the TV',
+      working: a.message || 'Working',
+      done: `${a.message || 'Done'}${a.failed && a.failed.length ? `. ${a.failed.length} could not be changed` : ''}`,
+      approve: 'Allow it on the TV: press OK on the question that appears',
+      ready: `${a.model || 'TV'}, Android ${a.android || '?'}. ${a.off ?? 0} apps already switched off`,
+      error: a.message || "Couldn't connect",
+    }[a.state] || '';
+    const val = { idle: 'Press OK', connecting: '...', working: '...', approve: 'Waiting', ready: 'Connected', done: 'Connected', error: 'Try again' }[a.state] || '';
+    return `
+      <button class="set-row" data-focus data-action="adb-connect">
+        <span class="lg chip set-chip">${icon('wifi')}</span>
+        <span class="set-label">Connect to the TV<span class="small">${esc(help)}</span></span>
+        <span class="set-val">${val}</span>
+      </button>`;
+  }
+
+  // The agreed list plus whatever was ticked on the phone page.
+  function cleanupItems() {
+    const items = D.cleanup.map((c) => ({ pkg: c.pkg, reason: c.reason }));
+    if (NATIVE) {
+      (nativeJson('chosenApps') || []).forEach((c) => {
+        if (!items.some((i) => i.pkg === c.pkg)) items.push({ pkg: c.pkg, reason: 'You chose this on your phone' });
+      });
+    }
+    return items;
+  }
+
   function renderCleanup() {
     const list = stage.querySelector('[data-cleanup-list]');
-    if (!D.cleanup.length) {
-      list.innerHTML = `
+    const items = cleanupItems();
+    if (!items.length) {
+      list.innerHTML = adbRow() + `
         <div class="cleanup-empty">
-          <span class="w-empty-title">Nothing to clean up yet</span>
-          <span class="small">Open Set up from your phone, download the app list there and send it over. Together we choose what goes, and this screen then lists those apps one by one.</span>
+          <span class="w-empty-title">Nothing chosen yet</span>
+          <span class="small">Open Set up from your phone, go to Apps to switch off, tick the apps you don't want and send them over. They are listed here, and you switch them off from this screen.</span>
         </div>`;
       return;
     }
-    const states = NATIVE ? nativeJson('packageStates', JSON.stringify(D.cleanup.map((c) => c.pkg))) || [] : [];
-    list.innerHTML = '<p class="small cleanup-note">Press OK on an app to open its page. Disable switches it off; Enable brings it back, so nothing here is permanent.</p>' + D.cleanup.map((c) => {
+    const states = NATIVE ? nativeJson('packageStates', JSON.stringify(items.map((c) => c.pkg))) || [] : [];
+    const a = state.adb || {};
+    const live = states.filter((st) => st.installed && st.enabled).length;
+    const ready = ['ready', 'done'].includes(a.state);
+    const actions = ready ? `
+      ${live ? `<button class="set-row" data-focus data-action="adb-disable">
+        <span class="lg chip set-chip">${icon('power')}</span>
+        <span class="set-label">${state.adbConfirm ? 'Press OK again to switch off' : `Switch off ${live} chosen app${live === 1 ? '' : 's'}`}<span class="small">${state.adbConfirm ? 'Uses pm disable-user. You can switch them back on from this screen' : 'Reversible. You confirm once more first'}</span></span>
+        <span class="set-val">${state.adbConfirm ? 'Confirm' : 'Press OK'}</span>
+      </button>` : ''}
+      ${a.ours ? `<button class="set-row" data-focus data-action="adb-restore">
+        <span class="lg chip set-chip">${icon('power')}</span>
+        <span class="set-label">Switch back on what I switched off<span class="small">${a.ours} app${a.ours === 1 ? '' : 's'}</span></span>
+        <span class="set-val">Press OK</span>
+      </button>` : ''}` : '';
+    list.innerHTML = adbRow() + actions + '<p class="small cleanup-note">Press OK on an app to open its page. Disable switches it off; Enable brings it back, so nothing here is permanent.</p>' + items.map((c) => {
       const st = states.find((x) => x.pkg === c.pkg);
       const value = !NATIVE ? 'On the TV' : !st || !st.installed ? 'Not on this TV' : st.enabled ? 'On' : 'Off';
       return `
         <button class="set-row" data-focus data-action="open-app-info" data-pkg="${c.pkg}">
           <span class="lg chip set-chip">${icon('power')}</span>
-          <span class="set-label">${st ? st.label : c.pkg}<span class="small">${c.reason}${value === 'Off' ? ' · Switched off. Press OK, then Enable, to bring it back.' : ''}</span></span>
+          <span class="set-label">${esc(st ? st.label : c.pkg)}<span class="small">${esc(c.reason)}${value === 'Off' ? ' · Switched off. Press OK, then Enable, to bring it back.' : ''}</span></span>
           <span class="set-val">${value}</span>
         </button>`;
     }).join('');
@@ -1267,6 +1362,14 @@
       }
     }
     if (name === 'govee') applyGovee(data);
+    if (name === 'adb') {
+      state.adb = { ...(state.adb || {}), ...data };
+      state.adbConfirm = false;
+      if (state.view === 'cleanup') {
+        renderCleanup();
+        stage.querySelector('[data-action="adb-connect"]')?.focus();
+      }
+    }
     if (state.setupOpen) renderSetupStatus();
     applyState();
   };
@@ -1567,6 +1670,9 @@
 
     stage.classList.toggle('light', !dark);
     stage.classList.toggle('photo', photo);
+    stage.classList.toggle('animate', !!state.home.drift);
+    all('[data-set-menu]').forEach((el) => { el.hidden = !!state.settingsCat; });
+    all('[data-set-cat]').forEach((el) => { el.hidden = el.dataset.setCat !== state.settingsCat; });
     applyColors();
     all('[data-theme-icon]').forEach((el) => { el.innerHTML = icon(dark ? 'moon' : 'sun'); });
 
@@ -1615,11 +1721,11 @@
       guest: NATIVE ? (guestInfo().ssid || 'Add from your phone') : 'Sample',
       spread: state.spread ? 'On' : 'Off',
       setup: NATIVE ? 'Press OK' : 'On the TV',
-      cleanup: D.cleanup.length ? `${D.cleanup.length} apps` : 'Nothing yet',
+      cleanup: cleanupItems().length ? `${cleanupItems().length} chosen` : 'Nothing yet',
       govee: !NATIVE ? 'On the TV'
         : state.govee.connected ? `Connected, ${state.govee.devices.length} devices`
           : state.govee.hasKey ? (state.govee.error || 'Connecting') : 'Not connected',
-      dbg: state.dbg || 'Press OK',
+      roles: `${Object.keys(state.roles).length} set`,
       home: !NATIVE ? 'On the TV' : state.homeDefault ? 'This launcher' : 'Google TV. Press OK',
       fit: `${Math.round((userFit || 1) * 100)}%`,
       'np-access': access.nowPlaying ? 'Allowed' : 'Off. Press OK to allow',
@@ -2040,6 +2146,7 @@
     }
     if (b.dataset.action === 'x-close') { closeExpand(); return; }
     if ((b.dataset.nav || b.dataset.navTo) && !refs.x.hidden) { refs.x.hidden = true; refs.xpanel.innerHTML = ''; xFrom = null; }
+    if (b.dataset.nav === 'settings') state.settingsCat = null;
     if (b.dataset.nav) openView(b.dataset.nav);
     else if (b.dataset.navTo) openView(b.dataset.navTo);
     else if (b.dataset.app) launchApp(b.dataset.app);
@@ -2071,6 +2178,26 @@
         toast(`Debug port: ${state.dbg}`);
         applyState();
       }, 50);
+    } else if (act === 'settings-cat') {
+      state.settingsCat = b.dataset.cat;
+      applyState();
+      stage.querySelector(`[data-set-cat="${state.settingsCat}"] [data-focus]`)?.focus();
+    } else if (act === 'adb-disable') {
+      if (!state.adbConfirm) {
+        state.adbConfirm = true;
+        renderCleanup();
+        stage.querySelector('[data-action="adb-disable"]')?.focus();
+      } else {
+        state.adbConfirm = false;
+        nativeCall('adbDisable');
+      }
+    } else if (act === 'adb-restore') {
+      nativeCall('adbRestore');
+    } else if (act === 'adb-connect') {
+      state.adb = { state: 'connecting' };
+      renderCleanup();
+      stage.querySelector('[data-action="adb-connect"]')?.focus();
+      nativeCall('adbConnect');
     } else if (act === 'home-role') {
       if (NATIVE) toast(nativeCall('requestDefaultHome') === 'started' ? 'Choose Smart TV Launcher on the next screen' : 'This TV does not offer that choice. Ask me for the other way');
       else toast('Works on the TV');
@@ -2108,6 +2235,7 @@
       toast(`TV backlight: ${id === 'sync' ? 'matching the picture' : id === 'off' ? 'off' : BACKLIGHT[id].name}`);
       sendBacklight();
     } else if (act === 'open-roles') {
+      state.rolesFrom = state.view;
       openView('roles');
     } else if (act === 'cycle-role') {
       const cur = ROLES.findIndex((r) => r.id === (state.roles[b.dataset.id] || ''));
@@ -2348,8 +2476,13 @@
       closeSheet();
     } else if (!refs.overlay.hidden) {
       closeOverlay();
+    } else if (state.view === 'settings' && state.settingsCat) {
+      const was = state.settingsCat;
+      state.settingsCat = null;
+      applyState();
+      stage.querySelector(`[data-action="settings-cat"][data-cat="${was}"]`)?.focus();
     } else if (state.view === 'roles') {
-      openView('room');
+      openView(state.rolesFrom || 'room');
     } else if (state.view === 'wallpapers' || state.view === 'cleanup' || state.view === 'guest') {
       openView('settings');
     } else if (state.view !== 'home') {
@@ -2368,6 +2501,16 @@
     if (e.key === 'Enter' && e.target.matches?.('[data-expand]:not(button)')) {
       e.preventDefault();
       e.target.click();
+      return;
+    }
+    if (e.key === 'Enter' && e.target.id === 'search-input') {
+      // Search: close the keyboard and move to the first result, or hand the words to Google TV.
+      e.preventDefault();
+      e.target.blur();
+      const first = stage.querySelector('[data-shows="titles"] .show, [data-shows="apps"] .app-card, [data-shows="free"] .show');
+      if (first) first.focus();
+      else if (NATIVE && state.query.trim()) nativeCall('googleSearch', state.query.trim());
+      else stage.querySelector('[data-action="google-search"]')?.focus();
       return;
     }
     const inText = e.target.tagName === 'INPUT';
@@ -2434,11 +2577,21 @@
 
   let userFit = readFit();
 
+  let fitSize = { w: 0, h: 0 };
   function fit() {
     const root = document.documentElement;
-    const w = innerWidth || root.clientWidth;
-    const h = innerHeight || root.clientHeight;
+    let w = innerWidth || root.clientWidth;
+    let h = innerHeight || root.clientHeight;
     if (!w || !h) return; // not laid out yet; the timers below try again
+    // The on-screen keyboard can shrink the window. Keep the size the page had
+    // before it opened, so the page doesn't zoom out to fit what is left.
+    const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
+    if (typing && fitSize.h && h < fitSize.h) {
+      w = fitSize.w;
+      h = fitSize.h;
+    } else {
+      fitSize = { w, h };
+    }
     stage.style.transform = `scale(${Math.min(w / 1280, h / 720) * (userFit || 1)})`;
     const diag = stage.querySelector('[data-fit-diag]');
     if (diag) diag.textContent = `Screen ${w} x ${h} at ${devicePixelRatio}x`;
@@ -2594,6 +2747,12 @@
   }
   build();
   ensureGlyphs();
+  new MutationObserver(alignFrost).observe(stage, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'class'] });
+  stage.addEventListener('scroll', alignFrost, true);
+  window.addEventListener('resize', alignFrost);
+  stage.addEventListener('animationend', alignFrost, true);
+  stage.addEventListener('transitionend', alignFrost, true);
+  alignFrost();
   let glyphTimer = 0;
   new MutationObserver(() => {
     if (!glyphTimer) glyphTimer = requestAnimationFrame(() => { glyphTimer = 0; ensureGlyphs(); });

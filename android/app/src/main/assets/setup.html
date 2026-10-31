@@ -25,6 +25,18 @@
   li img { width: 72px; height: 41px; object-fit: cover; border-radius: 6px; }
   li span { flex: 1; color: var(--sub); font-size: 14px; }
   a { color: var(--accent); }
+  select { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: #0f1219; color: var(--ink); font-size: 17px; }
+  .check { display: flex; align-items: center; gap: 10px; color: var(--ink); font-size: 16px; margin: 12px 0 0; }
+  .check input { width: 20px; height: 20px; accent-color: var(--accent); }
+  #qrPreview { margin: 14px auto 0; width: 220px; background: #fff; border-radius: 14px; padding: 8px; }
+  #qrPreview svg { display: block; width: 100%; height: auto; }
+  .apps li { gap: 10px; }
+  .apps li img { width: 40px; height: 40px; border-radius: 10px; background: #0f1219; object-fit: contain; }
+  .apps li div { flex: 1; min-width: 0; }
+  .apps li b { display: block; font-weight: 500; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .apps li small { color: var(--sub); font-size: 13px; }
+  .apps input[type=checkbox] { width: 24px; height: 24px; accent-color: var(--accent); flex: none; }
+  .apps li.locked { opacity: 0.55; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -60,11 +72,17 @@
     </section>
 
     <section>
-      <h2>Guest Wi-Fi</h2>
-      <p class="help">Shown on the TV as a QR code that guests scan to join. The password stays on the TV and is only in the code.</p>
+      <h2>Guest Wi-Fi code</h2>
+      <p class="help">Build a code that guests scan to join. The preview updates as you type. Save it to show the code on the TV (Settings, Network and phone, Guest Wi-Fi). The password stays on the TV and in the code.</p>
+      <label for="ssid">Network name</label>
       <input id="ssid" type="text" autocomplete="off" placeholder="Network name">
-      <input id="wpass" type="text" autocomplete="off" placeholder="Password (leave empty for an open network)">
-      <button id="saveWifi">Save</button>
+      <label for="wsec">Security</label>
+      <select id="wsec"><option value="WPA">WPA or WPA2 or WPA3 (most networks)</option><option value="WEP">WEP (old)</option><option value="nopass">None (open network)</option></select>
+      <label for="wpass">Password</label>
+      <input id="wpass" type="text" autocomplete="off" placeholder="Password">
+      <label class="check"><input id="whidden" type="checkbox"> Hidden network</label>
+      <div id="qrPreview" hidden></div>
+      <button id="saveWifi">Save to the TV</button>
       <div class="status" id="wifiStatus"></div>
     </section>
 
@@ -85,13 +103,18 @@
     </section>
 
     <section>
-      <h2>Apps on the TV</h2>
-      <p class="help">A list of every app on the TV, used to decide which ones to switch off.</p>
-      <a id="packages" href="#">Open the list</a>
+      <h2>Apps to switch off</h2>
+      <p class="help">Tick the apps you don't want. Nothing happens yet: the choice is sent to the TV, and you then switch them off from the TV itself (Settings, Home and apps, Clean up apps) after a final confirmation. Switching off is reversible. Apps the TV needs, and the ones you use, are locked.</p>
+      <input id="appFilter" type="text" autocomplete="off" placeholder="Search apps">
+      <ul id="appList" class="apps"></ul>
+      <button id="saveApps">Send my choice to the TV</button>
+      <div class="status" id="appStatus"></div>
+      <p class="help" style="margin-top:14px">The plain list of every app and service on the TV: <a id="packages" href="#">open</a></p>
     </section>
   </div>
 </main>
 
+<script src="/qrcode.js"></script>
 <script>
   let pin = '';
   const $ = (id) => document.getElementById(id);
@@ -112,6 +135,7 @@
     $('goveeState').textContent = s.govee.connected ? `Connected. ${s.govee.devices.length} lights found.`
       : s.govee.hasKey ? (s.govee.error || 'Connecting...') : 'Not connected.';
     $('town').value = s.town || '';
+    loadApps();
     if (s.wifi) $('ssid').value = s.wifi;
     $('packages').href = '/packages.txt?pin=' + encodeURIComponent(pin);
     $('photoList').innerHTML = s.wallpapers.map((w) => `<li><img src="${w.url}" alt=""><span>${w.name}</span><button class="quiet" data-name="${w.name}">Remove</button></li>`).join('');
@@ -141,10 +165,66 @@
     } catch (e) { say('tmdbStatus', e.message); }
   };
 
+  // ---- Apps to switch off ----
+  let apps = [];
+  let picked = new Set();
+  async function loadApps() {
+    if (apps.length) return; // keep unsaved ticks across refreshes
+    try {
+      apps = await api('/api/apps');
+      picked = new Set(apps.filter((a) => a.chosen).map((a) => a.pkg));
+      renderApps();
+    } catch (e) { say('appStatus', e.message); }
+  }
+  function renderApps() {
+    const q = $('appFilter').value.trim().toLowerCase();
+    $('appList').innerHTML = apps.filter((a) => !q || a.label.toLowerCase().includes(q)).map((a) => `
+      <li class="${a.protected ? 'locked' : ''}">
+        <img src="/api/icon?pin=${encodeURIComponent(pin)}&pkg=${encodeURIComponent(a.pkg)}" alt="" loading="lazy">
+        <div><b>${a.label.replace(/</g, '&lt;')}</b><small>${a.protected ? a.why : (a.enabled ? (a.system ? 'Came with the TV' : 'Installed by you') : 'Already switched off')}</small></div>
+        ${a.protected ? '' : `<input type="checkbox" data-pkg="${a.pkg}" ${picked.has(a.pkg) ? 'checked' : ''} aria-label="Switch off ${a.label.replace(/"/g, '')}">`}
+      </li>`).join('');
+  }
+  $('appFilter').oninput = renderApps;
+  $('appList').onchange = (e) => {
+    const pkg = e.target.dataset.pkg;
+    if (!pkg) return;
+    if (e.target.checked) picked.add(pkg); else picked.delete(pkg);
+  };
+  $('saveApps').onclick = async () => {
+    try {
+      await api('/api/cleanup', { pkgs: [...picked].join(',') });
+      say('appStatus', `Sent ${picked.size} app${picked.size === 1 ? '' : 's'}. Now open Clean up apps on the TV to switch them off.`, true);
+    } catch (e) { say('appStatus', e.message); }
+  };
+
+  // ---- Guest Wi-Fi code builder ----
+  const esc = (v) => v.replace(/([\\;,:"])/g, '\\$1');
+  function wifiText() {
+    const ssid = $('ssid').value;
+    const sec = $('wsec').value;
+    const hide = $('whidden').checked ? 'H:true;' : '';
+    if (!ssid) return '';
+    return sec === 'nopass' || !$('wpass').value ? `WIFI:T:nopass;S:${esc(ssid)};${hide};` : `WIFI:T:${sec};S:${esc(ssid)};P:${esc($('wpass').value)};${hide};`;
+  }
+  function drawQr() {
+    const text = wifiText();
+    const box = $('qrPreview');
+    box.hidden = !text;
+    $('wpass').disabled = $('wsec').value === 'nopass';
+    if (!text || typeof qrcode !== 'function') return;
+    const q = qrcode(0, 'M'); q.addData(text); q.make();
+    const n = q.getModuleCount();
+    let r = '';
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (q.isDark(y, x)) r += `<rect x="${x + 4}" y="${y + 4}" width="1.02" height="1.02"/>`;
+    box.innerHTML = `<svg viewBox="0 0 ${n + 8} ${n + 8}" shape-rendering="crispEdges"><rect width="${n + 8}" height="${n + 8}" fill="#fff"/><g fill="#000">${r}</g></svg>`;
+  }
+  ['ssid', 'wsec', 'wpass', 'whidden'].forEach((id) => { $(id).oninput = drawQr; $(id).onchange = drawQr; });
+
   $('saveWifi').onclick = async () => {
     try {
       const open = !$('wpass').value;
-      await api('/api/wifi', { ssid: $('ssid').value, password: $('wpass').value, security: open ? 'nopass' : 'WPA' });
+      await api('/api/wifi', { ssid: $('ssid').value, password: $('wpass').value, security: $('wsec').value, hidden: $('whidden').checked ? 'true' : 'false' });
       $('wpass').value = '';
       say('wifiStatus', 'Saved. Open Guest Wi-Fi on the TV.', true);
     } catch (e) { say('wifiStatus', e.message); }

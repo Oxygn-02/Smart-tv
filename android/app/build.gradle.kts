@@ -12,8 +12,8 @@ android {
         // Android TV 8.0+. Google TV sets are Android 10 or later.
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "0.7"
+        versionCode = 12
+        versionName = "0.9.1"
     }
 
     buildTypes {
@@ -51,6 +51,7 @@ val copyWebUi by tasks.registering(Sync::class) {
 tasks.named("preBuild") { dependsOn(copyWebUi) }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-ktx:1.9.1")
     implementation("androidx.webkit:webkit:1.11.0")
