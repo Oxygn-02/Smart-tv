@@ -180,6 +180,57 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         }
     }
 
+    // ---------- Clean-up over the TV's own debugging port (read only so far) ----------
+
+    private val adb = AdbClient(File(activity.filesDir, "adb"))
+    private val adbIo = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+    private fun adbEvent(state: String, message: String = "", extra: JSONObject = JSONObject()) =
+        host.emit("adb", extra.put("state", state).put("message", message).toString())
+
+    /**
+     * Connects to this TV's debugging port and, the first time, waits while the
+     * TV asks on screen to allow it. Reads three facts (model, Android version,
+     * how many apps are already switched off) and changes nothing. The progress
+     * arrives as "adb" events: connecting, approve, ready, error.
+     */
+    @JavascriptInterface
+    fun adbConnect() {
+        adbIo.execute {
+            try {
+                adbEvent("connecting", "Connecting to the TV")
+                val hosts = listOfNotNull("127.0.0.1", lanAddress())
+                var last: Exception? = null
+                var done = false
+                for (h in hosts) {
+                    try {
+                        adb.connect(h, 5555) { adbEvent("approve", "Allow it on the TV: press OK on the question that appears") }
+                        done = true
+                        break
+                    } catch (e: Exception) {
+                        last = e
+                    }
+                }
+                if (!done) throw last ?: AdbClient.AdbException("Couldn't reach the debug port")
+                val model = adb.shell("getprop ro.product.model").trim()
+                val android = adb.shell("getprop ro.build.version.release").trim()
+                val off = adb.shell("pm list packages -d").lines().count { it.startsWith("package:") }
+                adbEvent(
+                    "ready", "Connected",
+                    JSONObject().put("model", model).put("android", android).put("off", off),
+                )
+            } catch (e: Exception) {
+                adb.close()
+                adbEvent("error", e.message ?: "Couldn't connect")
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun adbDisconnect() {
+        adbIo.execute { adb.close() }
+    }
+
     // ---------- Show search: the TMDB key saved from the phone page ----------
 
     private val lookup = activity.getSharedPreferences("lookup", Context.MODE_PRIVATE)
@@ -653,6 +704,8 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
 
     fun close() {
         stopSetup()
+        adb.close()
+        adbIo.shutdownNow()
         govee.close()
     }
 

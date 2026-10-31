@@ -857,10 +857,31 @@
       </section>`;
   }
 
+  // The launcher's own link to this TV's debugging port. It only reads facts
+  // for now; apps are switched off from the list below once it is agreed.
+  function adbRow() {
+    if (!NATIVE) return '';
+    const a = state.adb || { state: 'idle' };
+    const help = {
+      idle: 'Lets the launcher switch apps off for you. Changes nothing yet',
+      connecting: 'Connecting to the TV',
+      approve: 'Allow it on the TV: press OK on the question that appears',
+      ready: `${a.model || 'TV'}, Android ${a.android || '?'}. ${a.off ?? 0} apps already switched off`,
+      error: a.message || "Couldn't connect",
+    }[a.state] || '';
+    const val = { idle: 'Press OK', connecting: '...', approve: 'Waiting', ready: 'Connected', error: 'Try again' }[a.state] || '';
+    return `
+      <button class="set-row" data-focus data-action="adb-connect">
+        <span class="lg chip set-chip">${icon('wifi')}</span>
+        <span class="set-label">Connect to the TV<span class="small">${esc(help)}</span></span>
+        <span class="set-val">${val}</span>
+      </button>`;
+  }
+
   function renderCleanup() {
     const list = stage.querySelector('[data-cleanup-list]');
     if (!D.cleanup.length) {
-      list.innerHTML = `
+      list.innerHTML = adbRow() + `
         <div class="cleanup-empty">
           <span class="w-empty-title">Nothing to clean up yet</span>
           <span class="small">Open Set up from your phone, download the app list there and send it over. Together we choose what goes, and this screen then lists those apps one by one.</span>
@@ -868,7 +889,7 @@
       return;
     }
     const states = NATIVE ? nativeJson('packageStates', JSON.stringify(D.cleanup.map((c) => c.pkg))) || [] : [];
-    list.innerHTML = '<p class="small cleanup-note">Press OK on an app to open its page. Disable switches it off; Enable brings it back, so nothing here is permanent.</p>' + D.cleanup.map((c) => {
+    list.innerHTML = adbRow() + '<p class="small cleanup-note">Press OK on an app to open its page. Disable switches it off; Enable brings it back, so nothing here is permanent.</p>' + D.cleanup.map((c) => {
       const st = states.find((x) => x.pkg === c.pkg);
       const value = !NATIVE ? 'On the TV' : !st || !st.installed ? 'Not on this TV' : st.enabled ? 'On' : 'Off';
       return `
@@ -1267,6 +1288,13 @@
       }
     }
     if (name === 'govee') applyGovee(data);
+    if (name === 'adb') {
+      state.adb = data;
+      if (state.view === 'cleanup') {
+        renderCleanup();
+        stage.querySelector('[data-action="adb-connect"]')?.focus();
+      }
+    }
     if (state.setupOpen) renderSetupStatus();
     applyState();
   };
@@ -2071,6 +2099,11 @@
         toast(`Debug port: ${state.dbg}`);
         applyState();
       }, 50);
+    } else if (act === 'adb-connect') {
+      state.adb = { state: 'connecting' };
+      renderCleanup();
+      stage.querySelector('[data-action="adb-connect"]')?.focus();
+      nativeCall('adbConnect');
     } else if (act === 'home-role') {
       if (NATIVE) toast(nativeCall('requestDefaultHome') === 'started' ? 'Choose Smart TV Launcher on the next screen' : 'This TV does not offer that choice. Ask me for the other way');
       else toast('Works on the TV');
