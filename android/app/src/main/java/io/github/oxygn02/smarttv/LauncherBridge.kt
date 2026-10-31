@@ -251,6 +251,8 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             pkg in homes -> "A home screen"
             pkg in inputs -> "TV input"
             pkg in PROTECTED_PKGS -> "Needed by the TV"
+            (pkg.startsWith("com.mediatek") || pkg.startsWith("mediatek.") || pkg.startsWith("com.mstar")) && pkg !in MAKER_OK -> "TV system service"
+            Regex("^uk\\.co\\.freeview\\.(fvpconfigauth|mdsclient|tifbridge|onnow|explore)$").matches(pkg) -> "Freeview Play service"
             Regex("update|\\.ota|setup|provision|permission|installer|webview|systemui|settings|bluetooth|keyboard|inputmethod|tvprovider|\\.gms|\\.gsf|vending").containsMatchIn(pkg.lowercase()) -> "Needed by the TV"
             KEEP_LABELS.any { key == it || key.startsWith(it) } -> "An app you use"
             else -> null
@@ -894,6 +896,8 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             "com.google.android.leanbacklauncher", "com.google.android.tvrecommendations", "com.android.tv.settings",
             "com.google.android.permissioncontroller", "com.google.android.packageinstaller", "com.android.providers.tv",
         )
+        // Maker apps that are only for factory testing, retail demos or playing files from USB.
+        val MAKER_OK = setOf("com.mediatek.wwtv.mediaplayer", "com.mediatek.testpq", "mediatek.factorymenu.ui", "com.mediatek.mtc.factory")
         val KEEP_LABELS = setOf(
             "youtube", "youtubemusic", "bbciplayer", "itvx", "channel4", "my5", "primevideo", "disney", "crunchyroll",
             "googleplaystore", "playstore", "googletv", "netflix",
