@@ -4,7 +4,7 @@
 @font-face {
   font-family: "Inter Local";
   src: url("fonts/inter-latin.woff2") format("woff2");
-  font-weight: 100 900;
+  font-weight: 300 900;
   font-display: swap;
 }
 
@@ -165,7 +165,7 @@ input {
 }
 
 .mark {
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: -0.02em;
   line-height: 1;
 }
@@ -372,7 +372,7 @@ button {
 
 .temp {
   font-size: 64px;
-  font-weight: 200;
+  font-weight: 300;
   line-height: 1;
   letter-spacing: -0.02em;
 }
@@ -581,7 +581,7 @@ button {
   padding: 6px 10px;
   border-radius: 48px;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
@@ -818,7 +818,7 @@ button {
 
 .games-title {
   font-size: 48px;
-  font-weight: 200;
+  font-weight: 300;
   letter-spacing: -0.02em;
 }
 
@@ -968,7 +968,7 @@ button.info {
   align-items: center;
   justify-content: center;
   font-size: 32px;
-  font-weight: 200;
+  font-weight: 300;
 }
 
 .switch-title {
@@ -1448,13 +1448,13 @@ button.info {
 
 .status-time {
   font-size: 24px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 
 .status-date {
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--sub);
 }
 
@@ -1487,7 +1487,7 @@ button.info {
   align-items: center;
   gap: 8px;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--sub);
   cursor: pointer;
   transition: color 0.25s, background 0.25s, transform 0.5s var(--gentle);
@@ -1495,7 +1495,7 @@ button.info {
 
 .tab.on {
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* Focus lens: a glass capsule appears only under the focused tab */
@@ -1584,7 +1584,7 @@ button.info {
 
 .w-label {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1609,7 +1609,7 @@ button.info {
   flex-direction: column;
   gap: 2px;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .w-music.now-playing {
@@ -1639,7 +1639,7 @@ button.info {
 
 .w-music .np-title {
   font-size: 32px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.02em;
   line-height: 1.1;
   margin-top: 6px;
@@ -1674,7 +1674,7 @@ button.info {
 
 .hero-title {
   font-size: 32px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 
@@ -1682,7 +1682,7 @@ button.info {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .w-mini {
@@ -1715,7 +1715,7 @@ button.info {
 
 .w-mini-title {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.01em;
 }
 
@@ -1768,7 +1768,7 @@ button.info {
 /* The label shows only for the focused app, as tvOS does */
 .dock-label {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
   opacity: 0;
   transform: translateY(-4px);
@@ -1838,13 +1838,13 @@ button.info {
 
 .sheet-title {
   font-size: 24px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 
 .sheet-label {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--sub);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1883,14 +1883,14 @@ button.info {
 
 .opt-label {
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
   padding: 4px 12px;
   border-radius: 48px;
 }
 
 .opt.on .opt-label {
   background: var(--onbtn);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .sheet-row {
@@ -1916,7 +1916,7 @@ button.info {
   background: transparent;
   color: var(--sub);
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
   cursor: pointer;
   transition: background 0.25s, color 0.25s;
 }
@@ -1924,7 +1924,7 @@ button.info {
 .seg.on {
   background: var(--ink);
   color: var(--playink);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .seg:focus-visible {
@@ -1935,13 +1935,13 @@ button.info {
 /* ---------- Type: heavier, SF-style weights across the other views ---------- */
 
 .eyebrow {
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0;
 }
 
 .music-title,
 .games-title {
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 
@@ -1957,12 +1957,12 @@ button.info {
 .info-val,
 .app-name,
 .switch-title {
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .btn,
 .pillbtn {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* Up next, in the gap between the song and the controls */
@@ -2000,7 +2000,7 @@ button.info {
 
 .np-next-title {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* =====================================================================
@@ -2062,7 +2062,7 @@ button.info {
 
 .swatch.on .small {
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .swatch.on .small::after {
@@ -2200,7 +2200,7 @@ button.info {
   align-items: center;
   gap: 10px;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--ink);
 }
 
@@ -2256,7 +2256,7 @@ button.w-empty {
 
 .w-empty-title {
   font-size: 20px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .w-empty .btn {
@@ -2410,19 +2410,19 @@ button.w-empty {
 .small { font-size: 16px; }
 .sub { font-size: 20px; }
 
-.status-time { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
+.status-time { font-size: 24px; font-weight: 500; letter-spacing: -0.01em; }
 .status-date { font-size: 20px; }
 
 .w-music .np-title,
 .hero-title,
 .music-title {
   font-size: 32px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.02em;
   line-height: 1.1;
 }
 
-.games-title { font-size: 48px; font-weight: 500; letter-spacing: -0.02em; }
+.games-title { font-size: 48px; font-weight: 300; letter-spacing: -0.02em; }
 .w-weather .temp { font-size: 64px; font-weight: 400; letter-spacing: -0.02em; }
 .w-empty-title { font-size: 20px; }
 .w-mini-title,
@@ -2448,14 +2448,14 @@ button.w-empty {
 
 .eyebrow {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ink);
 }
 
 .np-next-label,
 .music-queue-title {
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--sub);
 }
 
@@ -2468,7 +2468,7 @@ button.w-empty {
   align-items: center;
   gap: 10px;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--sub);
 }
 
@@ -2769,7 +2769,7 @@ button.w-empty {
 
 .fit-title {
   font-size: 32px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 
@@ -2781,7 +2781,7 @@ button.w-empty {
 
 .fit-size {
   font-size: 48px;
-  font-weight: 500;
+  font-weight: 300;
   margin-top: 4px;
 }
 
@@ -2824,7 +2824,7 @@ button.w-empty {
 .pillbtn,
 .light-name,
 .status-date {
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0;
 }
 
@@ -2832,7 +2832,7 @@ button.w-empty {
 .games-title,
 .ring-count,
 .fit-size {
-  font-weight: 500;
+  font-weight: 400;
 }
 
 /* ---------- Dock: hugs its icons ----------
@@ -2870,7 +2870,7 @@ button.w-empty {
   background: none;
   color: var(--ink);
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.2;
   white-space: nowrap;
   opacity: 0;
@@ -3095,7 +3095,7 @@ button.w-empty {
   left: 12px;
   bottom: 10px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), 0 0 14px rgba(0, 0, 0, 0.6);
 }
@@ -3177,7 +3177,7 @@ button.w-empty {
 
 .setup-title {
   font-size: 32px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.01em;
 }
 
@@ -3189,7 +3189,7 @@ button.w-empty {
 }
 
 .setup-steps strong {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .setup-pin {
@@ -3473,7 +3473,7 @@ button.w-empty {
 
 .amb-clock {
   font-size: 96px;
-  font-weight: 500;
+  font-weight: 300;
   line-height: 1;
   letter-spacing: -0.02em;
 }
@@ -3606,7 +3606,7 @@ button.w-empty {
 
 .x-title {
   font-size: 32px;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: -0.02em;
 }
 
@@ -3644,7 +3644,7 @@ button.w-empty {
 
 .x-temp {
   font-size: 96px;
-  font-weight: 500;
+  font-weight: 300;
   letter-spacing: -0.02em;
   line-height: 1;
 }
@@ -3674,7 +3674,7 @@ button.w-empty {
 
 .x-val {
   font-size: 24px;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .x-hours {
@@ -3711,7 +3711,7 @@ button.w-empty {
 
 .x-song {
   font-size: 32px;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: -0.02em;
 }
 
@@ -3828,7 +3828,7 @@ button.w-empty {
 .set-head {
   padding: 8px 12px 10px;
   font-size: 32px;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: -0.02em;
   text-align: left;
 }
@@ -4027,10 +4027,33 @@ button.w-empty {
 .status-time,
 .status-date,
 .amb-clock {
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 
 .status-time {
   margin-right: 2px;
+}
+
+
+/* Lighter type: regular for text, a step up for headings and the clock, a light cut for big numbers */
+#stage {
+  font-weight: 400;
+}
+
+.temp,
+.amb-clock,
+.fit-size,
+.x-temp {
+  font-weight: 300;
+  letter-spacing: -0.03em;
+}
+
+/* Thinner type needs a little more contrast to stay readable from the sofa */
+#stage {
+  --sub: rgba(236, 236, 241, 0.74);
+}
+
+#stage.light {
+  --sub: rgba(16, 17, 26, 0.7);
 }
