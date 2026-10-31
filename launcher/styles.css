@@ -4015,3 +4015,54 @@ button.w-empty {
 #stage.fast .widget:is(:focus-visible, :hover) {
   transform: none;
 }
+
+
+/* Home: what shows when nothing is being watched */
+.w-jump .jump-row {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+}
+
+.jump {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 84px;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 0.45s var(--gentle);
+}
+
+.jump:is(:focus-visible, :hover) {
+  transform: scale(1.08);
+}
+
+.w-scenes {
+  grid-area: 2 / 4 / 3 / 6;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+.scene-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.scene-grid .pillbtn {
+  height: 52px;
+  font-size: 17px;
+}
+
+.games-hero {
+  flex: 1;
+}

@@ -198,10 +198,9 @@
           </section>
 
           <section class="widget hero w-hero" aria-label="Continue watching" ${NATIVE ? '' : 'data-focus data-expand="hero" tabindex="0"'}>
-            <div class="w-empty">
-              ${icon('live', 34)}
-              <span class="w-empty-title">Nothing to continue</span>
-              <span class="small">Shows you start appear here when the app shares them</span>
+            <div class="w-empty w-jump">
+              <span class="w-empty-title" data-jump-title>Jump back in</span>
+              <div class="jump-row" data-jump></div>
             </div>
             <div class="hero-art" style="background:${h.art}"></div>
             <div class="hero-shade"></div>
@@ -218,6 +217,13 @@
                 <div class="hero-track"><div style="width:${h.progress}%"></div></div>
                 <span class="hero-left">${h.left}</span>
               </div>
+            </div>
+          </section>
+
+          <section class="widget glass w-scenes" data-scenes hidden aria-label="Scenes">
+            <span class="w-label">Scenes</span>
+            <div class="scene-grid">
+              ${['movie', 'gaming', 'relax', 'night'].map((id) => `<button class="pillbtn" data-focus data-action="room-scene" data-id="${id}">${ROOM_SCENE[id]?.name || id}</button>`).join('')}
             </div>
           </section>
 
@@ -397,20 +403,6 @@
             </div>
           </div>
         </section>
-        <div class="games-info">
-          <button class="info glass" data-focus data-action="cycle-hdmi">
-            <span class="lg chip info-chip">${icon('hdmi')}</span>
-            <span><span class="small">Input</span><span class="info-val" data-val="hdmi"></span></span>
-          </button>
-          <button class="info glass" data-focus data-action="cycle-countdown">
-            <span class="lg chip info-chip">${icon('timer')}</span>
-            <span><span class="small">Countdown</span><span class="info-val" data-val="countdown"></span></span>
-          </button>
-          <div class="info glass">
-            <span class="lg chip info-chip">${icon('power')}</span>
-            <span><span class="small">Console</span><span class="info-val">Wakes over HDMI-CEC</span></span>
-          </div>
-        </div>
       </section>`;
   }
 
@@ -458,6 +450,29 @@
       </section>`;
   }
 
+  // ---------- Jump back in: the apps you opened last ----------
+  // Remembered when you open an app from here, so it needs no permission.
+  let recent = [];
+  try { recent = JSON.parse(localStorage.getItem('recent') || '[]'); } catch { recent = []; }
+
+  function noteLaunch(id) {
+    recent = [id, ...recent.filter((x) => x !== id)].slice(0, 8);
+    try { localStorage.setItem('recent', JSON.stringify(recent)); } catch { /* not remembered */ }
+  }
+
+  function renderJump() {
+    const el = stage.querySelector('[data-jump]');
+    if (!el) return;
+    const used = recent.map((id) => APP[id]).filter(Boolean);
+    const list = (used.length ? used : dockApps()).slice(0, 4);
+    stage.querySelector('[data-jump-title]').textContent = used.length ? 'Jump back in' : 'Your apps';
+    el.innerHTML = list.map((a) => `
+      <button class="jump" data-focus data-app="${a.id}" aria-label="Open ${esc(a.name)}">
+        ${appIcon(a, 64)}
+        <span class="small">${esc(a.short || a.name)}</span>
+      </button>`).join('');
+  }
+
   // ---------- Continue watching (the TV's Watch Next list) ----------
   const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const appByPkg = (pkg) => D.apps.find((a) => a.pkg === pkg);
@@ -499,12 +514,6 @@
     hero.toggleAttribute('data-expand', !!h);
     hero.setAttribute('tabindex', h ? '0' : '-1');
     hero.dataset.expand = h ? 'hero' : '';
-    const note = hero.querySelector('.w-empty .small');
-    if (note) {
-      note.textContent = state.cwNote === 'permission'
-        ? "Android doesn't let this launcher read the Watch Next list on your TV."
-        : state.cwNote ? `Couldn't read Watch Next (${state.cwNote}).` : 'Shows you start in other apps appear here when they share them.';
-    }
     if (h) {
       hero.querySelector('.hero-art').style.background = h.art;
       hero.querySelector('.hero-app').innerHTML = `<span class="dot" style="background:${esc(h.appColor)}"></span>${esc(h.app)}`;
@@ -935,6 +944,7 @@
         row('home-role', icon('home'), 'Home button', 'Which app opens on Home', 'home'),
         row('open-cleanup', icon('power'), 'Clean up apps', 'Switch off apps you don\'t want', 'cleanup'),
         NATIVE ? row('grant-np', icon('music'), 'Now playing access', 'Show what is playing', 'np-access') : '',
+        NATIVE ? row('wn-check', icon('live'), 'Continue watching check', 'What the TV shares from your apps', 'wn') : '',
       ] },
       { id: 'lights', icon: icon('lamp'), title: 'Lights', help: 'Govee account, light roles', rows: [
         row('open-setup', icon('lamp'), 'Govee account', 'Lights and backlight', 'govee'),
@@ -1031,7 +1041,7 @@
     const actions = ready ? `
       ${live ? `<button class="set-row" data-focus data-action="adb-disable">
         <span class="lg chip set-chip">${icon('power')}</span>
-        <span class="set-label">${state.adbConfirm ? 'Press OK again to switch off' : `Switch off ${live} chosen app${live === 1 ? '' : 's'}`}<span class="small">${state.adbConfirm ? 'Uses pm disable-user. You can switch them back on from this screen' : 'Reversible. You confirm once more first'}</span></span>
+        <span class="set-label">${state.adbConfirm ? 'Press OK again to switch off' : `Switch off ${live} chosen app${live === 1 ? '' : 's'}`}<span class="small">${state.adbConfirm ? 'You can switch them back on from this screen' : 'Reversible. You confirm once more first'}</span></span>
         <span class="set-val">${state.adbConfirm ? 'Confirm' : 'Press OK'}</span>
       </button>` : ''}
       ${a.ours ? `<button class="set-row" data-focus data-action="adb-restore">
@@ -1456,8 +1466,10 @@
       toast('That app isn\'t installed');
       return;
     }
+    noteLaunch(id);
     if (NATIVE && a.pkg) nativeCall('launch', a.pkg);
     else toast(`Opening ${a.name}`);
+    renderJump();
   }
 
   // ---------- Govee ----------
@@ -1728,6 +1740,7 @@
     showPhoto();
     applyState();
     renderTrack();
+    renderJump();
     renderSearch();
     renderLights();
     updateClock();
@@ -1796,6 +1809,7 @@
       wp: wallpaperLabel(),
       ambient: state.ambient ? `After ${state.ambient} min` : 'Off',
       motion: state.motion === 'fast' ? 'Fast' : 'Smooth',
+      wn: state.wnCheck || 'Press OK',
       speed: state.speed || 'Press OK',
       guest: NATIVE ? (guestInfo().ssid || 'Add from your phone') : 'Sample',
       spread: state.spread ? 'On' : 'Off',
@@ -1836,6 +1850,7 @@
     stage.querySelector('.w-hero').classList.toggle('is-empty', NATIVE ? !state.cw.length : !sample);
     stage.querySelector('.w-music .np-next').hidden = !!NATIVE;
     all('[data-cw]').forEach((el) => { el.hidden = NATIVE ? Number(el.dataset.i) >= state.cw.length - 1 : !sample; });
+    all('[data-scenes]').forEach((el) => { el.hidden = NATIVE ? state.cw.length >= 3 : sample; });
     all('[data-recent]').forEach((el) => { el.hidden = sample || (NATIVE && state.cw.length > 1); });
 
     stage.querySelector('[data-games-sub]').textContent = g.autoSwitch
@@ -2251,14 +2266,14 @@
     else if (act === 'open-cleanup') openView('cleanup');
     else if (act === 'open-app-info') nativeCall('openAppInfo', b.dataset.pkg);
     else if (act === 'close-setup') closeSetup();
-    else if (act === 'debug-check') {
-      toast('Checking...');
-      setTimeout(() => {
-        const r = nativeJson('debugPortOpen') || {};
-        state.dbg = r.local || r.lan ? `Open${r.lan ? ` at ${r.ip}` : ' on this TV only'}` : 'Closed';
-        toast(`Debug port: ${state.dbg}`);
-        applyState();
-      }, 50);
+    else if (act === 'wn-check') {
+      const r = nativeJson('watchNext');
+      if (!r) state.wnCheck = "Couldn't check";
+      else if (!r.ok) state.wnCheck = r.error === 'permission' ? 'Android blocks this launcher' : `Error: ${r.error}`;
+      else if (!(r.items || []).length) state.wnCheck = 'Allowed, but your apps have shared nothing';
+      else state.wnCheck = `${r.items.length} shared by ${[...new Set(r.items.map((i) => (appByPkg(i.pkg) || {}).name || i.pkg))].join(', ')}`;
+      toast(state.wnCheck);
+      applyState();
     } else if (act === 'cycle-motion') {
       state.motion = state.motion === 'fast' ? 'smooth' : 'fast';
     } else if (act === 'speed-test') {
