@@ -4057,3 +4057,50 @@ button.w-empty {
 #stage.light {
   --sub: rgba(16, 17, 26, 0.7);
 }
+
+
+/* ---------- The light bar and page changes ---------- */
+
+/* One bar that slides and stretches between tabs (see moveTabGlow), instead of
+   a separate bar that appears on each tab. */
+.tab.on::after {
+  content: none;
+}
+
+.tabbar {
+  overflow: visible;
+}
+
+.tab-glow {
+  position: absolute;
+  left: 0;
+  bottom: 6px;
+  width: 18px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--glowc);
+  transform-origin: left center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+  will-change: transform;
+}
+
+/* Pages slide in from the side they sit on, and fade */
+.view:not([hidden]) {
+  animation: view-in-r 0.5s var(--ease-out);
+}
+
+#stage[data-dir="l"] .view:not([hidden]) {
+  animation-name: view-in-l;
+}
+
+@keyframes view-in-r {
+  from { opacity: 0; transform: translateX(36px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes view-in-l {
+  from { opacity: 0; transform: translateX(-36px); }
+  to { opacity: 1; transform: none; }
+}

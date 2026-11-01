@@ -1810,6 +1810,7 @@
         <nav class="tabbar glass" aria-label="Main">
           ${D.nav.map((n) => `
             <button class="tab" data-focus data-nav="${n.id}" aria-label="${n.label}">${icon(n.id, 22)}</button>`).join('')}
+          <span class="tab-glow" aria-hidden="true"></span>
         </nav>
         <div class="tools">
           <span class="status-wifi" title="Wi-Fi connected">${icon('wifi', 18)}</span>
@@ -2251,7 +2252,42 @@
     view.querySelectorAll(ANIM_SELECTOR).forEach((el) => el.classList.add('anim'));
   }
 
+  // The light bar under the current tab slides there, stretching across as it goes.
+  const TAB_ORDER = [...D.nav.map((n) => n.id), 'settings'];
+  let glowX = null;
+  let glowShown = false;
+
+  function moveTabGlow(animate = true) {
+    const bar = stage.querySelector('.tab-glow');
+    const tab = stage.querySelector(`.tab[data-nav="${state.view}"]`);
+    if (!bar) return;
+    if (!tab) { // a view that isn't a tab (Settings and its pages): the bar rests
+      bar.style.opacity = '0';
+      glowShown = false;
+      return;
+    }
+    const w = 18;
+    const x = tab.offsetLeft + tab.offsetWidth / 2 - w / 2;
+    const reduce = state.motion === 'fast';
+    if (glowX !== null && glowShown && animate && !reduce && bar.animate && x !== glowX) {
+      const lo = Math.min(glowX, x);
+      const span = Math.abs(x - glowX) + w;
+      bar.animate([
+        { transform: `translateX(${glowX}px) scaleX(1)` },
+        { transform: `translateX(${lo}px) scaleX(${span / w})`, offset: 0.45 },
+        { transform: `translateX(${x}px) scaleX(1)` },
+      ], { duration: 520, easing: 'cubic-bezier(0.3, 0.8, 0.3, 1)' });
+    }
+    bar.style.transform = `translateX(${x}px)`;
+    bar.style.opacity = '1';
+    glowX = x;
+    glowShown = true;
+  }
+
   function openView(id) {
+    const from = TAB_ORDER.indexOf(state.view);
+    const to = TAB_ORDER.indexOf(id);
+    stage.dataset.dir = from >= 0 && to >= 0 && to < from ? 'l' : 'r'; // which way the page slides in
     if (state.view === 'wallpapers' && id !== 'wallpapers') stage.querySelector('[data-wp-grid]').innerHTML = '';
     state.view = id;
     applyState();
@@ -2261,6 +2297,7 @@
     if (id === 'deepclean') renderDeep();
     if (id === 'guest') renderGuest();
     animateView(id);
+    moveTabGlow();
     alignFrost(100);
     setTimeout(() => alignFrost(0), 900); // again once the entry animation has settled
     if (id === 'games' && state.games.autoSwitch) startSwitch();
@@ -3005,10 +3042,11 @@
     } catch {}
   }
   build();
+  moveTabGlow(false);
   ensureGlyphs();
   new MutationObserver(() => alignFrost()).observe(stage, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
   stage.addEventListener('scroll', () => alignFrost(60), true);
-  window.addEventListener('resize', () => alignFrost());
+  window.addEventListener('resize', () => { alignFrost(); moveTabGlow(false); });
   alignFrost();
   let glyphTimer = 0;
   new MutationObserver(() => {
