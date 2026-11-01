@@ -4104,3 +4104,30 @@ button.w-empty {
   from { opacity: 0; transform: translateX(-36px); }
   to { opacity: 1; transform: none; }
 }
+
+
+/* Saved scenes and the update note */
+.my-scenes {
+  display: contents;
+}
+
+.scene-input {
+  width: 100%;
+  height: 56px;
+  font-size: 20px;
+}
+
+.tool.update-badge {
+  color: var(--glowc);
+}
+
+.tool.update-badge::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--glowc);
+}

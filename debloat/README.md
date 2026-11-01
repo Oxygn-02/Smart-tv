@@ -27,3 +27,10 @@ After **Connect to the TV**, Settings > Home and apps > Clean up apps shows **Ma
 
 ## Updates
 Settings > Home and apps > **Updates** reads `version.json` in this repository, and if a newer launcher is there, downloads `tv.apk` and hands it to Android's installer (Android asks you to confirm; the first time it asks you to allow this app to install apps). Downloader stays installed and is never offered for switching off, as a second route.
+
+## Safety net, scenes, updates and backup (v0.12)
+
+- **Safety net.** If this launcher fails to start three times in a row, or never reports ready within 40 seconds, it switches Google's home screen back on by itself (over the TV's own trusted debug connection) and hands over to it. This needs USB debugging to stay on and the "Always allow" key to stay trusted. Run Settings > Clean up the TV > Test the safety net first: it only checks, it changes nothing. Google's home screen group stays locked until this launcher is the home screen and that test has passed. The rescue has not been run on a real TV yet.
+- **My scenes.** Room > Save this as a scene stores the current lights and backlight under a name. Settings > Lights > My scenes deletes them.
+- **Update available.** The launcher checks `version.json` 8 seconds after start and every 6 hours, and shows a small update button in the top bar when a newer version exists. Press OK on it to install.
+- **Backup.** Settings are mirrored on the TV and can be downloaded from the phone setup page (Backup) and restored there after a reinstall. Keys and the Wi-Fi password are not included.

@@ -88,3 +88,10 @@ After a firmware update, check that the TV hasn't switched the stock home screen
 ## Clean-up over the TV's own debugging port (v0.8)
 Settings > Clean up apps > Connect to the TV lets the launcher open a connection to this TV's network debugging port (5555) and read three facts: the model, the Android version, and how many apps are already switched off. The first time, the TV asks on screen to allow the launcher; press OK. It changes nothing. Switching apps off will use `pm disable-user` from the agreed list, with a matching restore (see debloat/README.md).
 The ADB client is `AdbClient.kt`. Unit tests (`./gradlew testDebugUnitTest`) check its public key against a key made by the real `adb keygen`, and run a full connect, approve and shell round trip against a stand-in for the TV's adbd.
+
+## Safety net, scenes, updates and backup (v0.12)
+
+- **Safety net.** If this launcher fails to start three times in a row, or never reports ready within 40 seconds, it switches Google's home screen back on by itself (over the TV's own trusted debug connection) and hands over to it. This needs USB debugging to stay on and the "Always allow" key to stay trusted. Run Settings > Clean up the TV > Test the safety net first: it only checks, it changes nothing. Google's home screen group stays locked until this launcher is the home screen and that test has passed. The rescue has not been run on a real TV yet.
+- **My scenes.** Room > Save this as a scene stores the current lights and backlight under a name. Settings > Lights > My scenes deletes them.
+- **Update available.** The launcher checks `version.json` 8 seconds after start and every 6 hours, and shows a small update button in the top bar when a newer version exists. Press OK on it to install.
+- **Backup.** Settings are mirrored on the TV and can be downloaded from the phone setup page (Backup) and restored there after a reinstall. Keys and the Wi-Fi password are not included.

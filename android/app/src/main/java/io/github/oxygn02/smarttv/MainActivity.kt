@@ -30,6 +30,8 @@ class MainActivity : ComponentActivity(), BridgeHost {
 
     private lateinit var web: WebView
     private lateinit var bridge: LauncherBridge
+    private val ui = android.os.Handler(android.os.Looper.getMainLooper())
+    private var ready = false
 
     // The system's location question, and its "make this the home app" question.
     // After either, the page re-reads what changed.
@@ -39,6 +41,15 @@ class MainActivity : ComponentActivity(), BridgeHost {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // The safety net: every start counts as a failure until the page says it is working.
+        val guard = getSharedPreferences("guard", MODE_PRIVATE)
+        val fails = guard.getInt("fails", 0) + 1
+        guard.edit().putInt("fails", fails).commit()
+        if (HomeGuard.shouldRescue(fails)) {
+            rescue(guard)
+            return
+        }
 
         bridge = LauncherBridge(this, this)
 
@@ -87,6 +98,10 @@ class MainActivity : ComponentActivity(), BridgeHost {
         setContentView(web)
         web.requestFocus()
 
+        // If the page hasn't started within 20 seconds, load it again; after another 20, give up.
+        ui.postDelayed({ if (!ready) web.reload() }, 20_000)
+        ui.postDelayed({ if (!ready) rescue(guard) }, 40_000)
+
         // A launcher never closes on Back: the UI decides what Back means
         // (close a panel, or return to Home).
         onBackPressedDispatcher.addCallback(this) {
@@ -94,10 +109,36 @@ class MainActivity : ComponentActivity(), BridgeHost {
         }
     }
 
+    override fun launcherReady() {
+        ready = true
+        ui.removeCallbacksAndMessages(null)
+    }
+
+    /** The launcher can't start: put Google's home screen back and open it. */
+    private fun rescue(guard: android.content.SharedPreferences) {
+        setContentView(android.widget.TextView(this).apply {
+            text = "Switching back to Google's home screen"
+            setTextColor(Color.WHITE)
+            textSize = 24f
+            gravity = android.view.Gravity.CENTER
+            setBackgroundColor(Color.BLACK)
+        })
+        Thread {
+            val ok = HomeGuard.rescue(this)
+            guard.edit().putInt("fails", 0).putBoolean("rescued", ok).commit()
+            runOnUiThread {
+                runCatching {
+                    startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+                finish()
+            }
+        }.start()
+    }
+
     // The remote's Home button while the launcher is already showing.
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.hasCategory(Intent.CATEGORY_HOME)) {
+        if (::web.isInitialized && intent.hasCategory(Intent.CATEGORY_HOME)) {
             web.evaluateJavascript("window.launcherHome && window.launcherHome()", null)
         }
     }
@@ -158,8 +199,9 @@ class MainActivity : ComponentActivity(), BridgeHost {
         }
 
     override fun onDestroy() {
-        bridge.close()
-        web.destroy()
+        ui.removeCallbacksAndMessages(null)
+        if (::bridge.isInitialized) bridge.close()
+        if (::web.isInitialized) web.destroy()
         super.onDestroy()
     }
 }

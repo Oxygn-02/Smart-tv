@@ -34,6 +34,8 @@ class SetupServer(
         fun onTmdb(key: String)
         fun onWifi(ssid: String, password: String, security: String, hidden: Boolean)
         fun appsJson(): String
+        fun backupJson(): String
+        fun onRestore(text: String): Boolean
         fun wallpaperBytes(name: String): ByteArray?
         fun iconPng(pkg: String): ByteArray?
         fun onCleanup(pkgs: List<String>)
@@ -118,6 +120,11 @@ class SetupServer(
                 events.onWallpapersChanged()
                 ok()
             }
+            "/api/backup" -> NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "application/json", events.backupJson())
+                .also { it.addHeader("Content-Disposition", "attachment; filename=smart-tv-backup.json") }
+            "/api/restore" ->
+                if (events.onRestore(param("backup"))) ok()
+                else json(Response.Status.BAD_REQUEST, JSONObject().put("error", "That isn't a backup from this launcher"))
             "/api/apps" -> NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "application/json", events.appsJson())
             "/api/wall" -> events.wallpaperBytes(param("name"))?.let {
                 NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "image/jpeg", it.inputStream(), it.size.toLong())

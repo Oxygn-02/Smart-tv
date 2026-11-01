@@ -44,6 +44,9 @@ interface BridgeHost {
     /** Sends an event to the page: window.onNative(name, json). */
     fun emit(name: String, json: String)
 
+    /** The page has started and is working: the start-up watchdog can stand down. */
+    fun launcherReady()
+
     /** Shows the system's location permission question. */
     fun requestLocationPermission()
 
@@ -390,6 +393,7 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             try {
                 if (!adb.connected) throw AdbClient.AdbException("Connect to the TV first")
                 if (tier == "google" && !isDefaultHome()) throw AdbClient.AdbException("Make this launcher the home screen first")
+                if (tier == "google" && !safetyReady()) throw AdbClient.AdbException("Test the safety net first")
                 val todo = tierList(tier).map { it.first }.filter { (only.isEmpty() || it == only) && pkgName.matches(it) }
                     .filter { runCatching { pm.getApplicationInfo(it, 0) }.getOrNull()?.enabled == true }
                 val done = mutableListOf<String>()
@@ -405,6 +409,84 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             } catch (e: Exception) {
                 adbEvent("error", e.message ?: "That didn't work")
             }
+        }
+    }
+
+    // ---------- The safety net ----------
+
+    private val guardPrefs = activity.getSharedPreferences("guard", Context.MODE_PRIVATE)
+
+    /** Called by the page once it has built its screen. */
+    @JavascriptInterface
+    fun launcherReady() {
+        guardPrefs.edit().putInt("fails", 0).apply()
+        host.launcherReady()
+    }
+
+    @JavascriptInterface
+    fun safetyReady(): Boolean = guardPrefs.getBoolean("safetyOk", false)
+
+    /** True if the launcher had to give Google's home screen back since this was last cleared. */
+    @JavascriptInterface
+    fun wasRescued(): Boolean = guardPrefs.getBoolean("rescued", false)
+
+    @JavascriptInterface
+    fun clearRescued() = guardPrefs.edit().putBoolean("rescued", false).apply()
+
+    /**
+     * Proves the safety net can work on this TV: over the debug connection, Google's
+     * home screen and this launcher are both found. Needed before Google's home
+     * screen can be switched off. Changes nothing.
+     */
+    @JavascriptInterface
+    fun adbSafetyTest() {
+        adbIo.execute {
+            try {
+                if (!adb.connected) throw AdbClient.AdbException("Connect to the TV first")
+                val google = adb.shell("pm path com.google.android.tvlauncher")
+                val mine = adb.shell("pm path ${activity.packageName}")
+                if (!google.contains("package:") || !mine.contains("package:")) throw AdbClient.AdbException("The check didn't pass")
+                guardPrefs.edit().putBoolean("safetyOk", true).apply()
+                adbEvent("done", "Safety net ready: Google's home screen can be switched back on")
+            } catch (e: Exception) {
+                adbEvent("error", e.message ?: "The check didn't pass")
+            }
+        }
+    }
+
+    // ---------- Backup of settings ----------
+
+    private val backupPrefs = activity.getSharedPreferences("backup", Context.MODE_PRIVATE)
+
+    /** The page hands over its saved settings each time they change, so the phone page can offer them. */
+    @JavascriptInterface
+    fun saveBackup(json: String) {
+        if (json.length < 200_000) backupPrefs.edit().putString("settings", json).apply()
+    }
+
+    private fun backupText(): String {
+        val settings = runCatching { JSONObject(backupPrefs.getString("settings", "{}")) }.getOrDefault(JSONObject())
+        return JSONObject().put("app", "Smart TV Launcher").put("version", 1)
+            .put("settings", settings).put("chosenApps", JSONArray(chosen)).toString(2)
+    }
+
+    /** Puts a backup back: the page reloads with the saved settings. False if the file isn't one of ours. */
+    private fun restoreFrom(text: String): Boolean {
+        if (text.length > 200_000) return false
+        return try {
+            val o = JSONObject(text)
+            if (o.optString("app") != "Smart TV Launcher") return false
+            val settings = o.optJSONObject("settings") ?: return false
+            val apps = o.optJSONArray("chosenApps")
+            if (apps != null) {
+                val allowed = catalog().filter { !it.protectedApp }.map { it.pkg }.toSet()
+                chosen = (0 until apps.length()).map { apps.getString(it) }.filter { it in allowed }
+            }
+            backupPrefs.edit().putString("settings", settings.toString()).apply()
+            host.emit("restore", settings.toString())
+            true
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -825,6 +907,10 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         }
 
         override fun appsJson(): String = appCatalog().toString()
+
+        override fun backupJson(): String = backupText()
+
+        override fun onRestore(text: String): Boolean = restoreFrom(text)
 
         override fun wallpaperBytes(name: String): ByteArray? = this@LauncherBridge.wallpaperBytes(name)
 

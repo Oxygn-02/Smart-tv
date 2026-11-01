@@ -25,6 +25,7 @@
     // Tinted icons (Customize): colour from the room light or a hue of your own,
     // warmth 0 (cool) to 100 (warm), opacity 10 to 100.
     tint: { source: 'room', hue: 200, warmth: 50, opacity: 60 },
+    myScenes: [], // scenes you saved: {id, name, backlight, lights}
     edge: 'lights', // the glow round the screen: 'lights' (follows the backlight), 'custom' (your colour) or 'off'
     edgeHue: 330,
     view: 'home',
@@ -70,7 +71,7 @@
 
   // ---------- Saved settings ----------
   // Remembered on the TV between launches (browser storage inside the app).
-  const SAVED = ['edge', 'edgeHue', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
+  const SAVED = ['myScenes', 'edge', 'edgeHue', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
 
   function loadSaved() {
     try {
@@ -92,6 +93,7 @@
         const o = Object.fromEntries(SAVED.map((k) => [k, state[k]]));
         o.games = { hdmiPort: state.games.hdmiPort, autoSwitch: state.games.autoSwitch, countdownSec: state.games.countdownSec };
         localStorage.setItem('settings', JSON.stringify(o));
+        nativeCall('saveBackup', JSON.stringify(o)); // so the phone page can offer a copy
       } catch {
         // Not saved; it just won't be remembered.
       }
@@ -446,6 +448,8 @@
             </div>
             <div class="pill-row">
               ${H.scenes.map((sc) => `<button class="pillbtn" data-focus data-action="room-scene" data-id="${sc.id}">${sc.name}</button>`).join('')}
+              <span class="my-scenes" data-my-scenes></span>
+              <button class="pillbtn" data-focus data-expand="savescene">Save this as a scene</button>
               <button class="pillbtn" data-focus data-action="sleep"><span data-sleep-label>Sleep timer: Off</span></button>
             </div>
             <div class="light-list" data-light-list></div>
@@ -637,6 +641,58 @@
     }, 600);
   }
 
+  // ---------- Scenes you save ----------
+  function saveScene() {
+    const h = state.home;
+    const input = stage.querySelector('#scene-name');
+    const name = (input?.value || '').trim() || `Scene ${state.myScenes.length + 1}`;
+    const keepsBacklight = ['sync', 'off'].includes(h.backlight) || (BACKLIGHT[h.backlight] && !['none', 'live'].includes(h.backlight));
+    state.myScenes.push({
+      id: `s${Date.now()}`,
+      name,
+      backlight: keepsBacklight ? h.backlight : null,
+      lights: Object.fromEntries(roomLights().map((l) => [l.id, !!h.lights[l.id]])),
+    });
+    saveSoon();
+    closeExpand();
+    applyState();
+    toast(`Saved "${name}"`);
+  }
+
+  function applyMyScene(sc) {
+    const h = state.home;
+    if (sc.backlight) {
+      setBacklight(sc.backlight);
+      h.scene = null;
+      sendBacklight(); // the backlight first, so lights switched off below stay off
+    }
+    roomLights().forEach((l) => {
+      if (sc.lights[l.id] === undefined) return;
+      h.lights[l.id] = !!sc.lights[l.id];
+      if (NATIVE) nativeCall('goveePower', l.id, !!sc.lights[l.id]);
+    });
+    applyState();
+    toast(sc.name);
+  }
+
+  // The list for deleting them (Settings > Lights > My scenes).
+  function scenesView() {
+    return `
+      <section class="view view-myscenes" data-view="myscenes" hidden>
+        <section class="card glass cleanup" data-scenes-list aria-label="My scenes"></section>
+      </section>`;
+  }
+
+  function renderMyScenes() {
+    const list = stage.querySelector('[data-scenes-list]');
+    list.innerHTML = state.myScenes.length ? '<p class="small cleanup-note">Press OK on a scene to delete it.</p>' + state.myScenes.map((sc) => `
+      <button class="set-row" data-focus data-action="scene-del" data-id="${sc.id}">
+        <span class="lg chip set-chip">${icon('lamp')}</span>
+        <span class="set-label">${esc(sc.name)}<span class="small">${state.delConfirm === sc.id ? 'Press OK again to delete' : `${Object.values(sc.lights).filter(Boolean).length} lights on`}</span></span>
+        <span class="set-val">${state.delConfirm === sc.id ? 'Confirm' : 'Delete'}</span>
+      </button>`).join('') : '<div class="cleanup-empty"><span class="w-empty-title">No saved scenes</span><span class="small">On the Room tab, set the lights how you like, then press Save this as a scene.</span></div>';
+  }
+
   // ---------- Frost that lines up with the wallpaper ----------
   // Each glass panel paints the blurred wallpaper offset by where it sits on
   // screen, so it shows the part of the photo that is really behind it.
@@ -681,24 +737,25 @@
   // ---------- Updates ----------
   // version.json in the repository says what the newest launcher is.
   const UPDATE_BASE = 'https://raw.githubusercontent.com/Oxygn-02/Smart-tv/main/';
-  async function checkUpdate() {
-    if (state.updateFound) {
+  async function checkUpdate(quiet = false) {
+    if (state.updateFound && !quiet) {
       nativeCall('installUpdate', `${UPDATE_BASE}${state.updateFound.apk || 'tv.apk'}?t=${Date.now()}`);
       return;
     }
-    state.update = 'Checking...';
-    applyState();
+    if (!quiet) { state.update = 'Checking...'; applyState(); }
     try {
       const mine = nativeJson('appVersion') || { code: 0, name: '' };
       const r = await getJson(`${UPDATE_BASE}version.json?t=${Date.now()}`);
       if (r.versionCode > mine.code) {
         state.updateFound = r;
         state.update = `Update to ${r.versionName}. Press OK`;
+        if (quiet) toast(`Update available: ${r.versionName}`);
       } else {
+        state.updateFound = null;
         state.update = `Up to date (${mine.name})`;
       }
     } catch {
-      state.update = "Couldn't check. Is the TV online?";
+      state.update = quiet ? '' : "Couldn't check. Is the TV online?";
     }
     applyState();
   }
@@ -775,6 +832,13 @@
             || '<span class="small">No lights yet. Connect Govee in Settings.</span>'}
         </div>
         <div class="x-foot"><span class="small">${lights.filter((l) => h.lights[l.id]).length} of ${lights.length} lights on</span><button class="btn lg" data-focus data-nav-to="room">All room controls</button></div>`;
+    }
+    if (kind === 'savescene') {
+      return `
+        <div class="x-head"><span class="x-title">Save this scene</span>${close}</div>
+        <p class="small">Saves the backlight and which lights are on, so one press brings them back.</p>
+        <input id="scene-name" class="set-input scene-input" data-focus autocomplete="off" spellcheck="false" maxlength="24" placeholder="Name, like Film night">
+        <button class="btn lg btn-primary" data-focus data-action="scene-save">Save</button>`;
     }
     if (kind === 'weather') {
       const w = state.weather;
@@ -981,6 +1045,7 @@
       { id: 'lights', icon: icon('lamp'), title: 'Lights', help: 'Govee account, light roles', rows: [
         row('open-setup', icon('lamp'), 'Govee account', 'Lights and backlight', 'govee'),
         row('open-roles', icon('room'), 'Light roles', 'Where each light is in the room', 'roles'),
+        row('open-myscenes', icon('lamp'), 'My scenes', 'Scenes you saved from the Room tab', 'myscenes'),
       ] },
       { id: 'games', icon: icon('games'), title: 'Games', help: 'Console input and switching', rows: [
         row('cycle-hdmi', icon('hdmi'), 'Games input', `Where the ${state.games.device} is plugged in`, 'hdmi'),
@@ -1085,12 +1150,24 @@
       </section>`;
   }
 
+  // If this launcher ever fails to start three times, Google's home screen is switched back on by itself.
+  // This proves that can work on this TV before Google's home screen is switched off.
+  function safetyRow(safe, ready) {
+    return `
+      <button class="set-row" data-focus data-action="adb-safety" ${ready ? '' : 'disabled'}>
+        <span class="lg chip set-chip">${icon('power')}</span>
+        <span class="set-label">Test the safety net<span class="small">${safe ? 'Works. If this launcher fails to start three times, Google\'s home screen comes back by itself' : ready ? 'Checks that Google\'s home screen can be switched back on. Changes nothing' : 'Connect to the TV first'}</span></span>
+        <span class="set-val">${safe ? 'Ready' : 'Press OK'}</span>
+      </button>`;
+  }
+
   function renderDeep() {
     const list = stage.querySelector('[data-deep-list]');
     const items = nativeJson('deepCleanList') || [];
     const a = state.adb || {};
     const ready = ['ready', 'done'].includes(a.state);
     const isHome = nativeCall('isDefaultHome') === true;
+    const safe = nativeCall('safetyReady') === true;
     const confirm = state.deepConfirm;
     const group = (tier, title, note) => {
       const rows = items.filter((d) => d.tier === tier && d.installed);
@@ -1102,8 +1179,8 @@
             <span class="set-label">${confirm === 'safe' ? 'Press OK again to switch off' : `Switch off all ${on.length} recommended`}<span class="small">${ready ? (on.length ? 'Reversible. Switch them back on from Clean up apps' : 'All switched off') : 'Connect to the TV first'}</span></span>
             <span class="set-val">${confirm === 'safe' ? 'Confirm' : on.length ? 'Press OK' : 'Done'}</span>
           </button>` : '';
-      const locked = tier === 'google' && !isHome;
-      return `<div class="set-head deep-head">${title}</div><p class="small cleanup-note">${note}${locked ? ' Not available until this launcher is your home screen.' : ''}</p>${head}`
+      const locked = tier === 'google' && !(isHome && safe);
+      return `<div class="set-head deep-head">${title}</div><p class="small cleanup-note">${note}${locked ? ' Not available until this launcher is your home screen and the safety net below has been tested.' : ''}</p>${tier === 'google' ? safetyRow(safe, ready) : ''}${head}`
         + rows.map((d) => `
           <button class="set-row" data-focus data-action="adb-deep" data-tier="${tier}" data-pkg="${d.pkg}" ${tier === 'safe' || locked || !ready || !d.enabled ? 'disabled' : ''}>
             <span class="lg chip set-chip">${icon('power')}</span>
@@ -1555,6 +1632,11 @@
       }
     }
     if (name === 'govee') applyGovee(data);
+    if (name === 'restore') {
+      try { localStorage.setItem('settings', JSON.stringify(data)); } catch { /* not saved */ }
+      location.reload();
+      return;
+    }
     if (name === 'update') {
       state.update = { downloading: 'Downloading...', installing: 'Installing. Confirm on the TV', permission: 'Allow installs, then press OK again', error: data.message || "Couldn't update" }[data.state] || '';
       applyState();
@@ -1816,12 +1898,13 @@
           <span class="status-wifi" title="Wi-Fi connected">${icon('wifi', 18)}</span>
           <button class="tool" data-focus data-action="match-lights" aria-label="Match wallpaper to backlights">${icon('drop', 20)}</button>
           <button class="tool" data-focus data-action="customize" aria-label="Customize">${icon('sun', 20)}</button>
+          <button class="tool update-badge" data-focus data-action="update-check" aria-label="Update available" hidden>${icon('sync', 20)}</button>
           <button class="tool" data-focus data-nav="settings" aria-label="Settings">${icon('gear', 20)}</button>
         </div>
       </header>
 
       <div class="views">
-        ${homeView()}${searchView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}${wallpapersView()}${cleanupView()}${rolesView()}${guestView()}${deepView()}
+        ${homeView()}${searchView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}${wallpapersView()}${cleanupView()}${rolesView()}${guestView()}${deepView()}${scenesView()}
       </div>
 
       ${overlay()}
@@ -1938,12 +2021,14 @@
         : state.govee.connected ? `Connected, ${state.govee.devices.length} devices`
           : state.govee.hasKey ? (state.govee.error || 'Connecting') : 'Not connected',
       roles: `${Object.keys(state.roles).length} set`,
+      myscenes: state.myScenes.length ? `${state.myScenes.length} saved` : 'None yet',
       home: !NATIVE ? 'On the TV' : state.homeDefault ? 'This launcher' : 'Google TV. Press OK',
       fit: `${Math.round((userFit || 1) * 100)}%`,
       'np-access': access.nowPlaying ? 'Allowed' : 'Off. Press OK to allow',
       'usage-access': access.recentApps ? 'Allowed' : 'Off. Press OK to allow',
     };
     all('[data-val]').forEach((el) => { el.textContent = values[el.dataset.val]; });
+    all('.update-badge').forEach((el) => { el.hidden = !state.updateFound; });
     all('.tog').forEach((el) => el.classList.toggle('on', el.querySelector('[data-val]').textContent === 'On'));
     renderWeather();
 
@@ -2022,6 +2107,11 @@
     swatch.style.background = h.backlight === 'off' ? 'var(--track)' : `linear-gradient(135deg, ${colors.join(',')})`;
     stage.querySelector('[data-room-scene]').textContent = h.backlight === 'off'
       ? 'Backlight off' : h.backlight === 'sync' ? 'Synced to TV' : BACKLIGHT[h.backlight].name;
+    const mine = stage.querySelector('[data-my-scenes]');
+    if (mine) {
+      const html = state.myScenes.map((sc) => `<button class="pillbtn" data-focus data-action="my-scene" data-id="${sc.id}">${esc(sc.name)}</button>`).join('');
+      if (mine.__html !== html) { mine.__html = html; mine.innerHTML = html; }
+    }
     if (NATIVE) state.sleepAt = Number(nativeCall('goveeSleepAt')) || 0;
     const sl = stage.querySelector('[data-sleep-label]');
     if (sl) sl.textContent = state.sleepAt > Date.now() ? `Lights off in ${Math.max(1, Math.round((state.sleepAt - Date.now()) / 60000))} min` : 'Sleep timer: Off';
@@ -2295,6 +2385,7 @@
     if (id === 'cleanup') renderCleanup();
     if (id === 'roles') renderRoles();
     if (id === 'deepclean') renderDeep();
+    if (id === 'myscenes') renderMyScenes();
     if (id === 'guest') renderGuest();
     animateView(id);
     moveTabGlow();
@@ -2460,6 +2551,26 @@
       }
     } else if (act === 'adb-restore') {
       nativeCall('adbRestore');
+    } else if (act === 'scene-save') {
+      saveScene();
+    } else if (act === 'my-scene') {
+      const sc = state.myScenes.find((x) => x.id === b.dataset.id);
+      if (sc) applyMyScene(sc);
+    } else if (act === 'open-myscenes') {
+      openView('myscenes');
+    } else if (act === 'scene-del') {
+      if (state.delConfirm !== b.dataset.id) {
+        state.delConfirm = b.dataset.id;
+      } else {
+        state.myScenes = state.myScenes.filter((x) => x.id !== b.dataset.id);
+        state.delConfirm = null;
+        saveSoon();
+        applyState();
+      }
+      renderMyScenes();
+      stage.querySelector(`[data-action="scene-del"]`)?.focus();
+    } else if (act === 'adb-safety') {
+      nativeCall('adbSafetyTest');
     } else if (act === 'adb-sethome') {
       if (!state.homeConfirm) {
         state.homeConfirm = true;
@@ -2777,6 +2888,8 @@
       stage.querySelector(`[data-action="settings-cat"][data-cat="${was}"]`)?.focus();
     } else if (state.view === 'deepclean') {
       openView('cleanup');
+    } else if (state.view === 'myscenes') {
+      openView('settings');
     } else if (state.view === 'roles') {
       openView(state.rolesFrom || 'room');
     } else if (state.view === 'wallpapers' || state.view === 'cleanup' || state.view === 'guest') {
@@ -2797,6 +2910,11 @@
     if (e.key === 'Enter' && e.target.matches?.('[data-expand]:not(button)')) {
       e.preventDefault();
       e.target.click();
+      return;
+    }
+    if (e.key === 'Enter' && e.target.id === 'scene-name') {
+      e.preventDefault();
+      saveScene();
       return;
     }
     if (e.key === 'Enter' && e.target.id === 'search-input') {
@@ -3063,6 +3181,14 @@
     try {
       syncVolume();
       tmdbKey = nativeCall('tmdbKey') || '';
+      nativeCall('launcherReady'); // tells the start-up watchdog the page is working
+      nativeCall('saveBackup', localStorage.getItem('settings') || '{}');
+      if (nativeCall('wasRescued') === true) {
+        setTimeout(() => toast('The launcher had trouble starting, so Google\'s home screen was switched back on'), 1500);
+        nativeCall('clearRescued');
+      }
+      setTimeout(() => checkUpdate(true), 8000);
+      setInterval(() => { if (!document.hidden) checkUpdate(true); }, 6 * 3600 * 1000);
       renderContinue();
       pollNowPlaying();
       applyGovee(nativeJson('goveeStatus'));
