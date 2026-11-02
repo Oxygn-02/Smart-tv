@@ -14,7 +14,8 @@ import java.io.File
  * "Keep the launcher in front": when music starts playing in another app (YouTube
  * Music, or a song cast from a phone), the launcher is brought back to the front
  * after a few seconds while the music carries on. It only reacts to music
- * starting, so opening the music app yourself afterwards is left alone.
+ * starting, so opening the music app yourself afterwards is left alone. By default only cast songs count, because
+ * starting music inside YouTube Music usually means you want to stay there.
  */
 class MusicKeeper(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
@@ -56,6 +57,9 @@ class MusicKeeper(private val context: Context) {
     private fun isPlaying(s: PlaybackState?) = s?.state == PlaybackState.STATE_PLAYING
 
     private fun isMusic(c: MediaController): Boolean {
+        // Mode 1 only follows songs cast from a phone; mode 2 also follows music started in YouTube Music itself.
+        val cast = c.packageName == "com.google.android.apps.mediashell"
+        if (mode() < 2 && !cast) return false
         if (c.packageName == "com.google.android.youtube.tvmusic") return true
         // A song has an artist; a video from YouTube or a cast film doesn't.
         val md = c.metadata ?: return false
@@ -77,7 +81,10 @@ class MusicKeeper(private val context: Context) {
         }, 3500)
     }
 
-    fun enabled() = prefs.getBoolean("on", false)
+    /** 0 off, 1 songs cast from a phone, 2 also music started inside YouTube Music. */
+    fun mode() = prefs.getInt("mode", 0)
+
+    fun enabled() = mode() > 0
 
     private fun bringLauncherForward() {
         // Over the TV's own trusted debug port, which is not limited like an app starting a window from the background.
