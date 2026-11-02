@@ -34,3 +34,5 @@ Settings > Home and apps > **Updates** reads `version.json` in this repository, 
 - **My scenes.** Room > Save this as a scene stores the current lights and backlight under a name. Settings > Lights > My scenes deletes them.
 - **Update available.** The launcher checks `version.json` 8 seconds after start and every 6 hours, and shows a small update button in the top bar when a newer version exists. Press OK on it to install.
 - **Backup.** Settings are mirrored on the TV and can be downloaded from the phone setup page (Backup) and restored there after a reinstall. Keys and the Wi-Fi password are not included.
+
+- **For you / Inputs (v0.13).** Search shows a "For you" row (your apps' own recommendations plus popular titles on your services), search results use landscape thumbnails, and the Apps tab has an Inputs row (HDMI, aerial). See `debloat/PROPOSAL-next.md` and `debloat/RECOVERY.md`.

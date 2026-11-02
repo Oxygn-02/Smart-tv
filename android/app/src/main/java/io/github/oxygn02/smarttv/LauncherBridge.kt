@@ -183,6 +183,58 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         }
     }
 
+    // ---------- For you: what apps recommend on the TV's home channels ----------
+
+    /**
+     * The programmes installed apps publish to the system's home channels (the
+     * same rows Google's home screen shows), as {ok, error, items:[{title,
+     * sub, pkg, uri, art}]}. Only apps' own packages are listed, newest weight
+     * first, one per title. Android may refuse (error "permission") or an app
+     * may publish nothing; both are reported rather than hidden.
+     */
+    @JavascriptInterface
+    fun recommendations(): String {
+        val out = JSONObject()
+        val items = JSONArray()
+        try {
+            val cols = arrayOf(
+                TvContract.PreviewPrograms.COLUMN_TITLE,
+                TvContract.PreviewPrograms.COLUMN_SHORT_DESCRIPTION,
+                TvContract.PreviewPrograms.COLUMN_PACKAGE_NAME,
+                TvContract.PreviewPrograms.COLUMN_INTENT_URI,
+                TvContract.PreviewPrograms.COLUMN_THUMBNAIL_URI,
+                TvContract.PreviewPrograms.COLUMN_POSTER_ART_URI,
+                TvContract.PreviewPrograms.COLUMN_WEIGHT,
+            )
+            val seen = HashSet<String>()
+            activity.contentResolver.query(
+                TvContract.PreviewPrograms.CONTENT_URI, cols, null, null,
+                TvContract.PreviewPrograms.COLUMN_WEIGHT + " DESC",
+            )?.use { c ->
+                while (c.moveToNext() && items.length() < 24) {
+                    val title = c.getString(0).orEmpty()
+                    val pkg = c.getString(2).orEmpty()
+                    val art = c.getString(4).orEmpty().ifEmpty { c.getString(5).orEmpty() }
+                    if (title.isEmpty() || art.isEmpty() || !seen.add("$pkg|$title")) continue
+                    items.put(
+                        JSONObject()
+                            .put("title", title)
+                            .put("sub", c.getString(1).orEmpty())
+                            .put("pkg", pkg)
+                            .put("uri", c.getString(3).orEmpty())
+                            .put("art", art),
+                    )
+                }
+            }
+            out.put("ok", true)
+        } catch (e: SecurityException) {
+            out.put("ok", false).put("error", "permission")
+        } catch (e: Exception) {
+            out.put("ok", false).put("error", e.javaClass.simpleName)
+        }
+        return out.put("items", items).toString()
+    }
+
     // ---------- Clean-up over the TV's own debugging port (read only so far) ----------
 
     private val adb = AdbClient(File(activity.filesDir, "adb"))
@@ -779,6 +831,39 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         val intent = Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(input.id))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         activity.runOnUiThread { activity.startActivity(intent) }
+        return true
+    }
+
+    /**
+     * The TV's own inputs (HDMI ports, the aerial, AV) as [{id, label, type}],
+     * so they can be listed and chosen from the launcher. Labels are the ones
+     * the TV shows (including any custom name set in its Settings).
+     */
+    @JavascriptInterface
+    fun inputs(): String {
+        val out = JSONArray()
+        try {
+            val tim = activity.getSystemService(TvInputManager::class.java) ?: return out.toString()
+            tim.tvInputList
+                .filter { it.parentId == null && (it.type == TvInputInfo.TYPE_HDMI || it.type == TvInputInfo.TYPE_TUNER || it.type == TvInputInfo.TYPE_COMPOSITE || it.type == TvInputInfo.TYPE_COMPONENT || it.type == TvInputInfo.TYPE_VGA) }
+                .sortedWith(compareBy({ it.type != TvInputInfo.TYPE_HDMI }, { it.id }))
+                .forEach {
+                    val label = runCatching { it.loadLabel(activity)?.toString() }.getOrNull()
+                    val custom = runCatching { it.loadCustomLabel(activity)?.toString() }.getOrNull()
+                    out.put(JSONObject().put("id", it.id).put("label", (custom ?: label).orEmpty()).put("type", it.type))
+                }
+        } catch (_: Exception) { /* none */ }
+        return out.toString()
+    }
+
+    /** Switches to one of the ids from [inputs]. */
+    @JavascriptInterface
+    fun switchInput(id: String): Boolean {
+        val tim = activity.getSystemService(TvInputManager::class.java) ?: return false
+        if (tim.tvInputList.none { it.id == id }) return false
+        val intent = Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(id))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        activity.runOnUiThread { runCatching { activity.startActivity(intent) } }
         return true
     }
 

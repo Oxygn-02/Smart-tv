@@ -11,6 +11,7 @@
   }
 
   const state = {
+    forYou: [], // recommendations for the Search tab
     appearance: 'auto', // 'auto' (follow the TV/host) | 'light' | 'dark'
     theme: initialTheme(), // resolved 'dark' | 'light'
     iconStyle: 'default', // 'default' | 'dark' | 'clear' | 'tinted'
@@ -284,6 +285,8 @@
         </label>
         ${NATIVE ? `
         <div class="search-section">
+          <div class="eyebrow" data-fy-head hidden>For you</div>
+          <div class="shows" data-shows="foryou"></div>
           <div class="eyebrow" data-titles-head hidden>Shows and films</div>
           <div class="shows" data-shows="titles"></div>
           <p class="small" data-titles-note></p>
@@ -390,10 +393,20 @@
   function appsView() {
     return `
       <section class="view view-apps" data-view="apps" hidden>
+        <div class="input-row" data-inputs hidden></div>
         <div class="app-grid">
           ${D.apps.map((a) => appTile(a, 'app-card glass', 68)).join('')}
         </div>
       </section>`;
+  }
+
+  // The TV's inputs (HDMI, aerial) as a row above the apps.
+  function renderInputs() {
+    const el = stage.querySelector('[data-inputs]');
+    if (!el || !NATIVE) return;
+    const list = (nativeJson('inputs') || []).filter((i) => i.label);
+    el.hidden = !list.length;
+    el.innerHTML = list.map((i) => `<button class="pillbtn" data-focus data-action="input" data-id="${esc(i.id)}">${esc(i.label)}</button>`).join('');
   }
 
   function gamesView() {
@@ -542,6 +555,87 @@
     applyState();
   }
 
+  // Wide thumbnail: the landscape still when TMDB has one, else the poster.
+  function artStyle(h) {
+    const base = 'https://image.tmdb.org/t/p/';
+    if (h.backdrop_path) return `background:url("${base}w780${h.backdrop_path}") center / cover`;
+    if (h.poster_path) return `background:url("${base}w342${h.poster_path}") center top / cover`;
+    return 'background:linear-gradient(135deg,#2a2a38,#14141c)';
+  }
+
+  // ---------- For you ----------
+  // Two sources, woven into one row: what your apps recommend on the TV's home
+  // channels, and what is popular right now on the services you have.
+  const PROVIDER_IDS = { prime: [9, 119], disney: [337], crunchyroll: [283], iplayer: [38], itvx: [41], c4: [103], my5: [333], netflix: [8] };
+  const FY_KEY = 'foryou-v1';
+
+  async function loadForYou() {
+    if (!NATIVE) return;
+    let items = [];
+    const mine = nativeJson('recommendations') || { items: [] };
+    const fromApps = (mine.items || []).filter((i) => /^https?:/.test(i.art) && appByPkg(i.pkg)).slice(0, 8).map((i) => {
+      const app = appByPkg(i.pkg);
+      return { title: i.title, line: `Open ${app.name}`, art: `background:url("${i.art}") center / cover`, appId: app.id, uri: i.uri, pkg: i.pkg };
+    });
+    items = fromApps;
+    if (tmdbReady()) {
+      try {
+        let cached = null;
+        try { cached = JSON.parse(localStorage.getItem(FY_KEY) || 'null'); } catch { /* none */ }
+        const ids = D.apps.flatMap((a) => PROVIDER_IDS[a.id] || []);
+        const sig = ids.join(',');
+        let pop = cached && cached.sig === sig && Date.now() - cached.at < 6 * 3600e3 ? cached.items : null;
+        if (!pop && ids.length) {
+          const q = { watch_region: 'GB', with_watch_providers: ids.join('|'), with_watch_monetization_types: 'flatrate|free|ads', sort_by: 'popularity.desc', language: 'en-GB', include_adult: 'false' };
+          const [m, t] = await Promise.all([tmdb('discover/movie', q), tmdb('discover/tv', q)]);
+          const take = (r, type) => (r.results || []).filter((x) => x.backdrop_path || x.poster_path).slice(0, 6).map((x) => ({ ...x, media_type: type }));
+          const a = take(m, 'movie'), b = take(t, 'tv');
+          pop = [];
+          for (let i = 0; i < 6; i++) { if (b[i]) pop.push(b[i]); if (a[i]) pop.push(a[i]); }
+          try { localStorage.setItem(FY_KEY, JSON.stringify({ sig, at: Date.now(), items: pop })); } catch { /* not saved */ }
+        }
+        const seen = new Set(items.map((i) => normName(i.title)));
+        // Which of your apps carries each one is looked up when it is chosen.
+        (pop || []).forEach((h) => {
+          const title = h.title || h.name || '';
+          if (seen.has(normName(title))) return;
+          items.push({ title, line: [(h.release_date || h.first_air_date || '').slice(0, 4), h.media_type === 'tv' ? 'Series' : 'Film', h.vote_average > 0 ? `★ ${h.vote_average.toFixed(1)}` : ''].filter(Boolean).join(' · '), art: artStyle(h), tmdb: h });
+        });
+      } catch { /* the apps' own rows still show */ }
+    }
+    state.forYou = items.slice(0, 10);
+    renderSearch();
+  }
+
+  function renderForYou() {
+    const el = stage.querySelector('[data-shows="foryou"]');
+    const head = stage.querySelector('[data-fy-head]');
+    if (!el) return;
+    const show = !state.query.trim() && state.forYou.length;
+    head.hidden = !show;
+    el.hidden = !show;
+    el.innerHTML = show ? state.forYou.slice(0, 5).map((it, i) => {
+      const app = it.appId ? APP[it.appId] : null;
+      return `
+        <button class="show glass" data-focus data-action="foryou" data-i="${i}" aria-label="${esc(it.title)}">
+          <div class="show-art" style="${it.art}">${app ? `<span class="show-app">${appIcon(app, 34)}</span>` : ''}</div>
+          <div class="show-body"><div class="show-title">${esc(it.title)}</div><div class="small show-meta">${esc(it.line)}</div></div>
+        </button>`;
+    }).join('') : '';
+  }
+
+  // Opens a For you item: the app's own link, or the service that carries a popular title.
+  async function openForYou(it) {
+    if (!it) return;
+    if (it.uri) { nativeCall('watchNextOpen', it.uri, it.pkg); return; }
+    try {
+      const p = await tmdb(`${it.tmdb.media_type}/${it.tmdb.id}/watch/providers`);
+      const pick = pickApp((p.results || {}).GB || {});
+      if (pick) { toast(`Opening ${it.title} in ${pick.app.name}`); launchApp(pick.app.id); return; }
+    } catch { /* fall through */ }
+    toast(`${it.title} isn't on one of your apps right now`);
+  }
+
   // ---------- Show search (TMDB) ----------
   // Titles come from TMDB, and which services carry them from its watch
   // provider data (supplied by JustWatch). Only services you have installed
@@ -585,12 +679,13 @@
       const pick = pickApp(g);
       const title = h.title || h.name || '';
       const year = (h.release_date || h.first_air_date || '').slice(0, 4);
-      const poster = h.poster_path ? `background:url("https://image.tmdb.org/t/p/w342${h.poster_path}") center / cover` : 'background:linear-gradient(135deg,#2a2a38,#14141c)';
+      const poster = artStyle(h);
+      const rating = h.vote_average > 0 ? `★ ${h.vote_average.toFixed(1)}` : '';
       const line = pick ? `${pick.how} ${pick.app.name}` : 'Not on your apps';
       return `
         <button class="show glass" data-focus ${pick ? `data-app="${pick.app.id}"` : 'data-toast="That title isn\'t on any of your apps"'} aria-label="${esc(title)}. ${esc(line)}">
           <div class="show-art" style="${poster}">${pick ? `<span class="show-app">${appIcon(pick.app, 34)}</span>` : ''}</div>
-          <div class="show-body"><div class="show-title">${esc(title)}</div><div class="small show-meta">${[year, h.media_type === 'tv' ? 'Series' : 'Film'].filter(Boolean).join(' · ')}<br>${esc(line)}</div></div>
+          <div class="show-body"><div class="show-title">${esc(title)}</div><div class="small show-meta">${[year, h.media_type === 'tv' ? 'Series' : 'Film', rating].filter(Boolean).join(' · ')}<br>${esc(line)}</div></div>
         </button>`;
     }).join('');
 
@@ -1622,6 +1717,7 @@
   window.onNative = (name, data) => {
     if (name === 'setup') {
       tmdbKey = nativeCall('tmdbKey') || '';
+      if (tmdbKey && !state.forYou.length) loadForYou();
       refreshWallpapers();
       if (state.view === 'wallpapers') renderWallpapers();
       if (data?.town !== undefined) {
@@ -2220,7 +2316,7 @@
 
   function renderSearch() {
     const q = state.query.trim().toLowerCase();
-    if (NATIVE) return renderTvSearch(q);
+    if (NATIVE) { renderForYou(); return renderTvSearch(q); }
     const results = D.catalogue.filter((s) => APP[s.app] && (!q
       || s.title.toLowerCase().includes(q)
       || s.meta.toLowerCase().includes(q)
@@ -2502,6 +2598,8 @@
     else if (b.dataset.app) launchApp(b.dataset.app);
     else if (b.dataset.track) setTrack(Number(b.dataset.track));
     else if (b.dataset.toast) toast(b.dataset.toast);
+    else if (act === 'input') { if (!nativeCall('switchInput', b.dataset.id)) toast("Couldn't switch to that input"); }
+    else if (act === 'foryou') openForYou(state.forYou[Number(b.dataset.i)]);
     else if (act === 'theme') state.appearance = { auto: 'light', light: 'dark', dark: 'auto' }[state.appearance];
     else if (act === 'customize') openSheet();
     else if (act === 'toggle-sample') state.sampleData = !state.sampleData;
@@ -3134,6 +3232,7 @@
     leaveGaming();
     renderContinue();
     tmdbKey = nativeCall('tmdbKey') || '';
+    if (!state.forYou.length) loadForYou();
     pollNowPlaying();
     refreshNativeStatus();
     if (state.view === 'cleanup') renderCleanup(); // back from the TV's Settings
@@ -3181,6 +3280,8 @@
     try {
       syncVolume();
       tmdbKey = nativeCall('tmdbKey') || '';
+      setTimeout(loadForYou, 1500);
+      renderInputs();
       nativeCall('launcherReady'); // tells the start-up watchdog the page is working
       nativeCall('saveBackup', localStorage.getItem('settings') || '{}');
       if (nativeCall('wasRescued') === true) {

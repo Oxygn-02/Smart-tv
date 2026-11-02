@@ -4131,3 +4131,8 @@ button.w-empty {
   border-radius: 50%;
   background: var(--glowc);
 }
+
+.shows[hidden] { display: none; }
+
+.input-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.input-row[hidden] { display: none; }
