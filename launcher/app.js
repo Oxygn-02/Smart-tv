@@ -29,6 +29,7 @@
     myScenes: [], // scenes you saved: {id, name, backlight, lights}
     edge: 'lights', // the glow round the screen: 'lights' (follows the backlight), 'custom' (your colour) or 'off'
     edgeHue: 330,
+    edgeInt: 60, // how strong the glow is, 10 to 100 (60 is the original strength)
     view: 'home',
     playing: true,
     track: 0,
@@ -72,7 +73,7 @@
 
   // ---------- Saved settings ----------
   // Remembered on the TV between launches (browser storage inside the app).
-  const SAVED = ['myScenes', 'edge', 'edgeHue', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
+  const SAVED = ['myScenes', 'edge', 'edgeHue', 'edgeInt', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
 
   function loadSaved() {
     try {
@@ -104,6 +105,17 @@
   // ---------- Colours ----------
   // Everything derived from the light colour, the theme or the tint sliders is
   // worked out here and handed to the CSS as plain values (see color.js).
+  // The colour of the glow round the screen: the lights, the media playing, or one you pick.
+  function edgeColour(glow, dark) {
+    if (state.edge === 'custom') return hslToHex(state.edgeHue, 0.85, dark ? 0.58 : 0.5);
+    if (state.edge === 'media') {
+      const t = state.live && D.music.tracks[state.track];
+      const c = t && t.palette && t.palette[0];
+      if (c) return c;
+    }
+    return glow;
+  }
+
   function applyColors() {
     const dark = state.theme === 'dark';
     const [c0, c1, c2] = BACKLIGHT[state.home.lastScene].colors;
@@ -112,7 +124,7 @@
 
     set('--glowc', glow);
     // The glow round the screen: the lights' colour, or one you pick.
-    set('--edge-a', withAlpha(state.edge === 'custom' ? hslToHex(state.edgeHue, 0.85, dark ? 0.58 : 0.5) : glow, dark ? 0.8 : 0.55));
+    set('--edge-a', withAlpha(edgeColour(glow, dark), Math.min(1, (dark ? 0.8 : 0.55) * state.edgeInt / 60)));
     set('--glow-a', withAlpha(glow, dark ? 0.8 : 0.55));
     set('--focus', dark ? mixHex(glow, '#ffffff', 0.45) : mixHex(glow, '#15151d', 0.55));
     set('--focus-glow', withAlpha(glow, dark ? 0.5 : 0.35));
@@ -1437,6 +1449,7 @@
   const sliderValue = {
     hue: () => state.tint.hue / 3.6,
     edgehue: () => state.edgeHue / 3.6,
+    edgeint: () => (state.edgeInt - 10) / 0.9,
     warmth: () => state.tint.warmth,
     opacity: () => state.tint.opacity,
   };
@@ -1458,7 +1471,9 @@
   function setSlider(id, value) {
     const t = state.tint;
     const v = clamp(Math.round(value), id === 'opacity' ? 10 : 0, 100);
-    if (id === 'edgehue') {
+    if (id === 'edgeint') {
+      state.edgeInt = Math.round(10 + v * 0.9);
+    } else if (id === 'edgehue') {
       state.edgeHue = v * 3.6;
       state.edge = 'custom';
     } else if (id === 'hue') {
@@ -1473,7 +1488,7 @@
   }
 
   function nudgeSlider(id, dir) {
-    setSlider(id, sliderValue[id]() + dir * 5);
+    setSlider(id, sliderValue[id]() + dir * (id === 'edgehue' ? 2 : 5));
   }
 
   function wallpaperLabel() {
@@ -1522,7 +1537,11 @@
           </div>
           <div class="sheet-row">
             <span class="sheet-label">Edge glow<span class="sheet-help">Round the screen</span></span>
-            ${seg('edge-mode', [['lights', 'Match lights'], ['custom', 'My colour'], ['off', 'Off']])}
+            ${seg('edge-mode', [['lights', 'Lights'], ['media', 'Media'], ['custom', 'My colour'], ['off', 'Off']])}
+          </div>
+          <div class="sheet-row" data-edge-int>
+            <span class="sheet-label">Glow strength</span>
+            <span class="slider-wrap">${sliderMarkup('edgeint', 'Glow strength')}</span>
           </div>
           <div class="sheet-row" data-edge-hue hidden>
             <span class="sheet-label">Glow colour</span>
@@ -2075,6 +2094,7 @@
     pressed('[data-action="icon-style"]', (id) => id === state.iconStyle);
     stage.querySelector('[data-tint-block]').hidden = state.iconStyle !== 'tinted';
     stage.querySelector('[data-edge-hue]').hidden = state.edge !== 'custom';
+    stage.querySelector('[data-edge-int]').hidden = state.edge === 'off';
     pressed('[data-action="edge-mode"]', (id) => id === state.edge);
     renderSliders();
     pressed('[data-action="appearance"]', (id) => id === state.appearance);

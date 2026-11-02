@@ -4136,3 +4136,11 @@ button.w-empty {
 
 .input-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
 .input-row[hidden] { display: none; }
+
+.slider[data-slider="edgehue"] .slider-track {
+  background: linear-gradient(90deg, hsl(0 85% 58%), hsl(60 85% 58%), hsl(120 85% 58%), hsl(180 85% 58%), hsl(240 85% 58%), hsl(300 85% 58%), hsl(360 85% 58%));
+}
+
+.slider[data-slider="edgeint"] .slider-track {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), var(--edge-a, #888));
+}
