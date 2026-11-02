@@ -651,6 +651,23 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
     @JavascriptInterface
     fun tmdbKey(): String = lookup.getString("tmdb", "").orEmpty()
 
+    /** Optional Watchmode key from the phone page; it adds rent and buy prices to a title's page. */
+    @JavascriptInterface
+    fun pricesKey(): String = lookup.getString("prices", "").orEmpty()
+
+    /** Opens an app's page in the Play Store so it can be installed. */
+    @JavascriptInterface
+    fun openStore(pkg: String): Boolean {
+        if (!Regex("[A-Za-z0-9_.]+").matches(pkg)) return false
+        val tries = listOf("market://details?id=$pkg", "https://play.google.com/store/apps/details?id=$pkg")
+        activity.runOnUiThread {
+            for (u in tries) {
+                if (runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(u)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) break
+            }
+        }
+        return true
+    }
+
     // ---------- Now playing: whatever is coming out of the speakers ----------
 
     private class Playing(
@@ -980,6 +997,11 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             if (key.isEmpty()) govee.forgetKey() else govee.connect(key)
         }
 
+        override fun onPrices(key: String) {
+            lookup.edit().putString("prices", key).apply()
+            host.emit("setup", "{}")
+        }
+
         override fun onTmdb(key: String) {
             lookup.edit().putString("tmdb", key).apply()
             host.emit("setup", "{}")
@@ -1016,6 +1038,7 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             .put("town", "")
             .put("wifi", guest.getString("ssid", "").orEmpty())
             .put("tmdb", lookup.getString("tmdb", "").orEmpty().isNotEmpty())
+            .put("prices", lookup.getString("prices", "").orEmpty().isNotEmpty())
             .put("wallpapers", JSONArray(wallpapers()))
 
         override fun packagesText(): String = packageList()

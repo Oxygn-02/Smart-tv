@@ -32,6 +32,7 @@ class SetupServer(
         fun onGoveeKey(key: String)
         fun onTown(town: String)
         fun onTmdb(key: String)
+        fun onPrices(key: String)
         fun onWifi(ssid: String, password: String, security: String, hidden: Boolean)
         fun appsJson(): String
         fun backupJson(): String
@@ -91,6 +92,10 @@ class SetupServer(
             }
             "/api/tmdb" -> {
                 events.onTmdb(param("key").trim())
+                ok()
+            }
+            "/api/prices" -> {
+                events.onPrices(param("key").trim())
                 ok()
             }
             "/api/wifi" -> {

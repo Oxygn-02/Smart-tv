@@ -28,6 +28,8 @@
     tint: { source: 'room', hue: 200, warmth: 50, opacity: 60 },
     myScenes: [], // scenes you saved: {id, name, backlight, lights}
     edge: 'lights', // the glow round the screen: 'lights' (follows the backlight), 'custom' (your colour) or 'off'
+    trailers: true, // play a muted trailer behind a title's page
+    titleRows: [], // the search results, so a card can open its page
     edgeHue: 330,
     edgeInt: 60, // how strong the glow is, 10 to 100 (60 is the original strength)
     view: 'home',
@@ -73,7 +75,7 @@
 
   // ---------- Saved settings ----------
   // Remembered on the TV between launches (browser storage inside the app).
-  const SAVED = ['myScenes', 'edge', 'edgeHue', 'edgeInt', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
+  const SAVED = ['myScenes', 'edge', 'edgeHue', 'edgeInt', 'trailers', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
 
   function loadSaved() {
     try {
@@ -640,12 +642,164 @@
   async function openForYou(it) {
     if (!it) return;
     if (it.uri) { nativeCall('watchNextOpen', it.uri, it.pkg); return; }
+    if (it.tmdb) { openTitle(it.tmdb); return; }
     try {
       const p = await tmdb(`${it.tmdb.media_type}/${it.tmdb.id}/watch/providers`);
       const pick = pickApp((p.results || {}).GB || {});
       if (pick) { toast(`Opening ${it.title} in ${pick.app.name}`); launchApp(pick.app.id); return; }
     } catch { /* fall through */ }
     toast(`${it.title} isn't on one of your apps right now`);
+  }
+
+
+  // ---------- A title's page ----------
+  // Where it can be watched (free first), what it costs, the rating, a short
+  // description and, if switched on, a muted trailer fading in behind it.
+  // Free/subscription/rent/buy come from TMDB (JustWatch). TMDB has no prices,
+  // so those come from Watchmode when its key has been added on the phone page.
+  const STORE_PKG = {
+    netflix: 'com.netflix.ninja', disneyplus: 'com.disney.disneyplus', amazonprimevideo: 'com.amazon.amazonvideo.livingroom',
+    amazonvideo: 'com.amazon.amazonvideo.livingroom', primevideo: 'com.amazon.amazonvideo.livingroom', appletv: 'com.apple.atve.androidtv.appletv',
+    appletvplus: 'com.apple.atve.androidtv.appletv', googleplaymovies: 'com.google.android.videos', youtube: 'com.google.android.youtube.tv',
+    crunchyroll: 'com.crunchyroll.crunchyroid', paramountplus: 'com.cbs.ott',
+    bbciplayer: 'uk.co.bbc.iplayer', itvx: 'air.ITVMobilePlayer', channel4: 'com.channel4.ondemand',
+  };
+  const money = (v) => (typeof v === 'number' && v > 0 ? `£${v.toFixed(2).replace(/\.00$/, '')}` : '');
+
+  function providerRows(g, prices) {
+    const by = new Map();
+    const add = (list, kind) => (list || []).forEach((x) => {
+      const key = normName(x.provider_name);
+      const r = by.get(key) || { name: x.provider_name, logo: x.logo_path, kinds: {} };
+      r.kinds[kind] = true;
+      by.set(key, r);
+    });
+    add(g.free, 'free'); add(g.ads, 'ads'); add(g.flatrate, 'sub'); add(g.rent, 'rent'); add(g.buy, 'buy');
+    return [...by.values()].map((r) => {
+      const app = appForProvider(r.name);
+      const price = (prices || []).filter((s) => normName(s.name) === normName(r.name) || (ALIAS[normName(s.name)] || normName(s.name)) === (ALIAS[normName(r.name)] || normName(r.name)));
+      const lowest = (type) => Math.min(...price.filter((s) => s.type === type && s.price > 0).map((s) => s.price));
+      const parts = [];
+      if (r.kinds.free) parts.push('Free');
+      else if (r.kinds.ads) parts.push('Free with ads');
+      if (r.kinds.sub) parts.push('With subscription');
+      if (r.kinds.rent) parts.push(`Rent ${money(lowest('rent')) || ''}`.trim());
+      if (r.kinds.buy) parts.push(`Buy ${money(lowest('buy')) || ''}`.trim());
+      const rank = r.kinds.free || r.kinds.ads ? 0 : r.kinds.sub ? 1 : 2;
+      return { ...r, app, pkg: app ? app.pkg : STORE_PKG[ALIAS[normName(r.name)] || normName(r.name)] || '', line: parts.join(' · '), rank: rank + (app ? 0 : 3) };
+    }).sort((a, b) => a.rank - b.rank);
+  }
+
+  let titleSeq = 0;
+  let titleRowsNow = [];
+
+  function titleHead(h, d) {
+    const type = h.media_type === 'tv' ? 'tv' : 'movie';
+    const year = (h.release_date || h.first_air_date || '').slice(0, 4);
+    const runtime = d && (d.runtime || (d.episode_run_time || [])[0]);
+    const meta = [year, type === 'tv' ? (d && d.number_of_seasons ? `${d.number_of_seasons} season${d.number_of_seasons === 1 ? '' : 's'}` : 'Series') : 'Film',
+      runtime ? (runtime >= 60 ? `${Math.floor(runtime / 60)}h ${runtime % 60}m` : `${runtime}m`) : '', ...((d && d.genres) || []).slice(0, 2).map((x) => x.name)].filter(Boolean);
+    const rating = h.vote_average > 0 ? `<span class="t-rating">★ ${h.vote_average.toFixed(1)}</span>` : '';
+    return `<div class="t-title">${esc(h.title || h.name || '')}</div>
+      <div class="t-meta">${rating}<span>${esc(meta.join(' · '))}</span></div>`;
+  }
+
+  function renderTitleRows(rows) {
+    const el = refs.xpanel.querySelector('[data-t-rows]');
+    if (!el) return;
+    titleRowsNow = rows;
+    el.innerHTML = rows.length ? rows.map((r, i) => {
+      const icon36 = r.app ? appIcon(r.app, 40) : r.logo ? `<img class="t-logo" src="https://image.tmdb.org/t/p/w92${r.logo}" alt="">` : `<span class="t-logo t-letter">${esc(r.name.slice(0, 1))}</span>`;
+      const act = r.app ? 'Open' : r.pkg ? 'Install' : 'Not on this TV';
+      return `<button class="t-row" data-focus data-action="title-go" data-i="${i}" ${r.app || r.pkg ? '' : 'disabled'}>
+        ${icon36}<span class="t-row-name">${esc(r.name)}<span class="small">${esc(r.line)}</span></span><span class="t-row-act">${act}</span></button>`;
+    }).join('') : '<p class="small">Not on any streaming or rental service in the UK right now.</p>';
+  }
+
+  function trailerFor(d) {
+    const v = ((d && d.videos && d.videos.results) || []).filter((x) => x.site === 'YouTube' && /trailer|teaser/i.test(x.type));
+    return (v.find((x) => x.official && x.type === 'Trailer') || v.find((x) => x.type === 'Trailer') || v[0] || {}).key || '';
+  }
+
+  function startTrailer(key, seq) {
+    const box = refs.xpanel.querySelector('[data-t-trailer]');
+    if (!key || !box || !state.trailers || seq !== titleSeq) return;
+    const f = document.createElement('iframe');
+    f.setAttribute('allow', 'autoplay; encrypted-media');
+    f.setAttribute('tabindex', '-1');
+    f.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(key)}?autoplay=1&mute=1&controls=0&disablekb=1&fs=0&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&loop=1&playlist=${encodeURIComponent(key)}&enablejsapi=1`;
+    f.addEventListener('load', () => { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*'); } catch { /* none */ } });
+    box.append(f);
+    // Only shown once YouTube says it is playing, so an error page never appears.
+    const onMsg = (e) => {
+      if (e.source !== f.contentWindow) return;
+      let m; try { m = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch { return; }
+      const st = m && (m.event === 'onStateChange' ? m.info : m.info && m.info.playerState);
+      if (st === 1) box.classList.add('playing');
+    };
+    window.addEventListener('message', onMsg);
+    box.__off = () => window.removeEventListener('message', onMsg);
+  }
+
+  async function openTitle(h) {
+    if (!h) return;
+    const seq = ++titleSeq;
+    xFrom = document.activeElement;
+    const type = h.media_type === 'tv' ? 'tv' : 'movie';
+    const art = h.backdrop_path ? `https://image.tmdb.org/t/p/w1280${h.backdrop_path}` : '';
+    refs.xpanel.className = 'xpanel xwide';
+    refs.xpanel.innerHTML = `
+      <div class="t-bg" data-t-trailer><div class="t-still" style="${art ? `background-image:url('${art}')` : ''}"></div></div>
+      <div class="t-body">
+        <button class="btn lg x-close t-close" data-focus data-action="x-close">Close</button>
+        <div class="t-top">
+          ${h.poster_path ? `<img class="t-poster" src="https://image.tmdb.org/t/p/w342${h.poster_path}" alt="">` : ''}
+          <div class="t-info"><div data-t-head>${titleHead(h, null)}</div>
+            <p class="t-over" data-t-over>${esc(h.overview || '')}</p></div>
+        </div>
+        <div class="t-where"><div class="eyebrow">Where to watch</div><div class="t-rows" data-t-rows><p class="small">Finding where to watch...</p></div></div>
+      </div>`;
+    refs.x.hidden = false;
+    refs.x.classList.remove('closing');
+    applyState();
+    refs.xpanel.querySelector('[data-focus]')?.focus();
+
+    try {
+      const priceKey = nativeCall('pricesKey') || '';
+      const [d, p] = await Promise.all([
+        tmdb(`${type}/${h.id}`, { append_to_response: 'videos', include_video_language: 'en,null', language: 'en-GB' }).catch(() => null),
+        tmdb(`${type}/${h.id}/watch/providers`).catch(() => ({})),
+      ]);
+      if (seq !== titleSeq) return;
+      const g = (p.results || {}).GB || {};
+      if (d) {
+        refs.xpanel.querySelector('[data-t-head]').innerHTML = titleHead({ ...h, vote_average: d.vote_average || h.vote_average }, d);
+        refs.xpanel.querySelector('[data-t-over]').textContent = d.overview || h.overview || '';
+        startTrailer(trailerFor(d), seq);
+      }
+      renderTitleRows(providerRows(g, null));
+      if (!refs.xpanel.contains(document.activeElement) || document.activeElement.classList.contains('t-close')) refs.xpanel.querySelector('.t-row:not([disabled])')?.focus();
+      if (priceKey) {
+        try {
+          const find = await getJson(`https://api.watchmode.com/v1/search/?apiKey=${encodeURIComponent(priceKey)}&search_field=${type === 'tv' ? 'tmdb_tv_id' : 'tmdb_movie_id'}&search_value=${h.id}`);
+          const wid = (find.title_results || [])[0]?.id;
+          if (wid) {
+            const src = await getJson(`https://api.watchmode.com/v1/title/${wid}/sources/?apiKey=${encodeURIComponent(priceKey)}&regions=GB`);
+            if (seq !== titleSeq) return;
+            const focusedAt = document.activeElement?.dataset?.i;
+            renderTitleRows(providerRows(g, (src || []).map((s) => ({ name: s.name, type: s.type === 'sub' ? 'sub' : s.type, price: s.price }))));
+            if (focusedAt !== undefined) refs.xpanel.querySelector(`.t-row[data-i="${focusedAt}"]`)?.focus();
+          }
+        } catch { /* the apps are listed without prices */ }
+      }
+    } catch {
+      if (seq === titleSeq) renderTitleRows([]);
+    }
+  }
+
+  function goTitleRow(r) {
+    if (!r) return;
+    if (r.app) { closeExpand(); launchApp(r.app.id); } else if (r.pkg) nativeCall('openStore', r.pkg);
   }
 
   // ---------- Show search (TMDB) ----------
@@ -687,15 +841,18 @@
     const note = stage.querySelector('[data-titles-note]');
     if (!el) return;
     head.hidden = !rows.length && !note.textContent;
+    state.titleRows = [];
     el.innerHTML = rows.map(({ h, g }) => {
+      state.titleRows.push(h);
       const pick = pickApp(g);
       const title = h.title || h.name || '';
       const year = (h.release_date || h.first_air_date || '').slice(0, 4);
       const poster = artStyle(h);
       const rating = h.vote_average > 0 ? `★ ${h.vote_average.toFixed(1)}` : '';
-      const line = pick ? `${pick.how} ${pick.app.name}` : 'Not on your apps';
+      const free = [...(g.free || []), ...(g.ads || [])].map((x) => x.provider_name);
+      const line = free.length ? `Free on ${free.slice(0, 2).join(', ')}` : pick ? `${pick.how} ${pick.app.name}` : 'Rent, buy or other apps';
       return `
-        <button class="show glass" data-focus ${pick ? `data-app="${pick.app.id}"` : 'data-toast="That title isn\'t on any of your apps"'} aria-label="${esc(title)}. ${esc(line)}">
+        <button class="show glass" data-focus data-action="title" data-i="${state.titleRows.length - 1}" aria-label="${esc(title)}. ${esc(line)}">
           <div class="show-art" style="${poster}">${pick ? `<span class="show-app">${appIcon(pick.app, 34)}</span>` : ''}</div>
           <div class="show-body"><div class="show-title">${esc(title)}</div><div class="small show-meta">${[year, h.media_type === 'tv' ? 'Series' : 'Film', rating].filter(Boolean).join(' · ')}<br>${esc(line)}</div></div>
         </button>`;
@@ -736,9 +893,11 @@
         }));
         if (seq !== tmdbSeq) return;
         // Only titles one of your installed apps carries.
-        const onYourApps = rows.filter(({ g }) => pickApp(g)).slice(0, 5);
-        note.textContent = onYourApps.length ? '' : `Nothing on your apps matches “${q}”.`;
-        renderTitles(onYourApps, q);
+        // Titles on your apps first, then anything with an app that carries it.
+        const any = (g) => ['flatrate', 'free', 'ads', 'rent', 'buy'].some((k) => (g[k] || []).length);
+        const found = rows.filter(({ g }) => any(g)).sort((a, b) => (pickApp(a.g) ? 0 : 1) - (pickApp(b.g) ? 0 : 1)).slice(0, 5);
+        note.textContent = found.length ? '' : `Nothing matches “${q}”.`;
+        renderTitles(found, q);
       } catch {
         if (seq === tmdbSeq) {
           note.textContent = "Couldn't reach TMDB. Check the key on the phone page and the connection.";
@@ -987,6 +1146,7 @@
 
   function openExpand(card) {
     xFrom = card;
+    refs.xpanel.className = 'xpanel';
     refs.xpanel.innerHTML = xContent(card.dataset.expand);
     refs.x.hidden = false;
     refs.x.classList.remove('closing');
@@ -1011,10 +1171,13 @@
   function closeExpand() {
     if (refs.x.hidden) return;
     refs.x.classList.add('closing');
+    titleSeq++;
+    refs.xpanel.querySelector('[data-t-trailer]')?.__off?.();
     setTimeout(() => {
       refs.x.hidden = true;
       refs.x.classList.remove('closing');
       refs.xpanel.innerHTML = '';
+      refs.xpanel.className = 'xpanel';
       (xFrom && xFrom.isConnected ? xFrom : stage.querySelector('.dock-app'))?.focus();
       xFrom = null;
     }, 280);
@@ -1546,6 +1709,10 @@
           <div class="sheet-row" data-edge-hue hidden>
             <span class="sheet-label">Glow colour</span>
             <span class="slider-wrap">${sliderMarkup('edgehue', 'Glow colour')}</span>
+          </div>
+          <div class="sheet-row">
+            <span class="sheet-label">Trailers<span class="sheet-help">Behind a film's page</span></span>
+            ${seg('trailers', [['on', 'On'], ['off', 'Off']])}
           </div>
           <div class="sheet-row">
             <span class="sheet-label">Wallpaper</span>
@@ -2096,6 +2263,7 @@
     stage.querySelector('[data-edge-hue]').hidden = state.edge !== 'custom';
     stage.querySelector('[data-edge-int]').hidden = state.edge === 'off';
     pressed('[data-action="edge-mode"]', (id) => id === state.edge);
+    pressed('[data-action="trailers"]', (id) => (id === 'on') === state.trailers);
     renderSliders();
     pressed('[data-action="appearance"]', (id) => id === state.appearance);
     pressed('[data-action="wallpaper-set"]', (id) => id === wp);
@@ -2611,7 +2779,7 @@
       if (it) { nativeCall('watchNextOpen', it.uri, it.pkg); return; }
     }
     if (b.dataset.action === 'x-close') { closeExpand(); return; }
-    if ((b.dataset.nav || b.dataset.navTo) && !refs.x.hidden) { refs.x.hidden = true; refs.xpanel.innerHTML = ''; xFrom = null; }
+    if ((b.dataset.nav || b.dataset.navTo) && !refs.x.hidden) { titleSeq++; refs.x.hidden = true; refs.xpanel.innerHTML = ''; refs.xpanel.className = 'xpanel'; xFrom = null; }
     if (b.dataset.nav === 'settings') state.settingsCat = null;
     if (b.dataset.nav) openView(b.dataset.nav);
     else if (b.dataset.navTo) openView(b.dataset.navTo);
@@ -2619,6 +2787,9 @@
     else if (b.dataset.track) setTrack(Number(b.dataset.track));
     else if (b.dataset.toast) toast(b.dataset.toast);
     else if (act === 'input') { if (!nativeCall('switchInput', b.dataset.id)) toast("Couldn't switch to that input"); }
+    else if (act === 'title') openTitle(state.titleRows[Number(b.dataset.i)]);
+    else if (act === 'title-go') goTitleRow(titleRowsNow[Number(b.dataset.i)]);
+    else if (act === 'trailers') state.trailers = b.dataset.id === 'on';
     else if (act === 'foryou') openForYou(state.forYou[Number(b.dataset.i)]);
     else if (act === 'theme') state.appearance = { auto: 'light', light: 'dark', dark: 'auto' }[state.appearance];
     else if (act === 'customize') openSheet();

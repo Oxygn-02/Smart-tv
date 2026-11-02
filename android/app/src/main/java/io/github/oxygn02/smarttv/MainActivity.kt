@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity(), BridgeHost {
             setBackgroundColor(Color.BLACK)
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
+            settings.mediaPlaybackRequiresUserGesture = false // trailers start by themselves
             // Lay the page out at the real screen size, without zoom or the
             // TV's font scaling; the page scales itself to fit (launcher/app.js).
             settings.useWideViewPort = false

@@ -36,3 +36,5 @@ Settings > Home and apps > **Updates** reads `version.json` in this repository, 
 - **Backup.** Settings are mirrored on the TV and can be downloaded from the phone setup page (Backup) and restored there after a reinstall. Keys and the Wi-Fi password are not included.
 
 - **For you / Inputs (v0.13).** Search shows a "For you" row (your apps' own recommendations plus popular titles on your services), search results use landscape thumbnails, and the Apps tab has an Inputs row (HDMI, aerial). See `debloat/PROPOSAL-next.md` and `debloat/RECOVERY.md`.
+
+- **Title pages (v0.15).** Pressing a film or series in Search opens its page: poster, rating, description, a muted trailer fading in behind it (Customize > Trailers turns it off) and every UK service that carries it, free first, with Open or Install. Prices (like £3.99) need the optional free Watchmode key on the phone page; without it the page says Rent or Buy with no price.

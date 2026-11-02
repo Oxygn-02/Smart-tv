@@ -4144,3 +4144,221 @@ button.w-empty {
 .slider[data-slider="edgeint"] .slider-track {
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), var(--edge-a, #888));
 }
+
+/* ---------- A title's page ---------- */
+.xpanel.xwide {
+  position: relative;
+  width: 1120px;
+  height: 640px;
+  max-height: none;
+  padding: 0;
+}
+
+.t-bg {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 430px;
+  overflow: hidden;
+  /* Fades into the panel on the left, the bottom and the edges, so the picture blends in */
+  -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent 100%), linear-gradient(to right, transparent 0%, #000 55%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, #000 45%, transparent 100%), linear-gradient(to right, transparent 0%, #000 55%);
+  mask-composite: intersect;
+}
+
+.t-still {
+  position: absolute;
+  inset: 0;
+  background: center 20% / cover no-repeat;
+}
+
+.t-bg iframe {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 760px;
+  height: 428px;
+  border: 0;
+  transform: translate(-50%, -50%) scale(1.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.6s ease;
+}
+
+.t-bg.playing iframe {
+  opacity: 0.9;
+}
+
+.t-body {
+  position: relative;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 28px 36px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.t-close {
+  position: absolute;
+  top: 22px;
+  right: 28px;
+  z-index: 2;
+}
+
+.t-top {
+  display: flex;
+  gap: 26px;
+  align-items: flex-end;
+  min-height: 250px;
+  padding-top: 24px;
+}
+
+.t-poster {
+  width: 168px;
+  height: 252px;
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.65);
+  flex: none;
+}
+
+.t-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  max-width: 600px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 0 18px rgba(0, 0, 0, 0.5);
+}
+
+.t-title {
+  font-size: 40px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.t-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  color: var(--sub);
+}
+
+.t-rating {
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.t-over {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.t-where {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  flex: 1;
+}
+
+.t-rows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-content: start;
+  overflow: hidden;
+}
+
+.t-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.t-row:disabled {
+  opacity: 0.5;
+}
+
+.t-row:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 24px 2px var(--focus-glow);
+}
+
+.t-row-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  font-size: 19px;
+}
+
+.t-row-act {
+  font-size: 16px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.14);
+  white-space: nowrap;
+}
+
+.t-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex: none;
+}
+
+.t-letter {
+  display: grid;
+  place-items: center;
+  background: #8e8e9a;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* A film's page is always dark, like a cinema, so the trailer blends into it */
+.xpanel.xwide {
+  --ink: #f2f2f6;
+  --sub: rgba(242, 242, 246, 0.68);
+  background: #101117;
+  color: var(--ink);
+}
+
+.xpanel.xwide .eyebrow,
+.xpanel.xwide .small {
+  color: var(--sub);
+}
+
+.xpanel.xwide .t-info {
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+}
+
+.xpanel.xwide .t-row-act,
+.xpanel.xwide .t-row:disabled .t-row-act {
+  color: var(--ink);
+}
+
+.xpanel.xwide .t-close { color: #15151d; }
