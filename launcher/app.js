@@ -1308,6 +1308,7 @@
       { id: 'home', icon: icon('home'), title: 'Home and apps', help: 'Home button, clean up apps', rows: [
         row('home-role', icon('home'), 'Home button', 'Which app opens on Home', 'home'),
         row('open-cleanup', icon('power'), 'Clean up apps', 'Switch off apps you don\'t want', 'cleanup'),
+        NATIVE ? row('keep-front', icon('music'), 'Keep this screen in front', 'When music starts in another app, come back and let it play', 'keep') : '',
         NATIVE ? row('grant-np', icon('music'), 'Now playing access', 'Show what is playing', 'np-access') : '',
         NATIVE ? row('update-check', icon('wifi'), 'Updates', 'Check for a newer launcher', 'update') : '',
         NATIVE ? row('wn-check', icon('live'), 'Continue watching check', 'What the TV shares from your apps', 'wn') : '',
@@ -2283,6 +2284,7 @@
     const values = {
       theme: { auto: `Auto (${dark ? 'dark' : 'light'})`, light: 'Light', dark: 'Dark' }[state.appearance],
       wallpaper: { lights: 'Matches lights', photo: 'Photo', gradient: 'Gradient' }[wp],
+      keep: nativeCall('keepLauncher') === true ? 'On' : 'Off',
       hdmi: `HDMI ${g.hdmiPort}`,
       auto: g.autoSwitch ? 'On' : 'Off',
       countdown: g.countdownSec ? `${g.countdownSec} s` : 'None',
@@ -2787,6 +2789,7 @@
     else if (b.dataset.track) setTrack(Number(b.dataset.track));
     else if (b.dataset.toast) toast(b.dataset.toast);
     else if (act === 'input') { if (!nativeCall('switchInput', b.dataset.id)) toast("Couldn't switch to that input"); }
+    else if (act === 'keep-front') { const on = nativeCall('keepLauncher') !== true; nativeCall('setKeepLauncher', on); toast(on ? 'On. Music started in another app plays on while this screen returns' : 'Off'); }
     else if (act === 'title') openTitle(state.titleRows[Number(b.dataset.i)]);
     else if (act === 'title-go') goTitleRow(titleRowsNow[Number(b.dataset.i)]);
     else if (act === 'trailers') state.trailers = b.dataset.id === 'on';

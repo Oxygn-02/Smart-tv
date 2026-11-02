@@ -165,7 +165,18 @@ class MainActivity : ComponentActivity(), BridgeHost {
     // Back from an app: refresh what's playing and the recent apps.
     override fun onResume() {
         super.onResume()
+        resumed = true
         refreshPage()
+    }
+
+    companion object {
+        /** True while the launcher is on screen (read by MusicKeeper). */
+        @Volatile var resumed = false
+    }
+
+    override fun onPause() {
+        resumed = false
+        super.onPause()
     }
 
     private fun refreshPage() {

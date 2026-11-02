@@ -38,3 +38,5 @@ Settings > Home and apps > **Updates** reads `version.json` in this repository, 
 - **For you / Inputs (v0.13).** Search shows a "For you" row (your apps' own recommendations plus popular titles on your services), search results use landscape thumbnails, and the Apps tab has an Inputs row (HDMI, aerial). See `debloat/PROPOSAL-next.md` and `debloat/RECOVERY.md`.
 
 - **Title pages (v0.15).** Pressing a film or series in Search opens its page: poster, rating, description, a muted trailer fading in behind it (Customize > Trailers turns it off) and every UK service that carries it, free first, with Open or Install. Prices (like £3.99) need the optional free Watchmode key on the phone page; without it the page says Rent or Buy with no price.
+
+- **Keep this screen in front (v0.16).** Settings > Home and apps. When music starts in YouTube Music, or a song is cast, the launcher comes back to the front after 3.5 s and the music carries on. Off by default. Needs Now playing access and USB debugging (it brings the launcher forward over the TV's own trusted debug port). Videos are left alone: only a session with an artist counts as music.

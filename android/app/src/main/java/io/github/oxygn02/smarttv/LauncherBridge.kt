@@ -655,6 +655,15 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
     @JavascriptInterface
     fun pricesKey(): String = lookup.getString("prices", "").orEmpty()
 
+    /** "Keep the launcher in front" when music starts in another app (see MusicKeeper). */
+    @JavascriptInterface
+    fun keepLauncher(): Boolean = activity.getSharedPreferences("keep", Context.MODE_PRIVATE).getBoolean("on", false)
+
+    @JavascriptInterface
+    fun setKeepLauncher(on: Boolean) {
+        activity.getSharedPreferences("keep", Context.MODE_PRIVATE).edit().putBoolean("on", on).apply()
+    }
+
     /** Opens an app's page in the Play Store so it can be installed. */
     @JavascriptInterface
     fun openStore(pkg: String): Boolean {
