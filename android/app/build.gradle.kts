@@ -1,6 +1,20 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+}
+
+// The key every launcher update must be signed with. It is NOT in the repo:
+// android/keystore.properties (git-ignored) says where it is, e.g.
+//   storeFile=/path/to/smart-tv-signing.keystore
+//   storePassword=...
+//   keyAlias=...
+//   keyPassword=...
+// Losing this key means updates can no longer install over the app on the TV.
+val signing = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
 }
 
 android {
@@ -12,13 +26,26 @@ android {
         // Android TV 8.0+. Google TV sets are Android 10 or later.
         minSdk = 26
         targetSdk = 34
-        versionCode = 27
-        versionName = "0.17"
+        versionCode = 28
+        versionName = "0.18"
+    }
+
+    signingConfigs {
+        if (signing.getProperty("storeFile") != null) {
+            create("tv") {
+                storeFile = file(signing.getProperty("storeFile"))
+                storePassword = signing.getProperty("storePassword")
+                keyAlias = signing.getProperty("keyAlias")
+                keyPassword = signing.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Not debuggable: no WebView remote debugging, no run-as into the app's files.
+            signingConfig = signingConfigs.findByName("tv")
         }
     }
 
@@ -52,6 +79,7 @@ tasks.named("preBuild") { dependsOn(copyWebUi) }
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20231013") // real org.json for BackupSchema tests
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-ktx:1.9.1")
     implementation("androidx.webkit:webkit:1.11.0")

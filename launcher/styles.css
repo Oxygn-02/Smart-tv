@@ -4362,3 +4362,17 @@ button.w-empty {
 }
 
 .xpanel.xwide .t-close { color: #15151d; }
+
+/* Diagnostics: section labels as small captions, rows compact */
+.view-diag .set-head {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--sub);
+  margin: 12px 0 2px;
+}
+
+.view-diag .diag-row {
+  min-height: 0;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}

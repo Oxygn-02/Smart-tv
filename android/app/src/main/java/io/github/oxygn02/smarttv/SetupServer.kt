@@ -14,7 +14,11 @@ import java.io.File
 
 /**
  * The page behind "Set up from your phone". It runs only while that screen is
- * open on the TV, and every request needs the four-digit code the TV shows.
+ * open on the TV (and for 20 minutes at most), listening only on the TV's Wi-Fi
+ * address. The six-digit code the TV shows is exchanged once for a random
+ * session token, which every later request must carry. Wrong codes lock the
+ * page, and the lock survives restarting the launcher. Requests whose Host or
+ * Origin isn't this TV's address are refused (DNS rebinding, other web pages).
  * From a phone on the same Wi-Fi you can:
  * - save the Govee API key (typing it with a remote would be painful),
  * - set the weather town,
@@ -23,10 +27,11 @@ import java.io.File
  */
 class SetupServer(
     private val context: Context,
-    port: Int,
+    private val ip: String,
+    private val port: Int,
     private val pin: String,
     private val events: Events,
-) : NanoHTTPD(port) {
+) : NanoHTTPD(ip, port) {
 
     interface Events {
         fun onGoveeKey(key: String)
@@ -43,15 +48,52 @@ class SetupServer(
         fun onWallpapersChanged()
         fun stateJson(): JSONObject
         fun packagesText(): String
+        fun packagesBefore(): String
+        fun diagnosticsText(): String
     }
 
-    private var wrongTries = 0
-    private var lockedUntil = 0L
+    private val guard = context.getSharedPreferences("setup-guard", Context.MODE_PRIVATE)
+    private val triesByDevice = HashMap<String, Int>()
+    private var token: String? = null
 
     override fun serve(session: IHTTPSession): Response = try {
-        route(session)
+        secure(route(session))
     } catch (e: Exception) {
         json(Response.Status.INTERNAL_ERROR, JSONObject().put("error", "Something went wrong on the TV"))
+    }
+
+    private fun secure(r: Response): Response = r.apply {
+        addHeader("X-Frame-Options", "DENY")
+        addHeader("X-Content-Type-Options", "nosniff")
+        addHeader("Referrer-Policy", "no-referrer")
+        addHeader("Cache-Control", "no-store")
+    }
+
+    private fun same(a: String, b: String) = java.security.MessageDigest.isEqual(a.toByteArray(), b.toByteArray())
+
+    /** Only this TV's own address: a page elsewhere, or a renamed host (DNS rebinding), is refused. */
+    private fun fromThisTv(session: IHTTPSession): Boolean {
+        val self = "$ip:$port"
+        val host = session.headers["host"] ?: return false
+        if (host != self) return false
+        val origin = session.headers["origin"]
+        return origin == null || origin == "http://$self"
+    }
+
+    /** Wrong codes: 5 tries, then a lock that doubles each time (1 min up to 1 hour). Kept across restarts. */
+    private fun locked() = System.currentTimeMillis() < guard.getLong("lockedUntil", 0)
+
+    private fun wrongCode(device: String) {
+        val mine = (triesByDevice[device] ?: 0) + 1
+        triesByDevice[device] = mine
+        val all = guard.getInt("fails", 0) + 1
+        val e = guard.edit().putInt("fails", all)
+        if (mine >= 5 || all % 5 == 0) {
+            val level = guard.getInt("level", 0)
+            e.putLong("lockedUntil", System.currentTimeMillis() + minOf(60_000L shl level, 3_600_000L)).putInt("level", level + 1)
+            triesByDevice[device] = 0
+        }
+        e.apply()
     }
 
     private fun route(session: IHTTPSession): Response {
@@ -60,7 +102,7 @@ class SetupServer(
             val page = context.assets.open("setup.html").bufferedReader().use { it.readText() }
             // Never cached, so a phone that kept an old tab open loads the new page on reload.
             return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", page)
-                .also { it.addHeader("Cache-Control", "no-store") }
+                .also { it.addHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'") }
         }
 
         if (session.method == Method.GET && uri == "/qrcode.js") {
@@ -68,21 +110,35 @@ class SetupServer(
             return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "application/javascript; charset=utf-8", js)
         }
 
+        if (!fromThisTv(session)) return json(Response.Status.FORBIDDEN, JSONObject().put("error", "Open the address shown on the TV"))
+
         val files = HashMap<String, String>()
         if (session.method == Method.POST || session.method == Method.PUT) session.parseBody(files)
         fun param(name: String) = session.parameters[name]?.firstOrNull().orEmpty()
 
-        if (System.currentTimeMillis() < lockedUntil) {
-            return json(Response.Status.FORBIDDEN, JSONObject().put("error", "Too many tries. Wait a minute"))
+        if (locked()) {
+            return json(Response.Status.FORBIDDEN, JSONObject().put("error", "Too many wrong codes. Wait, then try again"))
         }
-        if (param("pin") != pin) {
-            if (++wrongTries >= 5) {
-                wrongTries = 0
-                lockedUntil = System.currentTimeMillis() + 60_000
+        val device = session.remoteIpAddress.orEmpty()
+        if (uri == "/api/login") {
+            if (session.method != Method.POST || !same(param("pin"), pin)) {
+                wrongCode(device)
+                return json(Response.Status.FORBIDDEN, JSONObject().put("error", "That code isn't right"))
             }
-            return json(Response.Status.FORBIDDEN, JSONObject().put("error", "That code isn't right"))
+            guard.edit().putInt("fails", 0).putInt("level", 0).apply()
+            triesByDevice.clear()
+            val t = ByteArray(24).also { java.security.SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
+            token = t
+            return json(Response.Status.OK, JSONObject().put("token", t))
         }
-        wrongTries = 0
+        val sent = session.headers["x-token"] ?: param("token")
+        val current = token
+        if (current == null || !same(sent, current)) {
+            return json(Response.Status.FORBIDDEN, JSONObject().put("error", "Enter the code from the TV again"))
+        }
+        // Anything that changes the TV must be a POST (links and images can't change anything).
+        val changes = uri !in setOf("/api/backup", "/api/wall", "/api/icon", "/packages.txt", "/packages-before.txt", "/api/diagnostics")
+        if (changes && session.method != Method.POST) return json(Response.Status.METHOD_NOT_ALLOWED, JSONObject().put("error", "Not allowed"))
 
         return when (uri) {
             "/api/state" -> json(Response.Status.OK, events.stateJson())
@@ -112,6 +168,7 @@ class SetupServer(
             }
             "/api/wallpaper" -> {
                 val tmp = files["file"] ?: return json(Response.Status.BAD_REQUEST, JSONObject().put("error", "No photo came through"))
+                if (File(tmp).length() > 25L * 1024 * 1024) return json(Response.Status.BAD_REQUEST, JSONObject().put("error", "That photo is too big (25 MB at most)"))
                 if (saveWallpaper(File(tmp))) {
                     events.onWallpapersChanged()
                     ok()
@@ -142,6 +199,10 @@ class SetupServer(
                 ok()
             }
             "/packages.txt" -> NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "text/plain; charset=utf-8", events.packagesText())
+            "/packages-before.txt" -> NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "text/plain; charset=utf-8", events.packagesBefore())
+                .also { it.addHeader("Content-Disposition", "attachment; filename=packages-before-clean-up.txt") }
+            "/api/diagnostics" -> NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "text/plain; charset=utf-8", events.diagnosticsText())
+                .also { it.addHeader("Content-Disposition", "attachment; filename=smart-tv-diagnostics.txt") }
             else -> json(Response.Status.NOT_FOUND, JSONObject().put("error", "Not found"))
         }
     }

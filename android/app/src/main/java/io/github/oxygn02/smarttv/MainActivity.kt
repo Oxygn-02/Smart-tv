@@ -7,7 +7,9 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.View
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -32,6 +34,9 @@ class MainActivity : ComponentActivity(), BridgeHost {
     private lateinit var bridge: LauncherBridge
     private val ui = android.os.Handler(android.os.Looper.getMainLooper())
     private var ready = false
+    private var shownAt = 0L
+    private var backDownAt = 0L
+    private lateinit var guard: android.content.SharedPreferences
 
     // The system's location question, and its "make this the home app" question.
     // After either, the page re-reads what changed.
@@ -43,7 +48,8 @@ class MainActivity : ComponentActivity(), BridgeHost {
         super.onCreate(savedInstanceState)
 
         // The safety net: every start counts as a failure until the page says it is working.
-        val guard = getSharedPreferences("guard", MODE_PRIVATE)
+        guard = getSharedPreferences("guard", MODE_PRIVATE)
+        shownAt = android.os.SystemClock.uptimeMillis()
         val fails = guard.getInt("fails", 0) + 1
         guard.edit().putInt("fails", fails).commit()
         if (HomeGuard.shouldRescue(fails)) {
@@ -73,6 +79,14 @@ class MainActivity : ComponentActivity(), BridgeHost {
             setBackgroundColor(Color.BLACK)
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
+            // Only the bundled page: no file:// or content:// access from it.
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            @Suppress("DEPRECATION")
+            settings.allowFileAccessFromFileURLs = false
+            @Suppress("DEPRECATION")
+            settings.allowUniversalAccessFromFileURLs = false
+            settings.setGeolocationEnabled(false)
             settings.mediaPlaybackRequiresUserGesture = false // trailers start by themselves
             // Lay the page out at the real screen size, without zoom or the
             // TV's font scaling; the page scales itself to fit (launcher/app.js).
@@ -92,6 +106,18 @@ class MainActivity : ComponentActivity(), BridgeHost {
                     view: WebView,
                     request: WebResourceRequest,
                 ): WebResourceResponse? = assets.shouldInterceptRequest(request.url)
+
+                // The page never navigates anywhere: links and redirects open nowhere.
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
+                    request.url.host != "appassets.androidplatform.net"
+
+                // The page's renderer died (often low memory): count it and start again
+                // instead of letting it take the whole launcher down.
+                override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                    HomeGuard.note(guard, if (detail.didCrash()) "page crashed" else "page closed for memory")
+                    pageFailed()
+                    return true
+                }
             }
             addJavascriptInterface(bridge, "Android")
             loadUrl("https://appassets.androidplatform.net/assets/web/index.html")
@@ -101,7 +127,7 @@ class MainActivity : ComponentActivity(), BridgeHost {
 
         // If the page hasn't started within 20 seconds, load it again; after another 20, give up.
         ui.postDelayed({ if (!ready) web.reload() }, 20_000)
-        ui.postDelayed({ if (!ready) rescue(guard) }, 40_000)
+        ui.postDelayed({ if (!ready) { HomeGuard.note(guard, "page never started"); rescue(guard) } }, 40_000)
 
         // A launcher never closes on Back: the UI decides what Back means
         // (close a panel, or return to Home).
@@ -113,6 +139,79 @@ class MainActivity : ComponentActivity(), BridgeHost {
     override fun launcherReady() {
         ready = true
         ui.removeCallbacksAndMessages(null)
+    }
+
+    // ---------- Heartbeat ----------
+    // A WebView launcher more often freezes or goes blank than crashes. Each time
+    // the launcher comes back to the front the page must answer "ok" (drawn and
+    // responding) within 8 seconds. A miss reloads it; three misses in a row give
+    // the TV back to Google's home screen. This runs in native code, so it works
+    // even when the page doesn't.
+    private var pingSeq = 0
+
+    private fun heartbeat() {
+        if (!::web.isInitialized || !ready) return
+        val seq = ++pingSeq
+        var answered = false
+        web.evaluateJavascript("window.launcherAlive ? window.launcherAlive() : 'old'") { v ->
+            if (seq != pingSeq) return@evaluateJavascript
+            answered = true
+            if (v?.contains("ok") == true || v?.contains("old") == true) {
+                guard.edit().putInt("hangs", 0).apply()
+            } else {
+                HomeGuard.note(guard, "page blank")
+                pageFailed()
+            }
+        }
+        ui.postDelayed({
+            if (seq == pingSeq && !answered && resumed) {
+                HomeGuard.note(guard, "page not responding")
+                pageFailed()
+            }
+        }, 8_000)
+    }
+
+    private fun pageFailed() {
+        val hangs = guard.getInt("hangs", 0) + 1
+        guard.edit().putInt("hangs", hangs).commit()
+        if (HomeGuard.shouldRescue(hangs)) {
+            guard.edit().putInt("hangs", 0).commit()
+            rescue(guard)
+        } else {
+            recreate() // a fresh activity and page
+        }
+    }
+
+    // ---------- Safe mode ----------
+    // Hold Back for 3 seconds within 20 seconds of the launcher appearing to go
+    // straight to Google's home screen, whatever state the page is in.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+            val now = android.os.SystemClock.uptimeMillis()
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) backDownAt = now
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount > 0 &&
+                now - backDownAt >= 3_000 && backDownAt - shownAt <= 20_000) {
+                backDownAt = Long.MAX_VALUE / 2
+                safeMode()
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun safeMode() {
+        HomeGuard.note(guard, "safe mode (Back held)")
+        val other = packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
+            .map { it.activityInfo }
+            .firstOrNull { it.packageName != packageName && it.packageName != "com.android.tv.settings" && it.enabled }
+        if (other != null) {
+            runCatching {
+                startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                    .setClassName(other.packageName, other.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }.onFailure { rescue(guard) }
+        } else {
+            rescue(guard) // Google's home is switched off: switch it back on first
+        }
     }
 
     /** The launcher can't start: put Google's home screen back and open it. */
@@ -127,6 +226,7 @@ class MainActivity : ComponentActivity(), BridgeHost {
         Thread {
             val ok = HomeGuard.rescue(this)
             guard.edit().putInt("fails", 0).putBoolean("rescued", ok).commit()
+            HomeGuard.note(guard, if (ok) "rescued: Google's home switched back on" else "rescue failed (debug connection)")
             runOnUiThread {
                 runCatching {
                     startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -166,7 +266,9 @@ class MainActivity : ComponentActivity(), BridgeHost {
     override fun onResume() {
         super.onResume()
         resumed = true
+        shownAt = android.os.SystemClock.uptimeMillis()
         refreshPage()
+        heartbeat()
     }
 
     companion object {

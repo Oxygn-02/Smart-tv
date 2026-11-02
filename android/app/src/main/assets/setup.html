@@ -48,7 +48,7 @@
 
   <section id="login">
     <h2>Enter the code from the TV</h2>
-    <input id="pin" type="tel" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000">
+    <input id="pin" type="tel" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="000000">
     <button id="go">Continue</button>
     <div class="status" id="loginStatus"></div>
   </section>
@@ -118,7 +118,7 @@
       <ul id="appList" class="apps"></ul>
       <button id="saveApps">Send my choice to the TV</button>
       <div class="status" id="appStatus"></div>
-      <p class="help" style="margin-top:14px">The plain list of every app and service on the TV: <a id="packages" href="#">open</a></p>
+      <p class="help" style="margin-top:14px">The plain list of every app and service on the TV: <a id="packages" href="#">open</a>. The list saved before the first clean-up: <a id="before" href="#">download</a>.</p>
     </section>
 
     <section>
@@ -128,20 +128,23 @@
       <input id="restoreFile" type="file" accept=".json,application/json" style="margin-top:12px">
       <button id="restoreGo">Restore from this file</button>
       <div class="status" id="backupStatus"></div>
+      <p class="help" style="margin-top:14px">If something goes wrong, the diagnostics report helps find out why (no keys or passwords in it): <a id="diag" href="#">download</a>.</p>
     </section>
   </div>
-  <p class="help" style="text-align:center">Setup page version 0.11.0</p>
+  <p class="help" style="text-align:center">Setup page version 0.12.0</p>
 </main>
 
 <script src="/qrcode.js"></script>
 <script>
-  let pin = '';
+  let token = '';
+  const h = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const tq = () => 'token=' + encodeURIComponent(token);
   const $ = (id) => document.getElementById(id);
   const say = (id, text, good) => { const el = $(id); el.textContent = text; el.className = 'status ' + (good ? 'good' : text ? 'bad' : ''); };
 
   async function api(path, fields) {
     const form = new FormData();
-    form.append('pin', pin);
+    form.append('token', token);
     for (const [k, v] of Object.entries(fields || {})) form.append(k, v);
     const r = await fetch(path, { method: 'POST', body: form });
     const data = await r.json().catch(() => ({}));
@@ -156,14 +159,23 @@
     $('town').value = s.town || '';
     loadApps();
     if (s.wifi) $('ssid').value = s.wifi;
-    $('backupLink').href = '/api/backup?pin=' + encodeURIComponent(pin);
-    $('packages').href = '/packages.txt?pin=' + encodeURIComponent(pin);
-    $('photoList').innerHTML = s.wallpapers.map((w) => `<li><img src="/api/wall?pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(w.name)}" alt=""><span>${w.name}</span><button class="quiet" data-name="${w.name}">Remove</button></li>`).join('');
+    $('backupLink').href = '/api/backup?' + tq();
+    $('packages').href = '/packages.txt?' + tq();
+    $('before').href = '/packages-before.txt?' + tq();
+    $('diag').href = '/api/diagnostics?' + tq();
+    $('photoList').innerHTML = s.wallpapers.map((w) => `<li><img src="/api/wall?${tq()}&name=${encodeURIComponent(w.name)}" alt=""><span>${h(w.name)}</span><button class="quiet" data-name="${h(w.name)}">Remove</button></li>`).join('');
   }
 
   $('go').onclick = async () => {
-    pin = $('pin').value.trim();
-    try { await refresh(); $('login').hidden = true; $('panels').hidden = false; }
+    try {
+      const form = new FormData();
+      form.append('pin', $('pin').value.trim());
+      const r = await fetch('/api/login', { method: 'POST', body: form });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'That code isn\'t right');
+      token = data.token;
+      $('pin').value = '';
+      await refresh(); $('login').hidden = true; $('panels').hidden = false; }
     catch (e) { say('loginStatus', e.message); }
   };
 
@@ -208,7 +220,7 @@
     const q = $('appFilter').value.trim().toLowerCase();
     $('appList').innerHTML = apps.filter((a) => !q || a.label.toLowerCase().includes(q)).map((a) => `
       <li class="${a.protected ? 'locked' : ''}">
-        <img src="/api/icon?pin=${encodeURIComponent(pin)}&pkg=${encodeURIComponent(a.pkg)}" alt="" loading="lazy">
+        <img src="/api/icon?${tq()}&pkg=${encodeURIComponent(a.pkg)}" alt="" loading="lazy">
         <div><b>${a.label.replace(/</g, '&lt;')}</b><small>${a.protected ? a.why : (a.enabled ? (a.system ? 'Came with the TV' : 'Installed by you') : 'Already switched off')}</small></div>
         ${a.protected ? '' : `<input type="checkbox" data-pkg="${a.pkg}" ${picked.has(a.pkg) ? 'checked' : ''} aria-label="Switch off ${a.label.replace(/"/g, '')}">`}
       </li>`).join('');

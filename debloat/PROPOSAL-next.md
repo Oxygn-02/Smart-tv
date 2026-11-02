@@ -4,6 +4,10 @@ Built from the package list you sent. Nothing here is in `launcher/data.js` or t
 Clean up list yet. Everything is `pm disable-user --user 0` only, so reversible.
 Tell me which groups to add.
 
+Order (from the improvement brief): Recommended group first and reboot; then one Careful package at a time,
+testing voice search after each; Google's home screen last, only after the safety-net drill in
+`RECOVERY.md` has passed. The launcher saves the full package list before its first change.
+
 ## A. Low risk (nothing on a TV uses them)
 | Package | Why | If wrong |
 |---|---|---|
@@ -17,7 +21,7 @@ Tell me which groups to add.
 | com.android.providers.userdictionary | Typing dictionary sync | keyboard learns no words |
 | com.android.wallpaperbackup, com.android.sharedstoragebackup, com.android.backupconfirm | Phone-style backup helpers | no backup/restore of the TV |
 
-## B. Freeview apps you did not list as used
+## B. Freeview apps you did not list as used (SKIPPED: small gain, may be tied to the guide)
 | Package | Label |
 |---|---|
 | uk.co.freeview.amc_catchup | WATCH FREE UK |
@@ -35,7 +39,7 @@ Tell me if you use any of these five.
 |---|---|
 | com.google.android.katniss (already listed) | Do you use the voice button? |
 | com.google.android.tts | Needed only for spoken menus/Assistant answers |
-| com.google.android.tungsten.setupwraith, com.mediatek.wwtv.setupwizard | First-run wizards. Safe after setup, but a factory reset would need them (re-enable first) |
+| com.google.android.tungsten.setupwraith, com.mediatek.wwtv.setupwizard | SKIPPED: first-run wizards may be needed after a factory reset |
 | com.mediatek.tvinput ("TIF Test") | A test input; probably safe, verify the Inputs row still works after |
 | com.android.documentsui ("Files") | Some apps' file pickers use it |
 | com.airoha.btd (RemoteOTA) | Updates the remote's firmware; leave unless the remote never needs updating |

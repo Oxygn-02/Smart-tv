@@ -17,10 +17,11 @@ import java.util.concurrent.Executors
  */
 class GoveeHub(context: Context, private val publish: (String) -> Unit) {
 
-    private val prefs = context.applicationContext.getSharedPreferences("govee", Context.MODE_PRIVATE)
     private val io = Executors.newSingleThreadExecutor()
     private val lan = GoveeLan(context)
-    private val cloud = GoveeCloud { prefs.getString("key", "").orEmpty() }
+    private val appContext = context.applicationContext
+    private fun savedKey() = SecretStore.migrate(appContext, "govee", "govee", "key")
+    private val cloud = GoveeCloud { savedKey() }
 
     @Volatile private var devices: List<GoveeDevice> = emptyList()
     @Volatile private var connected = false
@@ -28,11 +29,11 @@ class GoveeHub(context: Context, private val publish: (String) -> Unit) {
     private val isOn = ConcurrentHashMap<String, Boolean>()
     private val dreamOn = ConcurrentHashMap<String, Boolean>()
 
-    fun hasKey() = prefs.getString("key", "").orEmpty().isNotBlank()
+    fun hasKey() = savedKey().isNotBlank()
 
     /** Saves a new key (if given), then loads the account's devices. Returns at once. */
     fun connect(newKey: String?) {
-        if (!newKey.isNullOrBlank()) prefs.edit().putString("key", newKey.trim()).apply()
+        if (!newKey.isNullOrBlank()) SecretStore.put(appContext, "govee", newKey.trim())
         if (!hasKey()) {
             connected = false
             publish(status())
@@ -75,7 +76,7 @@ class GoveeHub(context: Context, private val publish: (String) -> Unit) {
     }
 
     fun forgetKey() {
-        prefs.edit().remove("key").apply()
+        SecretStore.put(appContext, "govee", "")
         devices = emptyList()
         connected = false
         error = ""

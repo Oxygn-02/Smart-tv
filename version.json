@@ -1,1 +1,7 @@
-{"versionCode": 27, "versionName": "0.17", "apk": "tv.apk"}
+{
+  "versionCode": 28,
+  "versionName": "0.18",
+  "apk": "tv.apk",
+  "sha256": "1723c603c82732580fd39d3756ccf1787ca703eaacbaa04b5f613666a6c1ee48",
+  "notes": "Safety and security update: stronger safety net, safe mode (hold Back), encrypted keys, checked updates, Diagnostics page."
+}

@@ -28,7 +28,9 @@
     tint: { source: 'room', hue: 200, warmth: 50, opacity: 60 },
     myScenes: [], // scenes you saved: {id, name, backlight, lights}
     edge: 'lights', // the glow round the screen: 'lights' (follows the backlight), 'custom' (your colour) or 'off'
-    trailers: true, // play a muted trailer behind a title's page
+    updateChannel: 'stable', // 'stable' or 'beta'
+    updateNotes: '',
+    trailers: false, // play a muted trailer (off until the speed test shows room for it) behind a title's page
     titleRows: [], // the search results, so a card can open its page
     edgeHue: 330,
     edgeInt: 60, // how strong the glow is, 10 to 100 (60 is the original strength)
@@ -75,7 +77,7 @@
 
   // ---------- Saved settings ----------
   // Remembered on the TV between launches (browser storage inside the app).
-  const SAVED = ['myScenes', 'edge', 'edgeHue', 'edgeInt', 'trailers', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
+  const SAVED = ['myScenes', 'edge', 'edgeHue', 'edgeInt', 'trailers', 'updateChannel', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
 
   function loadSaved() {
     try {
@@ -511,6 +513,10 @@
 
   // ---------- Continue watching (the TV's Watch Next list) ----------
   const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // Addresses from outside (TMDB, other apps) go into the page only if they are plain https
+  // addresses with nothing that could end an attribute or a CSS url().
+  const safeUrl = (u) => (typeof u === 'string' && /^https:\/\/[^\s"'()<>\\]+$/.test(u) ? u : '');
+  const tmdbImg = (size, path) => (typeof path === 'string' && /^\/[A-Za-z0-9_.-]+$/.test(path) ? `https://image.tmdb.org/t/p/${size}${path}` : '');
   const appByPkg = (pkg) => D.apps.find((a) => a.pkg === pkg);
 
   function leftText(pos, dur) {
@@ -521,7 +527,7 @@
 
   function cwShape(it) {
     const app = appByPkg(it.pkg);
-    const poster = /^https?:/.test(it.poster) ? `url("${it.poster}") center / cover no-repeat, ` : '';
+    const poster = safeUrl(it.poster) ? `url("${safeUrl(it.poster)}") center / cover no-repeat, ` : '';
     return {
       title: it.title,
       subtitle: it.sub,
@@ -571,11 +577,11 @@
 
   // Wide thumbnail: the landscape still when TMDB has one, else the poster.
   function artStyle(h) {
-    const base = 'https://image.tmdb.org/t/p/';
-    if (h.backdrop_path) return `background:url("${base}w780${h.backdrop_path}") center / cover`;
-    if (h.poster_path) return `background:url("${base}w342${h.poster_path}") center top / cover`;
+    if (tmdbImg('w780', h.backdrop_path)) return `background:url("${tmdbImg('w780', h.backdrop_path)}") center / cover`;
+    if (tmdbImg('w342', h.poster_path)) return `background:url("${tmdbImg('w342', h.poster_path)}") center top / cover`;
     return 'background:linear-gradient(135deg,#2a2a38,#14141c)';
   }
+
 
   // ---------- For you ----------
   // Two sources, woven into one row: what your apps recommend on the TV's home
@@ -587,7 +593,7 @@
     if (!NATIVE) return;
     let items = [];
     const mine = nativeJson('recommendations') || { items: [] };
-    const fromApps = (mine.items || []).filter((i) => /^https?:/.test(i.art) && appByPkg(i.pkg)).slice(0, 8).map((i) => {
+    const fromApps = (mine.items || []).filter((i) => safeUrl(i.art) && appByPkg(i.pkg)).slice(0, 8).map((i) => {
       const app = appByPkg(i.pkg);
       return { title: i.title, line: `Open ${app.name}`, art: `background:url("${i.art}") center / cover`, appId: app.id, uri: i.uri, pkg: i.pkg };
     });
@@ -709,7 +715,7 @@
     if (!el) return;
     titleRowsNow = rows;
     el.innerHTML = rows.length ? rows.map((r, i) => {
-      const icon36 = r.app ? appIcon(r.app, 40) : r.logo ? `<img class="t-logo" src="https://image.tmdb.org/t/p/w92${r.logo}" alt="">` : `<span class="t-logo t-letter">${esc(r.name.slice(0, 1))}</span>`;
+      const icon36 = r.app ? appIcon(r.app, 40) : tmdbImg('w92', r.logo) ? `<img class="t-logo" src="${tmdbImg('w92', r.logo)}" alt="">` : `<span class="t-logo t-letter">${esc(r.name.slice(0, 1))}</span>`;
       const act = r.app ? 'Open' : r.pkg ? 'Install' : 'Not on this TV';
       return `<button class="t-row" data-focus data-action="title-go" data-i="${i}" ${r.app || r.pkg ? '' : 'disabled'}>
         ${icon36}<span class="t-row-name">${esc(r.name)}<span class="small">${esc(r.line)}</span></span><span class="t-row-act">${act}</span></button>`;
@@ -723,7 +729,7 @@
 
   function startTrailer(key, seq) {
     const box = refs.xpanel.querySelector('[data-t-trailer]');
-    if (!key || !box || !state.trailers || seq !== titleSeq) return;
+    if (!/^[A-Za-z0-9_-]{6,20}$/.test(key || '') || !box || !state.trailers || seq !== titleSeq) return;
     const f = document.createElement('iframe');
     f.setAttribute('allow', 'autoplay; encrypted-media');
     f.setAttribute('tabindex', '-1');
@@ -746,14 +752,14 @@
     const seq = ++titleSeq;
     xFrom = document.activeElement;
     const type = h.media_type === 'tv' ? 'tv' : 'movie';
-    const art = h.backdrop_path ? `https://image.tmdb.org/t/p/w1280${h.backdrop_path}` : '';
+    const art = tmdbImg('w1280', h.backdrop_path);
     refs.xpanel.className = 'xpanel xwide';
     refs.xpanel.innerHTML = `
       <div class="t-bg" data-t-trailer><div class="t-still" style="${art ? `background-image:url('${art}')` : ''}"></div></div>
       <div class="t-body">
         <button class="btn lg x-close t-close" data-focus data-action="x-close">Close</button>
         <div class="t-top">
-          ${h.poster_path ? `<img class="t-poster" src="https://image.tmdb.org/t/p/w342${h.poster_path}" alt="">` : ''}
+          ${tmdbImg('w342', h.poster_path) ? `<img class="t-poster" src="${tmdbImg('w342', h.poster_path)}" alt="">` : ''}
           <div class="t-info"><div data-t-head>${titleHead(h, null)}</div>
             <p class="t-over" data-t-over>${esc(h.overview || '')}</p></div>
         </div>
@@ -765,7 +771,7 @@
     refs.xpanel.querySelector('[data-focus]')?.focus();
 
     try {
-      const priceKey = nativeCall('pricesKey') || '';
+      const priceKey = nativeCall('pricesReady') === true;
       const [d, p] = await Promise.all([
         tmdb(`${type}/${h.id}`, { append_to_response: 'videos', include_video_language: 'en,null', language: 'en-GB' }).catch(() => null),
         tmdb(`${type}/${h.id}/watch/providers`).catch(() => ({})),
@@ -781,10 +787,10 @@
       if (!refs.xpanel.contains(document.activeElement) || document.activeElement.classList.contains('t-close')) refs.xpanel.querySelector('.t-row:not([disabled])')?.focus();
       if (priceKey) {
         try {
-          const find = await getJson(`https://api.watchmode.com/v1/search/?apiKey=${encodeURIComponent(priceKey)}&search_field=${type === 'tv' ? 'tmdb_tv_id' : 'tmdb_movie_id'}&search_value=${h.id}`);
+          const find = await nativeFetch('pricesFetch', 'search/', { search_field: type === 'tv' ? 'tmdb_tv_id' : 'tmdb_movie_id', search_value: String(h.id) });
           const wid = (find.title_results || [])[0]?.id;
           if (wid) {
-            const src = await getJson(`https://api.watchmode.com/v1/title/${wid}/sources/?apiKey=${encodeURIComponent(priceKey)}&regions=GB`);
+            const src = await nativeFetch('pricesFetch', `title/${Number(wid)}/sources/`, { regions: 'GB' });
             if (seq !== titleSeq) return;
             const focusedAt = document.activeElement?.dataset?.i;
             renderTitleRows(providerRows(g, (src || []).map((s) => ({ name: s.name, type: s.type === 'sub' ? 'sub' : s.type, price: s.price }))));
@@ -806,16 +812,26 @@
   // Titles come from TMDB, and which services carry them from its watch
   // provider data (supplied by JustWatch). Only services you have installed
   // are offered. TMDB gives no prices.
-  let tmdbKey = '';
-  const tmdbReady = () => NATIVE && !!tmdbKey;
+  // The keys stay on the Android side: it makes these calls and sends the answer back as a "net" event.
+  let tmdbOn = false;
+  const tmdbReady = () => NATIVE && tmdbOn;
+  const netWaiting = new Map();
+  let netSeq = 0;
 
-  function tmdb(path, params = {}) {
-    const url = new URL(`https://api.themoviedb.org/3/${path}`);
-    const bearer = tmdbKey.length > 40;
-    if (!bearer) url.searchParams.set('api_key', tmdbKey);
-    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-    return getJson(url.toString(), bearer ? { Authorization: `Bearer ${tmdbKey}` } : undefined);
+  function nativeFetch(method, path, params = {}) {
+    return new Promise((resolve, reject) => {
+      const id = ++netSeq;
+      const timer = setTimeout(() => { netWaiting.delete(id); reject(new Error('timeout')); }, 15000);
+      netWaiting.set(id, (r) => {
+        clearTimeout(timer);
+        if (!r.ok) return reject(new Error(`status ${r.status}`));
+        try { resolve(JSON.parse(r.body)); } catch (e) { reject(e); }
+      });
+      nativeCall(method, id, path, JSON.stringify(params));
+    });
   }
+
+  const tmdb = (path, params = {}) => nativeFetch('tmdbFetch', path, params);
 
   const normName = (t) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
   const ALIAS = { amazonvideo: 'primevideo', amazonprimevideo: 'primevideo', amazonprimevideowithads: 'primevideo' };
@@ -949,6 +965,31 @@
       </section>`;
   }
 
+  // ---------- Diagnostics ----------
+  // What the TV says about the launcher: memory, storage, versions, why it last
+  // closed, and the safety net's log. No keys, passwords or searches.
+  function diagView() {
+    return `
+      <section class="view view-diag" data-view="diag" hidden>
+        <section class="card glass cleanup" data-diag-list aria-label="Diagnostics"></section>
+      </section>`;
+  }
+
+  function renderDiag() {
+    const list = stage.querySelector('[data-diag-list]');
+    const d = nativeJson('diagnostics') || {};
+    const row = (label, value) => `<div class="set-row diag-row" data-focus tabindex="0"><span class="set-label">${esc(label)}</span><span class="set-val">${esc(value)}</span></div>`;
+    const lines = (title, items) => `<div class="set-head deep-head">${esc(title)}</div>` + (items && items.length
+      ? items.map((t) => `<div class="set-row diag-row" data-focus tabindex="0"><span class="set-label small">${esc(t)}</span></div>`).join('')
+      : '<p class="small cleanup-note">Nothing recorded.</p>');
+    list.innerHTML = '<p class="small cleanup-note">A copy can be downloaded from the phone setup page (Backup, diagnostics report).</p>'
+      + row('Launcher', d.app || '?') + row('Firmware', d.firmware || '?') + row('Android', d.android || '?')
+      + row('WebView', d.webview || '?') + row('Free memory', d.memory || '?') + row('Free storage', d.storage || '?')
+      + row('On for', d.uptime || '?') + row('Debug connection', d.adb || '?') + row('Now playing access', d.listener ? 'Allowed' : 'Not allowed')
+      + row('Apps switched off by the launcher', String(d.switchedOff ?? '?'))
+      + lines('Why the launcher last closed', d.exits) + lines('Safety net', d.events);
+  }
+
   function renderMyScenes() {
     const list = stage.querySelector('[data-scenes-list]');
     list.innerHTML = state.myScenes.length ? '<p class="small cleanup-note">Press OK on a scene to delete it.</p>' + state.myScenes.map((sc) => `
@@ -1005,17 +1046,19 @@
   const UPDATE_BASE = 'https://raw.githubusercontent.com/Oxygn-02/Smart-tv/main/';
   async function checkUpdate(quiet = false) {
     if (state.updateFound && !quiet) {
-      nativeCall('installUpdate', `${UPDATE_BASE}${state.updateFound.apk || 'tv.apk'}?t=${Date.now()}`);
+      nativeCall('installUpdate', state.updateChannel); // Android checks the checksum, version and signature
       return;
     }
     if (!quiet) { state.update = 'Checking...'; applyState(); }
     try {
       const mine = nativeJson('appVersion') || { code: 0, name: '' };
-      const r = await getJson(`${UPDATE_BASE}version.json?t=${Date.now()}`);
+      const r = await getJson(`${UPDATE_BASE}${state.updateChannel === 'beta' ? 'version-beta.json' : 'version.json'}?t=${Date.now()}`);
       if (r.versionCode > mine.code) {
         state.updateFound = r;
+        const notes = typeof r.notes === 'string' ? r.notes.slice(0, 140) : '';
         state.update = `Update to ${r.versionName}. Press OK`;
-        if (quiet) toast(`Update available: ${r.versionName}`);
+        state.updateNotes = notes;
+        toast(`Update available: ${r.versionName}${notes ? `. ${notes}` : ''}`);
       } else {
         state.updateFound = null;
         state.update = `Up to date (${mine.name})`;
@@ -1311,6 +1354,8 @@
         NATIVE ? row('keep-front', icon('music'), 'Keep this screen in front', 'Come back when music starts in another app, and let it play on', 'keep') : '',
         NATIVE ? row('grant-np', icon('music'), 'Now playing access', 'Show what is playing', 'np-access') : '',
         NATIVE ? row('update-check', icon('wifi'), 'Updates', 'Check for a newer launcher', 'update') : '',
+        NATIVE ? row('update-channel', icon('sync'), 'Update channel', 'Beta gets new versions before Stable', 'channel') : '',
+        NATIVE ? row('open-diag', icon('live'), 'Diagnostics', 'Memory, storage, crashes and safety-net events', 'diag') : '',
         NATIVE ? row('wn-check', icon('live'), 'Continue watching check', 'What the TV shares from your apps', 'wn') : '',
       ] },
       { id: 'lights', icon: icon('lamp'), title: 'Lights', help: 'Govee account, light roles', rows: [
@@ -1465,11 +1510,23 @@
       + group('google', 'Google\'s home screen', 'Where the ads come from. Switch off only once this launcher is working as your home screen.');
   }
 
+  // A firmware update can switch apps back on. Only apps this launcher switched off are offered.
+  function reapplyRow(ready) {
+    const fw = NATIVE ? nativeJson('firmwareCheck') || {} : {};
+    const n = (fw.reenabled || []).length;
+    if (!n) return '';
+    return `<button class="set-row" data-focus data-action="adb-reapply" ${ready ? '' : 'disabled'}>
+        <span class="lg chip set-chip">${icon('power')}</span>
+        <span class="set-label">${fw.changed ? 'A TV update' : 'Something'} switched ${n} app${n === 1 ? '' : 's'} back on<span class="small">${ready ? esc(fw.reenabled.map((x) => x.label).slice(0, 4).join(', ')) : 'Connect to the TV first'}</span></span>
+        <span class="set-val">Switch off again</span>
+      </button>`;
+  }
+
   function renderCleanup() {
     const list = stage.querySelector('[data-cleanup-list]');
     const items = cleanupItems();
     if (!items.length) {
-      list.innerHTML = adbRow() + ((NATIVE && ['ready', 'done'].includes((state.adb || {}).state)) ? homeRows() : '') + `
+      list.innerHTML = adbRow() + reapplyRow(['ready', 'done'].includes((state.adb || {}).state)) + ((NATIVE && ['ready', 'done'].includes((state.adb || {}).state)) ? homeRows() : '') + `
         <div class="cleanup-empty">
           <span class="w-empty-title">No apps chosen</span>
           <span class="small">Open Set up from your phone, go to Apps to switch off, tick the apps you don't want and send them over. They are listed here, and you switch them off from this screen.</span>
@@ -1492,7 +1549,7 @@
         <span class="set-label">Switch back on what I switched off<span class="small">${a.ours} app${a.ours === 1 ? '' : 's'}</span></span>
         <span class="set-val">Press OK</span>
       </button>` : ''}` : '';
-    list.innerHTML = adbRow() + home + actions + '<p class="small cleanup-note">Press OK on an app to open its page. Disable switches it off; Enable brings it back, so nothing here is permanent.</p>' + items.map((c) => {
+    list.innerHTML = adbRow() + reapplyRow(ready) + home + actions + '<p class="small cleanup-note">Press OK on an app to open its page. Disable switches it off; Enable brings it back, so nothing here is permanent.</p>' + items.map((c) => {
       const st = states.find((x) => x.pkg === c.pkg);
       const value = !NATIVE ? 'On the TV' : !st || !st.installed ? 'Not on this TV' : st.enabled ? 'On' : 'Off';
       return `
@@ -1903,8 +1960,8 @@
   // Messages from the Android side: the phone page was used, Govee answered.
   window.onNative = (name, data) => {
     if (name === 'setup') {
-      tmdbKey = nativeCall('tmdbKey') || '';
-      if (tmdbKey && !state.forYou.length) loadForYou();
+      tmdbOn = nativeCall('tmdbReady') === true;
+      if (tmdbOn && !state.forYou.length) loadForYou();
       refreshWallpapers();
       if (state.view === 'wallpapers') renderWallpapers();
       if (data?.town !== undefined) {
@@ -1915,6 +1972,11 @@
       }
     }
     if (name === 'govee') applyGovee(data);
+    if (name === 'net') {
+      const done = netWaiting.get(data.id);
+      if (done) { netWaiting.delete(data.id); done(data); }
+      return;
+    }
     if (name === 'restore') {
       try { localStorage.setItem('settings', JSON.stringify(data)); } catch { /* not saved */ }
       location.reload();
@@ -1939,7 +2001,9 @@
     applyState();
   };
 
+  let launchedFrom = null; // Back from an app lands on the tile that opened it
   function launchApp(id) {
+    launchedFrom = document.activeElement;
     const a = APP[id];
     if (!a) {
       toast('That app isn\'t installed');
@@ -2187,7 +2251,7 @@
       </header>
 
       <div class="views">
-        ${homeView()}${searchView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}${wallpapersView()}${cleanupView()}${rolesView()}${guestView()}${deepView()}${scenesView()}
+        ${homeView()}${searchView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}${wallpapersView()}${cleanupView()}${rolesView()}${guestView()}${deepView()}${scenesView()}${diagView()}
       </div>
 
       ${overlay()}
@@ -2298,6 +2362,8 @@
       motion: state.motion === 'fast' ? 'Fast' : 'Smooth',
       wn: state.wnCheck || 'Press OK',
       update: state.update || 'Press OK',
+      channel: state.updateChannel === 'beta' ? 'Beta' : 'Stable',
+      diag: 'Open',
       speed: state.speed || 'Press OK',
       guest: NATIVE ? (guestInfo().ssid || 'Add from your phone') : 'Sample',
       spread: state.spread ? 'On' : 'Off',
@@ -2672,6 +2738,7 @@
     if (id === 'roles') renderRoles();
     if (id === 'deepclean') renderDeep();
     if (id === 'myscenes') renderMyScenes();
+    if (id === 'diag') renderDiag();
     if (id === 'guest') renderGuest();
     animateView(id);
     moveTabGlow();
@@ -2789,6 +2856,8 @@
     else if (b.dataset.track) setTrack(Number(b.dataset.track));
     else if (b.dataset.toast) toast(b.dataset.toast);
     else if (act === 'input') { if (!nativeCall('switchInput', b.dataset.id)) toast("Couldn't switch to that input"); }
+    else if (act === 'update-channel') { state.updateChannel = state.updateChannel === 'beta' ? 'stable' : 'beta'; state.updateFound = null; state.update = ''; saveSoon(); checkUpdate(true); }
+    else if (act === 'open-diag') openView('diag');
     else if (act === 'keep-front') { const m = ((Number(nativeCall('keepMode')) || 0) + 1) % 3; nativeCall('setKeepMode', m); toast(['Off', 'On for songs cast to the TV. Music you start in YouTube Music stays put', 'On for cast songs and for music you start in YouTube Music'][m]); }
     else if (act === 'title') openTitle(state.titleRows[Number(b.dataset.i)]);
     else if (act === 'title-go') goTitleRow(titleRowsNow[Number(b.dataset.i)]);
@@ -2841,6 +2910,8 @@
         state.adbConfirm = false;
         nativeCall('adbDisable');
       }
+    } else if (act === 'adb-reapply') {
+      nativeCall('adbReapply');
     } else if (act === 'adb-restore') {
       nativeCall('adbRestore');
     } else if (act === 'scene-save') {
@@ -3180,7 +3251,7 @@
       stage.querySelector(`[data-action="settings-cat"][data-cat="${was}"]`)?.focus();
     } else if (state.view === 'deepclean') {
       openView('cleanup');
-    } else if (state.view === 'myscenes') {
+    } else if (state.view === 'myscenes' || state.view === 'diag') {
       openView('settings');
     } else if (state.view === 'roles') {
       openView(state.rolesFrom || 'room');
@@ -3418,6 +3489,10 @@
     applyState();
   }
 
+  // The native heartbeat asks this whenever the launcher comes back to the front:
+  // "ok" only if the page is drawn (see MainActivity.heartbeat).
+  window.launcherAlive = () => (stage.querySelector('.topbar') && stage.getBoundingClientRect().width > 0 ? 'ok' : 'blank');
+
   window.launcherResume = () => {
     if (!NATIVE) return;
     lastInput = Date.now();
@@ -3425,13 +3500,15 @@
     readBacklight();
     leaveGaming();
     renderContinue();
-    tmdbKey = nativeCall('tmdbKey') || '';
+    tmdbOn = nativeCall('tmdbReady') === true;
     if (!state.forYou.length) loadForYou();
     pollNowPlaying();
     refreshNativeStatus();
     if (state.view === 'cleanup') renderCleanup(); // back from the TV's Settings
     if (Date.now() - weatherAt > 15 * 60 * 1000 || state.locationPending) loadWeather();
     applyState();
+    if (launchedFrom && launchedFrom.isConnected && visible(launchedFrom) && refs.x.hidden) launchedFrom.focus();
+    launchedFrom = null;
   };
 
   // Things Android can change while we're in another app (a permission, the
@@ -3473,7 +3550,7 @@
   if (NATIVE) {
     try {
       syncVolume();
-      tmdbKey = nativeCall('tmdbKey') || '';
+      tmdbOn = nativeCall('tmdbReady') === true;
       setTimeout(loadForYou, 1500);
       renderInputs();
       nativeCall('launcherReady'); // tells the start-up watchdog the page is working
@@ -3483,6 +3560,10 @@
         nativeCall('clearRescued');
       }
       setTimeout(() => checkUpdate(true), 8000);
+      setTimeout(() => {
+        const fw = nativeJson('firmwareCheck') || {};
+        if (fw.changed && (fw.reenabled || []).length) toast(`A TV update switched ${fw.reenabled.length} app${fw.reenabled.length === 1 ? '' : 's'} back on. Settings, Clean up apps to switch them off again`);
+      }, 12000);
       setInterval(() => { if (!document.hidden) checkUpdate(true); }, 6 * 3600 * 1000);
       renderContinue();
       pollNowPlaying();

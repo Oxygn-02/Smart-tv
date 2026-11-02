@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Only bundled scripts run. The page talks to the weather services and this
+     repository (update check); TMDB and Watchmode go through the Android side. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://api.bigdatacloud.net https://get.geojs.io https://raw.githubusercontent.com; frame-src https://www.youtube-nocookie.com; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TV Launcher</title>
 <link rel="stylesheet" href="styles.css">

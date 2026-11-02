@@ -20,6 +20,13 @@ object HomeGuard {
 
     private val component = Regex("^[A-Za-z0-9_.]+/[A-Za-z0-9_.$]+$")
 
+    /** Records the last safety-net event (shown on the Diagnostics page). Keeps the last 8. */
+    fun note(prefs: android.content.SharedPreferences, what: String) {
+        val line = "${java.text.SimpleDateFormat("d MMM HH:mm", java.util.Locale.UK).format(java.util.Date())}  $what"
+        val old = prefs.getString("events", "").orEmpty().split('\n').filter { it.isNotBlank() }
+        prefs.edit().putString("events", (listOf(line) + old).take(8).joinToString("\n")).apply()
+    }
+
     /** True when the last starts all failed, so it is time to give the home screen back. */
     fun shouldRescue(startFails: Int) = startFails >= MAX_FAILS
 

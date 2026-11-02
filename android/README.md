@@ -33,14 +33,29 @@ The UI is copied into the app on every build (`copyWebUi` in `app/build.gradle.k
 
 ## Build
 
-Needs Android Studio (or JDK 17 and the Android SDK; set `sdk.dir` in `local.properties`). From this folder:
+Releases are signed with the launcher's own key, which is **not** in the repo.
+Put it next to the project and point `android/keystore.properties` (git-ignored) at it:
 
-```sh
-./gradlew assembleDebug
-# APK: app/build/outputs/apk/debug/app-debug.apk
+```
+storeFile=/path/to/smart-tv-signing.keystore
+storePassword=android
+keyAlias=androiddebugkey
+keyPassword=android
 ```
 
-Or open `android/` in Android Studio and run it on an Android TV emulator (Google TV image) first.
+Then:
+
+```sh
+cd android
+./gradlew testDebugUnitTest assembleRelease
+cp app/build/outputs/apk/release/app-release.apk ../tv.apk
+sha256sum ../tv.apk     # goes into version.json as "sha256"
+```
+
+`version.json` must have the new `versionCode`, `versionName`, `sha256` and a short
+`notes` line, or the TV refuses the update. Losing the signing key means no
+update can install over the app on the TV again (it would need uninstalling),
+so keep a copy somewhere private.
 
 ## Install without a computer
 
