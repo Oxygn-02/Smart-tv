@@ -5461,3 +5461,38 @@ button.w-empty {
   white-space: nowrap;
   font-size: 14px;
 }
+
+/* Team logos sit in a light glass circle; the team's colour and initials
+   show only when there is no logo. */
+.sp-logo {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--tc);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 4px 10px -4px rgba(0, 0, 0, 0.45);
+}
+
+.sp-logo.has-img {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(232, 234, 240, 0.9));
+}
+
+.sp-initials {
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sp-logo.has-img .sp-initials {
+  visibility: hidden;
+}
+
+.sp-img {
+  position: absolute;
+  inset: 14%;
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+}

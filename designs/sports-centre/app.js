@@ -924,10 +924,10 @@
   const watchInfo = () => NBA_WATCH.find((w) => w.id === state.nbaWatch) || NBA_WATCH[0];
   const watchApp = () => D.apps.find((a) => watchInfo().app.test(a.name));
 
+  // A team's logo in a light glass circle. Under it sit the team's colour and
+  // initials, which show if the logo can't load (see the error listener below).
   function teamBadge(t, size = 44) {
-    return t.logo
-      ? `<img class="sp-logo" src="${t.logo}" alt="" width="${size}" height="${size}">`
-      : `<span class="sp-logo sp-mono" style="--tc:${t.color};width:${size}px;height:${size}px">${esc(t.abbr)}</span>`;
+    return `<span class="sp-logo" style="--tc:${t.color};width:${size}px;height:${size}px;font-size:${Math.max(9, Math.round(size * 0.27))}px"><span class="sp-initials">${esc(t.abbr)}</span>${t.logo ? `<img class="sp-img" src="${t.logo}" alt="" loading="lazy">` : ''}</span>`;
   }
 
   function statusText(g) {
@@ -2918,6 +2918,9 @@
     };
 
     stage.addEventListener('scroll', (e) => edgeFade(e.target), { capture: true, passive: true });
+    // A team logo that can't load is removed, leaving the team's colour and initials.
+    stage.addEventListener('error', (e) => { if (e.target.classList && e.target.classList.contains('sp-img')) { e.target.parentElement?.classList.remove('has-img'); e.target.remove(); } }, true);
+    stage.addEventListener('load', (e) => { if (e.target.classList && e.target.classList.contains('sp-img')) e.target.parentElement?.classList.add('has-img'); }, true);
     refs.townInput.value = state.town;
     showPhoto();
     applyState();

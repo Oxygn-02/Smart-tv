@@ -138,7 +138,8 @@
     ['SAC', 'Sacramento Kings', 'Kings', '5a2d81', 'W'], ['SA', 'San Antonio Spurs', 'Spurs', 'c4ced4', 'W'], ['UTAH', 'Utah Jazz', 'Jazz', '002b5c', 'W'],
   ].map(([abbr, name, short, color, conf], i) => ({ id: String(i + 1), abbr, name, short, color, conf }));
   const teamBy = (abbr) => TEAMS.find((t) => t.abbr === abbr);
-  const logo = (t) => enc(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><circle cx="48" cy="48" r="46" fill="#${t.color}"/><circle cx="48" cy="48" r="46" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="3"/><text x="48" y="57" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="${t.abbr.length > 3 ? 22 : 28}" font-weight="800" fill="#fff">${t.abbr}</text></svg>`);
+  // ESPN's own logo images, as its feed gives them on the TV
+  const logo = (t) => `https://a.espncdn.com/i/teamlogos/nba/500/${t.abbr.toLowerCase()}.png`;
   const espnTeam = (t) => ({ id: t.id, abbreviation: t.abbr, displayName: t.name, shortDisplayName: t.short, color: t.color, logo: logo(t) });
   const record = (t) => { const w = 3 + (hash(t.abbr) % 9); return `${w}-${10 - w}`; };
 
