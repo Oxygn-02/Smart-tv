@@ -1,7 +1,7 @@
 {
-  "versionCode": 29,
-  "versionName": "0.19",
+  "versionCode": 30,
+  "versionName": "0.20",
   "apk": "tv.apk",
-  "sha256": "7569ba78cf8055deeab4072a72e7ff13c88d1340938e9e80e31f3d18d560ce16",
-  "notes": "Search and For you pictures now show, and scrolling pages fade and blur at the edges instead of cutting off."
+  "sha256": "64525399911ca7daeb36321b3d06f83fb1f16c605852ab8e089a206f98bf27fc",
+  "notes": "New look: focus lifts like Apple TV, a welcome on first start, Settings in plain words, and developer options hidden (press the Settings icon 3 times)."
 }

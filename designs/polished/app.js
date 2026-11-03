@@ -1359,6 +1359,7 @@
         row('cycle-ambient', icon('moon'), 'Screensaver', 'Photos and the clock when nothing is happening', 'ambient'),
         row('cycle-clock', icon('timer'), 'Clock', '12-hour or 24-hour', 'clock'),
         row('screen-fit', icon('live'), 'Fit to screen', 'If the edges are cut off', 'fit'),
+        row('cycle-motion', icon('live'), 'Animations', 'Fast turns them off, for a slow TV', 'motion'),
         NATIVE ? '' : row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to see empty widgets', 'sample'),
       ] },
       { id: 'home', icon: icon('home'), title: 'Apps', help: 'Home button, apps you don\'t use, music, updates', rows: [
@@ -1390,7 +1391,6 @@
         NATIVE ? row('update-channel', icon('sync'), 'Update channel', 'Beta gets new versions before Stable', 'channel') : '',
         NATIVE ? row('wn-check', icon('live'), 'Continue watching check', 'What the TV shares from your apps', 'wn') : '',
         row('speed-test', icon('timer'), 'Speed test', 'Moves around by itself for about 20 seconds. Hands off', 'speed'),
-        row('cycle-motion', icon('live'), 'Animations', 'Fast turns them off, for a slow TV', 'motion'),
         row('show-welcome', icon('home'), 'Show the welcome again', 'The first-run screen', 'welcome'),
         row('hide-dev', icon('power'), 'Hide developer options', 'Press the Settings icon 3 times to show them again', 'hidedev'),
       ] },
@@ -3311,7 +3311,7 @@
 
   function goBack() {
     if (!refs.x.hidden) {
-      closeExpand();
+      if (refs.xpanel.classList.contains('xwelcome')) closeWelcome(); else closeExpand();
     } else if (!refs.setup.hidden) {
       closeSetup();
     } else if (!refs.fit.hidden) {

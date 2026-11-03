@@ -50,7 +50,7 @@ Do it with a computer and adb ready, ideally on an Android TV / Google TV emulat
 in Android Studio first.
 
 1. Install the launcher beside Google's home and make it the home screen.
-2. Settings > Clean up the TV > **Test the safety net**. It must say Ready.
+2. Show Developer options (press OK on the Settings icon three times quickly), then Settings > Developer options > Debug connection and clean-up > Connect to the TV > Clean up the TV > **Test the safety net**. It must say Ready.
 3. **Crash test:** `adb shell am crash io.github.oxygn02.smarttv` then press Home,
    three times. Google's home screen must come back on its own.
 4. **Blank-page test:** `adb shell am force-stop com.google.android.webview` while the

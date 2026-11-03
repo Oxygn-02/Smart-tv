@@ -12,7 +12,7 @@
 
   const state = {
     forYou: [], // recommendations for the Search tab
-    appearance: 'auto', // 'auto' (follow the TV/host) | 'light' | 'dark'
+    appearance: 'dark', // 'auto' (follow the TV/host) | 'light' | 'dark'
     theme: initialTheme(), // resolved 'dark' | 'light'
     iconStyle: 'default', // 'default' | 'dark' | 'clear' | 'tinted'
     sampleData: true, // off = preview the empty states real data may need
@@ -30,10 +30,12 @@
     edge: 'lights', // the glow round the screen: 'lights' (follows the backlight), 'custom' (your colour) or 'off'
     updateChannel: 'stable', // 'stable' or 'beta'
     updateNotes: '',
+    dev: false, // developer options shown in Settings (press the Settings icon 3 times)
+    welcomed: false, // the first-run welcome has been seen
     trailers: false, // play a muted trailer (off until the speed test shows room for it) behind a title's page
     titleRows: [], // the search results, so a card can open its page
     edgeHue: 330,
-    edgeInt: 60, // how strong the glow is, 10 to 100 (60 is the original strength)
+    edgeInt: 42, // how strong the glow is, 10 to 100 (60 is the original strength)
     view: 'home',
     playing: true,
     track: 0,
@@ -77,7 +79,7 @@
 
   // ---------- Saved settings ----------
   // Remembered on the TV between launches (browser storage inside the app).
-  const SAVED = ['myScenes', 'edge', 'edgeHue', 'edgeInt', 'trailers', 'updateChannel', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
+  const SAVED = ['myScenes', 'edge', 'edgeHue', 'edgeInt', 'trailers', 'updateChannel', 'dev', 'welcomed', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
 
   function loadSaved() {
     try {
@@ -636,8 +638,11 @@
     const head = stage.querySelector('[data-fy-head]');
     if (!el) return;
     const show = !state.query.trim() && state.forYou.length;
-    head.hidden = !show;
-    el.hidden = !show;
+    const why = !state.query.trim() && !state.forYou.length && NATIVE ? (tmdbReady() ? '' : 'Add a TMDB key on the phone setup page to see films and series here.') : '';
+    head.hidden = !show && !why;
+    el.hidden = !show && !why;
+    el.classList.toggle('shows-note', !!why);
+    if (why) { el.innerHTML = `<p class="small fy-why">${why}</p>`; return; }
     el.innerHTML = show ? state.forYou.slice(0, 5).map((it, i) => {
       const app = it.appId ? APP[it.appId] : null;
       return `
@@ -767,7 +772,7 @@
           <div class="t-info"><div data-t-head>${titleHead(h, null)}</div>
             <p class="t-over" data-t-over>${esc(h.overview || '')}</p></div>
         </div>
-        <div class="t-where"><div class="eyebrow">Where to watch</div><div class="t-rows" data-t-rows><p class="small">Finding where to watch...</p></div></div>
+        <div class="t-where"><div class="eyebrow">Where to watch</div><div class="t-rows" data-t-rows><div class="t-row skeleton"></div><div class="t-row skeleton"></div></div></div>
       </div>`;
     refs.x.hidden = false;
     refs.x.classList.remove('closing');
@@ -894,7 +899,10 @@
     }
     tmdbTimer = setTimeout(async () => {
       const seq = ++tmdbSeq;
-      note.textContent = 'Searching...';
+      note.textContent = '';
+      const tl = stage.querySelector('[data-shows="titles"]');
+      stage.querySelector('[data-titles-head]').hidden = false;
+      tl.innerHTML = Array.from({ length: 5 }, () => '<div class="show skeleton" aria-hidden="true"><div class="show-art"></div><div class="sk-line"></div><div class="sk-line short"></div></div>').join('');
       try {
         const r = await tmdb('search/multi', { query: q, include_adult: 'false', language: 'en-GB' });
         const words = q.toLowerCase().normalize('NFKD').replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(Boolean);
@@ -1344,42 +1352,47 @@
       </label>`;
     // Settings are grouped: a short list of categories, each opening its own rows.
     const cats = [
-      { id: 'display', icon: icon('image'), title: 'Display', help: 'Appearance, wallpaper, screen size, ambient screen', rows: [
-        row('theme', '<span data-theme-icon></span>', 'Appearance', 'Light, dark, or follow the TV', 'theme'),
-        row('wallpaper', icon('image'), 'Wallpaper', 'Photo, gradient, or your light colours', 'wallpaper'),
-        row('open-wallpapers', icon('image'), 'Wallpaper photos', 'Choose one, or add your own', 'wp'),
-        row('screen-fit', icon('live'), 'Screen size', 'Resize if the edges are cropped', 'fit'),
-        row('cycle-ambient', icon('moon'), 'Ambient screen', 'Photos and clock when idle', 'ambient'),
+      { id: 'display', icon: icon('image'), title: 'Appearance', help: 'Light or dark, wallpaper, clock, screen size', rows: [
+        row('theme', '<span data-theme-icon></span>', 'Light or dark', 'Auto follows the TV', 'theme'),
+        row('wallpaper', icon('image'), 'Wallpaper', 'A photo, a gradient, or your light colours', 'wallpaper'),
+        row('open-wallpapers', icon('image'), 'Wallpaper photos', 'Choose one, or add your own from your phone', 'wp'),
+        row('cycle-ambient', icon('moon'), 'Screensaver', 'Photos and the clock when nothing is happening', 'ambient'),
         row('cycle-clock', icon('timer'), 'Clock', '12-hour or 24-hour', 'clock'),
+        row('screen-fit', icon('live'), 'Fit to screen', 'If the edges are cut off', 'fit'),
         row('cycle-motion', icon('live'), 'Animations', 'Fast turns them off, for a slow TV', 'motion'),
-        row('speed-test', icon('timer'), 'Speed test', 'Moves around by itself for about 20 seconds. Hands off', 'speed'),
         NATIVE ? '' : row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to see empty widgets', 'sample'),
       ] },
-      { id: 'home', icon: icon('home'), title: 'Home and apps', help: 'Home button, clean up apps', rows: [
-        row('home-role', icon('home'), 'Home button', 'Which app opens on Home', 'home'),
-        row('open-cleanup', icon('power'), 'Clean up apps', 'Switch off apps you don\'t want', 'cleanup'),
-        NATIVE ? row('keep-front', icon('music'), 'Keep this screen in front', 'Come back when music starts in another app, and let it play on', 'keep') : '',
-        NATIVE ? row('grant-np', icon('music'), 'Now playing access', 'Show what is playing', 'np-access') : '',
-        NATIVE ? row('update-check', icon('wifi'), 'Updates', 'Check for a newer launcher', 'update') : '',
-        NATIVE ? row('update-channel', icon('sync'), 'Update channel', 'Beta gets new versions before Stable', 'channel') : '',
-        NATIVE ? row('open-diag', icon('live'), 'Diagnostics', 'Memory, storage, crashes and safety-net events', 'diag') : '',
-        NATIVE ? row('wn-check', icon('live'), 'Continue watching check', 'What the TV shares from your apps', 'wn') : '',
+      { id: 'home', icon: icon('home'), title: 'Apps', help: 'Home button, apps you don\'t use, music, updates', rows: [
+        row('home-role', icon('home'), 'Home button', 'Which screen the Home button opens', 'home'),
+        row('open-cleanup', icon('power'), 'Apps you don\'t use', 'Switch them off. You can switch them back on', 'cleanup'),
+        NATIVE ? row('keep-front', icon('music'), 'Music in the background', 'When a song starts, come back here and let it play', 'keep') : '',
+        NATIVE ? row('update-check', icon('sync'), 'Check for updates', 'Get the newest version of this home screen', 'update') : '',
       ] },
-      { id: 'lights', icon: icon('lamp'), title: 'Lights', help: 'Govee account, light roles', rows: [
-        row('open-setup', icon('lamp'), 'Govee account', 'Lights and backlight', 'govee'),
-        row('open-roles', icon('room'), 'Light roles', 'Where each light is in the room', 'roles'),
-        row('open-myscenes', icon('lamp'), 'My scenes', 'Scenes you saved from the Room tab', 'myscenes'),
+      { id: 'lights', icon: icon('lamp'), title: 'Lights', help: 'Govee lights, where they are, your scenes', rows: [
+        row('open-setup', icon('lamp'), 'Connect Govee', 'Your lights and the TV backlight', 'govee'),
+        row('open-roles', icon('room'), 'Where your lights are', 'So scenes light the room the right way', 'roles'),
+        row('open-myscenes', icon('lamp'), 'My scenes', 'Scenes you saved in Room', 'myscenes'),
       ] },
-      { id: 'games', icon: icon('games'), title: 'Games', help: 'Console input and switching', rows: [
-        row('cycle-hdmi', icon('hdmi'), 'Games input', `Where the ${state.games.device} is plugged in`, 'hdmi'),
-        row('toggle-auto', icon('games'), 'Switch input for Games', 'Turn off to stay here', 'auto'),
-        row('cycle-countdown', icon('timer'), 'Switch countdown', 'Time to cancel first', 'countdown'),
+      { id: 'games', icon: icon('games'), title: 'Games', help: 'Your console and switching to it', rows: [
+        row('cycle-hdmi', icon('hdmi'), 'Console input', `Where the ${state.games.device} is plugged in`, 'hdmi'),
+        row('toggle-auto', icon('games'), 'Switch when I open Games', 'Turn off to stay on this screen', 'auto'),
+        row('cycle-countdown', icon('timer'), 'Countdown before switching', 'Time to change your mind', 'countdown'),
       ] },
-      { id: 'connect', icon: icon('phone'), title: 'Network and phone', help: 'Phone setup, guest Wi-Fi, weather town, Wi-Fi', rows: [
-        row('open-setup', icon('phone'), 'Set up from your phone', 'Govee key, wallpapers, apps, Wi-Fi code', 'setup'),
+      { id: 'connect', icon: icon('phone'), title: 'Phone and Wi-Fi', help: 'Set up from your phone, guest Wi-Fi, weather', rows: [
+        row('open-setup', icon('phone'), 'Set up from your phone', 'Keys, photos and apps, typed on your phone', 'setup'),
         row('open-guest', icon('wifi'), 'Guest Wi-Fi', 'A code guests scan to join', 'guest'),
         town,
-        row('wifi', icon('wifi'), 'Wi-Fi', 'Opens the TV network settings', 'wifi'),
+        row('wifi', icon('wifi'), 'Wi-Fi', 'Opens the TV\'s network settings', 'wifi'),
+      ] },
+      { id: 'dev', icon: icon('live'), title: 'Developer options', help: 'Debug connection, diagnostics, tests', rows: [
+        NATIVE ? row('open-devclean', icon('power'), 'Debug connection and clean-up', 'Connect to the TV, switch off background parts, home screen', 'devclean') : '',
+        NATIVE ? row('open-diag', icon('live'), 'Diagnostics', 'Memory, storage, crashes and safety-net events', 'diag') : '',
+        NATIVE ? row('grant-np', icon('music'), 'Now playing access', 'Lets this screen see what is playing', 'np-access') : '',
+        NATIVE ? row('update-channel', icon('sync'), 'Update channel', 'Beta gets new versions before Stable', 'channel') : '',
+        NATIVE ? row('wn-check', icon('live'), 'Continue watching check', 'What the TV shares from your apps', 'wn') : '',
+        row('speed-test', icon('timer'), 'Speed test', 'Moves around by itself for about 20 seconds. Hands off', 'speed'),
+        row('show-welcome', icon('home'), 'Show the welcome again', 'The first-run screen', 'welcome'),
+        row('hide-dev', icon('power'), 'Hide developer options', 'Press the Settings icon 3 times to show them again', 'hidedev'),
       ] },
     ];
     return `
@@ -1535,7 +1548,7 @@
     const list = stage.querySelector('[data-cleanup-list]');
     const items = cleanupItems();
     if (!items.length) {
-      list.innerHTML = adbRow() + reapplyRow(['ready', 'done'].includes((state.adb || {}).state)) + ((NATIVE && ['ready', 'done'].includes((state.adb || {}).state)) ? homeRows() : '') + `
+      list.innerHTML = (state.devClean ? adbRow() + reapplyRow(['ready', 'done'].includes((state.adb || {}).state)) + ((NATIVE && ['ready', 'done'].includes((state.adb || {}).state)) ? homeRows() : '') : '') + `
         <div class="cleanup-empty">
           <span class="w-empty-title">No apps chosen</span>
           <span class="small">Open Set up from your phone, go to Apps to switch off, tick the apps you don't want and send them over. They are listed here, and you switch them off from this screen.</span>
@@ -1545,7 +1558,7 @@
     const states = NATIVE ? nativeJson('packageStates', JSON.stringify(items.map((c) => c.pkg))) || [] : [];
     const a = state.adb || {};
     const live = states.filter((st) => st.installed && st.enabled).length;
-    const ready = ['ready', 'done'].includes(a.state);
+    const ready = state.devClean && ['ready', 'done'].includes(a.state);
     const home = NATIVE && ready ? homeRows() : '';
     const actions = ready ? `
       ${live ? `<button class="set-row" data-focus data-action="adb-disable">
@@ -1558,7 +1571,7 @@
         <span class="set-label">Switch back on what I switched off<span class="small">${a.ours} app${a.ours === 1 ? '' : 's'}</span></span>
         <span class="set-val">Press OK</span>
       </button>` : ''}` : '';
-    list.innerHTML = adbRow() + reapplyRow(ready) + home + actions + '<p class="small cleanup-note">Press OK on an app to open its page. Disable switches it off; Enable brings it back, so nothing here is permanent.</p>' + items.map((c) => {
+    list.innerHTML = (state.devClean ? adbRow() + reapplyRow(ready) : '') + home + actions + '<p class="small cleanup-note">Press OK on an app to open its page. Disable switches it off; Enable brings it back, so nothing here is permanent.</p>' + items.map((c) => {
       const st = states.find((x) => x.pkg === c.pkg);
       const value = !NATIVE ? 'On the TV' : !st || !st.installed ? 'Not on this TV' : st.enabled ? 'On' : 'Off';
       return `
@@ -2010,6 +2023,8 @@
     applyState();
   };
 
+  let devTaps = 0;
+  let devTapAt = 0;
   let launchedFrom = null; // Back from an app lands on the tile that opened it
   function launchApp(id) {
     launchedFrom = document.activeElement;
@@ -2373,6 +2388,9 @@
       motion: state.motion === 'fast' ? 'Fast' : 'Smooth',
       wn: state.wnCheck || 'Press OK',
       update: state.update || 'Press OK',
+      devclean: 'Open',
+      hidedev: '',
+      welcome: '',
       channel: state.updateChannel === 'beta' ? 'Beta' : 'Stable',
       diag: 'Open',
       speed: state.speed || 'Press OK',
@@ -2392,6 +2410,7 @@
     };
     all('[data-val]').forEach((el) => { el.textContent = values[el.dataset.val]; });
     all('.update-badge').forEach((el) => { el.hidden = !state.updateFound; });
+    all('[data-action="settings-cat"][data-cat="dev"]').forEach((el) => { el.hidden = !state.dev; });
     all('.tog').forEach((el) => el.classList.toggle('on', el.querySelector('[data-val]').textContent === 'On'));
     renderWeather();
 
@@ -2889,7 +2908,18 @@
     }
     if (b.dataset.action === 'x-close') { closeExpand(); return; }
     if ((b.dataset.nav || b.dataset.navTo) && !refs.x.hidden) { titleSeq++; refs.x.hidden = true; refs.xpanel.innerHTML = ''; refs.xpanel.className = 'xpanel'; xFrom = null; }
-    if (b.dataset.nav === 'settings') state.settingsCat = null;
+    if (b.dataset.nav === 'settings') {
+      state.settingsCat = null;
+      // Developer options: press the Settings icon 3 times in a row.
+      const now = Date.now();
+      devTaps = now - devTapAt < 900 ? devTaps + 1 : 1;
+      devTapAt = now;
+      if (devTaps >= 3 && !state.dev) {
+        state.dev = true;
+        saveSoon();
+        toast('Developer options are on. They are at the end of Settings');
+      }
+    }
     if (b.dataset.nav) openView(b.dataset.nav);
     else if (b.dataset.navTo) openView(b.dataset.navTo);
     else if (b.dataset.app) launchApp(b.dataset.app);
@@ -2898,6 +2928,12 @@
     else if (act === 'input') { if (!nativeCall('switchInput', b.dataset.id)) toast("Couldn't switch to that input"); }
     else if (act === 'update-channel') { state.updateChannel = state.updateChannel === 'beta' ? 'stable' : 'beta'; state.updateFound = null; state.update = ''; saveSoon(); checkUpdate(true); }
     else if (act === 'open-diag') openView('diag');
+    else if (act === 'hide-dev') { state.dev = false; state.devClean = false; state.settingsCat = null; saveSoon(); toast('Developer options are hidden'); }
+    else if (act === 'open-devclean') { state.devClean = true; openView('cleanup'); }
+    else if (act === 'welcome-setup') { closeWelcome(); openSetup(); }
+    else if (act === 'welcome-later') closeWelcome();
+    else if (act === 'show-welcome') openWelcome();
+    else if (act === 'welcome-fit') { closeWelcome(); openFit(); }
     else if (act === 'keep-front') { const m = ((Number(nativeCall('keepMode')) || 0) + 1) % 3; nativeCall('setKeepMode', m); toast(['Off', 'On for songs cast to the TV. Music you start in YouTube Music stays put', 'On for cast songs and for music you start in YouTube Music'][m]); }
     else if (act === 'title') openTitle(state.titleRows[Number(b.dataset.i)]);
     else if (act === 'title-go') goTitleRow(titleRowsNow[Number(b.dataset.i)]);
@@ -2918,7 +2954,7 @@
       markWallpaper();
       toast(`Wallpaper: ${wallpaperLabel()}`);
     } else if (act === 'open-setup') openSetup();
-    else if (act === 'open-cleanup') openView('cleanup');
+    else if (act === 'open-cleanup') { state.devClean = false; openView('cleanup'); }
     else if (act === 'open-app-info') nativeCall('openAppInfo', b.dataset.pkg);
     else if (act === 'close-setup') closeSetup();
     else if (act === 'wn-check') {
@@ -3275,7 +3311,7 @@
 
   function goBack() {
     if (!refs.x.hidden) {
-      closeExpand();
+      if (refs.xpanel.classList.contains('xwelcome')) closeWelcome(); else closeExpand();
     } else if (!refs.setup.hidden) {
       closeSetup();
     } else if (!refs.fit.hidden) {
@@ -3417,6 +3453,36 @@
   function fitText() {
     const val = stage.querySelector('[data-fit-val]');
     if (val) val.textContent = `${Math.round((userFit || 1) * 100)}%`;
+  }
+
+  // ---------- First run ----------
+  function openWelcome() {
+    const g = state.govee || {};
+    const items = [
+      ['Lights', g.connected ? 'Connected' : 'Add your Govee key', !!g.connected],
+      ['Films and series', tmdbReady() ? 'Ready' : 'Add a TMDB key', tmdbReady()],
+      ['Weather', state.weather ? `${state.weather.town}` : 'Uses where the TV is, or a town you choose', !!state.weather],
+    ];
+    xFrom = document.activeElement;
+    refs.xpanel.className = 'xpanel xwelcome';
+    refs.xpanel.innerHTML = `
+      <div class="wel-title">Welcome to your new home screen</div>
+      <p class="wel-lead">A few things work best once they're set up. Type them on your phone instead of the remote.</p>
+      <ul class="wel-list">${items.map(([t, d, ok]) => `<li class="${ok ? 'ok' : ''}"><span class="wel-dot"></span><span class="wel-name">${t}</span><span class="wel-state">${esc(d)}</span></li>`).join('')}</ul>
+      <div class="wel-actions">
+        <button class="btn lg btn-primary" data-focus data-action="welcome-setup">Set up with my phone</button>
+        <button class="btn lg" data-focus data-action="welcome-later">Later</button>
+      </div>
+      <button class="wel-fit" data-focus data-action="welcome-fit">Edges of the picture cut off? Fit to screen</button>`;
+    refs.x.hidden = false;
+    refs.x.classList.remove('closing');
+    refs.xpanel.querySelector('[data-action="welcome-setup"]').focus();
+  }
+
+  function closeWelcome() {
+    state.welcomed = true;
+    saveSoon();
+    closeExpand();
   }
 
   function openFit() {
@@ -3613,7 +3679,7 @@
     } catch (e) {
       console.warn('start-up calls failed', e);
     }
-    if (userFit === null) openFit(); // first run: set the screen size
+    if (!state.welcomed) setTimeout(openWelcome, 700); // first run: a welcome, not a settings screen
   }
   [100, 500, 1500].forEach((ms) => setTimeout(fit, ms));
 })();
