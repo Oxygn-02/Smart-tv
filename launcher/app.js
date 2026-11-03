@@ -39,6 +39,7 @@
     nbaWatch: 'leaguepass', // where you watch the NBA
     nbaTab: 'games',
     nbaNews: [],
+    clipPreviews: true, // a few muted seconds when you stop on a highlight
     trailers: false, // play a muted trailer (off until the speed test shows room for it) behind a title's page
     titleRows: [], // the search results, so a card can open its page
     edgeHue: 330,
@@ -86,7 +87,7 @@
 
   // ---------- Saved settings ----------
   // Remembered on the TV between launches (browser storage inside the app).
-  const SAVED = ['myScenes', 'edge', 'edgeHue', 'edgeInt', 'trailers', 'updateChannel', 'dev', 'welcomed', 'nbaTeams', 'nbaWatch', 'starred', 'homeLayout', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
+  const SAVED = ['myScenes', 'edge', 'edgeHue', 'edgeInt', 'trailers', 'updateChannel', 'dev', 'welcomed', 'nbaTeams', 'nbaWatch', 'starred', 'homeLayout', 'clipPreviews', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
 
   function loadSaved() {
     try {
@@ -898,11 +899,24 @@
     }));
   }
 
+  // A highlight's video: the first https .mp4 address anywhere in the item
+  // (ESPN puts it under links.source or video[].links). The preview's pretend
+  // TV uses a bundled sample clip.
+  function findClip(o, depth = 0) {
+    if (!o || depth > 5) return '';
+    if (typeof o === 'string') return (/^https:\/\/[^\s"'()<>\\]+\.mp4(\?[^\s"'()<>\\]*)?$/.test(o) || (DEMO && /^clips\/[\w-]+\.mp4$/.test(o))) ? o : '';
+    if (Array.isArray(o)) { for (const x of o) { const c = findClip(x, depth + 1); if (c) return c; } return ''; }
+    if (typeof o === 'object') { for (const k of Object.keys(o)) { const c = findClip(o[k], depth + 1); if (c) return c; } }
+    return '';
+  }
+
   function parseNews(n) {
     return ((n && n.articles) || []).slice(0, 14).map((a) => ({
       id: String(a.id || a.headline), headline: String(a.headline || ''), description: String(a.description || ''),
-      published: new Date(a.published || Date.now()), image: sportsImg(a.images && a.images[0] && a.images[0].url),
+      published: new Date(a.published || Date.now()),
+      image: sportsImg((a.images && a.images[0] && a.images[0].url) || (a.video && a.video[0] && (a.video[0].thumbnail || a.video[0].posterImages?.default?.href))),
       video: a.type === 'Media' || !!(a.video || (a.videos && a.videos.length)),
+      clip: findClip(a.video || a.videos || a.links || null),
     })).filter((a) => a.headline);
   }
 
@@ -1057,7 +1071,7 @@
         const vids = items.filter((a) => a.video);
         const reads = items.filter((a) => !a.video);
         body.innerHTML = (vids.length ? `<div class="eyebrow">Highlights</div><div class="sp-vids">${vids.slice(0, 4).map((a) => `
-            <button class="show glass sp-vid" data-focus data-action="sp-video" data-id="${esc(a.id)}" aria-label="Watch: ${esc(a.headline)}">
+            <button class="show glass sp-vid" data-focus data-action="sp-video" data-id="${esc(a.id)}" ${a.clip ? `data-clip="${esc(a.clip)}"` : ''} aria-label="Watch: ${esc(a.headline)}">
               <div class="show-art" style="${a.image ? `background:url('${a.image}') center / cover` : ''}"><span class="sp-play">${filledIcon('play', 18)}</span></div>
               <div class="show-body"><div class="show-title">${esc(a.headline)}</div><div class="small show-meta">${esc(ago(a.published))}</div></div>
             </button>`).join('')}</div>` : '')
@@ -1145,13 +1159,67 @@
         const top = (pts.leaders || [])[0];
         return top ? `<div class="g-leader"><span class="g-l-team">${esc((tm.team && tm.team.abbreviation) || '')}</span><span>${esc((top.athlete && top.athlete.displayName) || '')}</span><span class="g-l-val">${esc(top.displayValue || '')}</span></div>` : '';
       }).join('');
-      const vids = (s.videos || []).slice(0, 2).map((v) => `<button class="t-row" data-focus data-action="sp-highlights" data-q="${esc(v.headline || `${g.away.name} ${g.home.name} highlights`)}"><span class="t-logo t-letter">▶</span><span class="t-row-name">${esc(v.headline || 'Highlights')}<span class="small">Watch on YouTube</span></span><span class="t-row-act">Play</span></button>`).join('');
+      const vids = (s.videos || []).slice(0, 3).map((v) => {
+        const clip = findClip(v);
+        const thumb = sportsImg(v.thumbnail || (v.posterImages && v.posterImages.default && v.posterImages.default.href));
+        const title = v.headline || `${g.away.name} ${g.home.name} highlights`;
+        return `<button class="t-row g-vid" data-focus ${clip ? `data-action="sp-clip" data-clip="${esc(clip)}" data-title="${esc(title)}"` : `data-action="sp-highlights" data-q="${esc(title)}"`}>
+          <span class="g-thumb" style="${thumb ? `background:url('${thumb}') center / cover` : ''}"><span class="sp-play">${filledIcon('play', 14)}</span></span>
+          <span class="t-row-name">${esc(title)}<span class="small">${clip ? (v.duration ? `${Math.floor(v.duration / 60)}:${pad(v.duration % 60)}` : 'Video') : 'On YouTube'}</span></span><span class="t-row-act">Play</span></button>`;
+      }).join('');
       main.innerHTML = (art || '') + (leaders ? `<div class="eyebrow">Top scorers</div><div class="g-leaders">${leaders}</div>` : '') + (vids ? `<div class="eyebrow">Highlights</div>${vids}` : '')
         || `<p class="small">${g.state === 'pre' ? `Tip-off ${esc(whenText(g.date))}. The report and highlights appear here after the game.` : 'No report yet.'}</p>`;
     } catch {
       const main = refs.xpanel.querySelector('[data-g-main]');
       if (main) main.innerHTML = '<p class="small">Couldn\'t load the game details. Is the TV online?</p>';
     }
+  }
+
+  // ---------- Highlights: a muted preview, and the full clip ----------
+  // Stopping on a highlight for a moment plays a few muted seconds in its
+  // picture, fading in over the thumbnail. OK plays the whole clip here; Back
+  // closes it. Without a clip, highlights open in YouTube instead.
+  let previewTimer = 0;
+  function stopPreview() {
+    clearTimeout(previewTimer);
+    stage.querySelectorAll('.previewing').forEach((b) => b.classList.remove('previewing'));
+    stage.querySelectorAll('video.clip-preview').forEach((v) => { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); });
+  }
+
+  function startPreview(el) {
+    stopPreview();
+    if (!state.clipPreviews || state.motion === 'fast' || !el.dataset.clip) return;
+    previewTimer = setTimeout(() => {
+      const box = el.querySelector('.show-art, .g-thumb');
+      if (!box || document.activeElement !== el) return;
+      const v = document.createElement('video');
+      v.className = 'clip-preview';
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = 'auto';
+      v.src = el.dataset.clip;
+      v.addEventListener('playing', () => { v.classList.add('on'); box.classList.add('previewing'); }, { once: true });
+      box.append(v);
+      v.play().catch(() => v.remove());
+      previewTimer = setTimeout(() => { v.classList.remove('on'); box.classList.remove('previewing'); setTimeout(() => { if (v.isConnected) { v.pause(); v.remove(); } }, 600); }, 5600);
+    }, 700);
+  }
+
+  function playClip(url, title) {
+    if (!url) return;
+    stopPreview();
+    xFrom = document.activeElement;
+    refs.xpanel.className = 'xpanel xvideo';
+    refs.xpanel.innerHTML = `
+      <video class="clip-full" autoplay playsinline src="${esc(url)}"></video>
+      <div class="clip-bar"><span class="clip-title">${esc(title)}</span><span class="small">OK to pause · Back to close</span></div>
+      <button class="clip-focus" data-focus data-action="clip-toggle" aria-label="Pause or play"></button>`;
+    refs.x.hidden = false;
+    refs.x.classList.remove('closing');
+    const v = refs.xpanel.querySelector('video');
+    v.addEventListener('error', () => { closeExpand(); toast('That clip wouldn\'t play. Opening YouTube'); openHighlights(title); }, { once: true });
+    v.addEventListener('ended', () => closeExpand(), { once: true });
+    refs.xpanel.querySelector('.clip-focus').focus();
   }
 
   // Highlights open in YouTube, searched for the game or the clip's title.
@@ -1836,6 +1904,7 @@
     if (refs.x.hidden) return;
     refs.x.classList.add('closing');
     titleSeq++;
+    refs.xpanel.querySelectorAll('video').forEach((v) => { v.pause(); v.removeAttribute('src'); v.load(); });
     refs.xpanel.querySelector('[data-t-trailer]')?.__off?.();
     setTimeout(() => {
       refs.x.hidden = true;
@@ -1965,6 +2034,7 @@
         row('cycle-ambient', icon('moon'), 'Screensaver', 'Photos and the clock when nothing is happening', 'ambient'),
         row('cycle-clock', icon('timer'), 'Clock', '12-hour or 24-hour', 'clock'),
         row('edit-home', icon('home'), 'Home layout', 'Choose what each card on Home shows', 'homelayout'),
+        row('cycle-previews', icon('live'), 'Highlight previews', 'A few muted seconds when you stop on a highlight', 'previews'),
         row('screen-fit', icon('live'), 'Fit to screen', 'If the edges are cut off', 'fit'),
         row('cycle-motion', icon('live'), 'Animations', 'Fast turns them off, for a slow TV', 'motion'),
         NATIVE ? '' : row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to see empty widgets', 'sample'),
@@ -2918,6 +2988,7 @@
     };
 
     stage.addEventListener('scroll', (e) => edgeFade(e.target), { capture: true, passive: true });
+    stage.addEventListener('focusin', (e) => { if (e.target.dataset && e.target.dataset.clip) startPreview(e.target); else if (previewTimer) stopPreview(); });
     // A team logo that can't load is removed, leaving the team's colour and initials.
     stage.addEventListener('error', (e) => { if (e.target.classList && e.target.classList.contains('sp-img')) { e.target.parentElement?.classList.remove('has-img'); e.target.remove(); } }, true);
     stage.addEventListener('load', (e) => { if (e.target.classList && e.target.classList.contains('sp-img')) e.target.parentElement?.classList.add('has-img'); }, true);
@@ -3004,6 +3075,7 @@
       update: state.update || 'Press OK',
       devclean: 'Open',
       homelayout: 'Edit',
+      previews: state.clipPreviews ? 'On' : 'Off',
       hidedev: '',
       welcome: '',
       channel: state.updateChannel === 'beta' ? 'Beta' : 'Stable',
@@ -3566,7 +3638,10 @@
     else if (act === 'sp-game') openGame(b.dataset.id);
     else if (act === 'sp-watch') { if (!refs.x.hidden) closeExpand(); watchNow(); }
     else if (act === 'sp-highlights') openHighlights(b.dataset.q || 'NBA highlights');
-    else if (act === 'sp-video') { const a = state.nbaNews.find((x) => x.id === b.dataset.id); openHighlights(a ? a.headline : 'NBA highlights'); }
+    else if (act === 'sp-video') { const a = state.nbaNews.find((x) => x.id === b.dataset.id); if (a && a.clip) playClip(a.clip, a.headline); else openHighlights(a ? a.headline : 'NBA highlights'); }
+    else if (act === 'clip-toggle') { const v = refs.xpanel.querySelector('video'); if (v) { if (v.paused) v.play(); else v.pause(); } }
+    else if (act === 'sp-clip') playClip(b.dataset.clip, b.dataset.title || 'Highlights');
+    else if (act === 'cycle-previews') { state.clipPreviews = !state.clipPreviews; saveSoon(); }
     else if (act === 'sp-story') openStory(b.dataset.id);
     else if (act === 'sp-watch-pick') { state.nbaWatch = b.dataset.id; saveSoon(); renderSports(); renderGameWidget(); }
     else if (act === 'sp-follow') {

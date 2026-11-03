@@ -190,6 +190,7 @@
     return { articles: NEWS.map(([type, headline, description, abbr], i) => ({
       id: 9000 + i, type, headline, description, published: new Date(Date.now() - (i + 1) * 3 * 3600000).toISOString(),
       images: [{ url: picture(headline, true, hash(abbr) % 360) }], links: { web: { href: 'https://www.espn.com/nba/' } },
+      video: type === 'Media' ? [{ headline, duration: 96, links: { source: { href: 'clips/sample-highlight.mp4' } } }] : undefined,
     })) };
   }
   function summary(eventId) {
@@ -206,7 +207,7 @@
       header: { competitions: [{ competitors: [home, away], status: ev.status }] },
       leaders: done ? [leader(away, `${away.team.shortDisplayName} star`, 31), leader(home, `${home.team.shortDisplayName} star`, 27)] : [],
       article: ev.status.type.state === 'post' ? { headline: `${away.team.shortDisplayName} beat ${home.team.shortDisplayName} ${away.score}-${home.score}`, description: `A strong fourth quarter decided it as the ${away.team.shortDisplayName} closed out the win on the road.` } : null,
-      videos: done ? [{ headline: `${away.team.shortDisplayName} vs ${home.team.shortDisplayName}: full highlights`, thumbnail: picture(`${away.team.abbreviation} ${home.team.abbreviation}`, true, hash(ev.id) % 360) }] : [],
+      videos: done ? [{ headline: `${away.team.shortDisplayName} vs ${home.team.shortDisplayName}: full highlights`, duration: 214, thumbnail: picture(`${away.team.abbreviation} ${home.team.abbreviation}`, true, hash(ev.id) % 360), links: { source: { href: 'clips/sample-highlight.mp4' } } }, { headline: 'Best of the fourth quarter', duration: 75, thumbnail: picture('Fourth quarter', true, (hash(ev.id) + 90) % 360), links: { source: { href: 'clips/sample-highlight.mp4' } } }] : [],
     };
   }
   function sportsAnswer(path, q) {

@@ -41,4 +41,19 @@ class BackupSchemaTest {
         val out = BackupSchema.clean(JSONObject().put("myScenes", JSONArray().put(JSONObject("""{"id":"s1","name":"A"}"""))))
         assertTrue(out.getJSONArray("myScenes").getJSONObject(0).has("lights"))
     }
+
+    @Test
+    fun keepsTeamsLayoutAndStars() {
+        val out = BackupSchema.clean(JSONObject("""{"nbaTeams":["LAL","bad team",""],"nbaWatch":"sky","homeLayout":{"a":"game","c":"evil","e":"starred"},
+            "starred":[{"id":3,"type":"tv","title":"The Traitors","poster":"/abc.jpg","badge":"x"},{"id":"x","type":"tv"},{"id":5,"type":"game"},{"id":7,"type":"movie","poster":"javascript:alert(1)"}],"clipPreviews":false}"""))
+        assertEquals(1, out.getJSONArray("nbaTeams").length())
+        assertEquals("sky", out.getString("nbaWatch"))
+        assertEquals("game", out.getJSONObject("homeLayout").getString("a"))
+        assertFalse(out.getJSONObject("homeLayout").has("c"))
+        val st = out.getJSONArray("starred")
+        assertEquals(2, st.length())
+        assertFalse(st.getJSONObject(0).has("badge"))
+        assertFalse(st.getJSONObject(1).has("poster"))
+        assertFalse(out.getBoolean("clipPreviews"))
+    }
 }

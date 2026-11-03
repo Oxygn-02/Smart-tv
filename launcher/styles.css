@@ -5496,3 +5496,116 @@ button.w-empty {
   height: 72%;
   object-fit: contain;
 }
+
+/* ---------- Highlight previews and the clip player ---------- */
+.clip-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+
+.clip-preview.on {
+  opacity: 1;
+}
+
+.sp-vid .show-art .sp-play {
+  z-index: 1;
+  transition: opacity 0.4s;
+}
+
+.show-art.previewing .sp-play,
+.g-thumb.previewing .sp-play {
+  opacity: 0;
+}
+
+.g-vid {
+  gap: 14px;
+}
+
+.g-thumb {
+  position: relative;
+  flex: none;
+  width: 112px;
+  height: 63px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.g-thumb .sp-play {
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+}
+
+.xpanel.xvideo {
+  position: relative;
+  width: 1184px;
+  height: 666px;
+  max-height: none;
+  padding: 0;
+  background: #000;
+}
+
+.clip-full {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.clip-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding: 40px 32px 22px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  color: #f2f2f6;
+}
+
+.clip-title {
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.clip-focus {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+#stage .clip-focus:focus-visible {
+  outline: none;
+  box-shadow: none;
+  background: transparent !important;
+}
+
+/* The game page's report column scrolls when it holds more than fits */
+.xgame .t-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.xgame .g-cols {
+  flex: 1;
+  min-height: 0;
+}
+
+.xgame .g-col:first-child {
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 4px;
+  margin: -4px;
+  scroll-padding: 12px;
+}
