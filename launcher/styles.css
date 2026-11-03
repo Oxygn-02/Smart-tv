@@ -5609,3 +5609,26 @@ button.w-empty {
   margin: -4px;
   scroll-padding: 12px;
 }
+
+.sp-top {
+  font-size: 14px;
+  color: var(--sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sp-top b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.sp-f-top {
+  font-size: 16px;
+  color: rgba(242, 242, 246, 0.85);
+}
+
+.sp-feature .btn-primary {
+  background: rgba(255, 255, 255, 0.92);
+  color: #15151b;
+}

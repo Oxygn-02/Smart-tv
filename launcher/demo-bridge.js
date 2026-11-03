@@ -143,6 +143,16 @@
   const espnTeam = (t) => ({ id: t.id, abbreviation: t.abbr, displayName: t.name, shortDisplayName: t.short, color: t.color, logo: logo(t) });
   const record = (t) => { const w = 3 + (hash(t.abbr) % 9); return `${w}-${10 - w}`; };
 
+  // A well-known player per team for the sample box scores (the stats are made up).
+  const STAR = {
+    ATL: 'Trae Young', BOS: 'Jayson Tatum', BKN: 'Cam Thomas', CHA: 'LaMelo Ball', CHI: 'Coby White', CLE: 'Donovan Mitchell', DET: 'Cade Cunningham',
+    IND: 'Pascal Siakam', MIA: 'Tyler Herro', MIL: 'Giannis Antetokounmpo', NY: 'Jalen Brunson', ORL: 'Paolo Banchero', PHI: 'Joel Embiid', TOR: 'Scottie Barnes',
+    WSH: 'Alex Sarr', DAL: 'Anthony Davis', DEN: 'Nikola Jokic', GS: 'Stephen Curry', HOU: 'Alperen Sengun', LAC: 'Kawhi Leonard', LAL: 'Luka Doncic',
+    MEM: 'Ja Morant', MIN: 'Anthony Edwards', NO: 'Zion Williamson', OKC: 'Shai Gilgeous-Alexander', PHX: 'Devin Booker', POR: 'Deni Avdija', SAC: 'Domantas Sabonis',
+    SA: 'Victor Wembanyama', UTAH: 'Lauri Markkanen',
+  };
+  const SIDEKICK = { LAL: 'LeBron James', BOS: 'Jaylen Brown', DEN: 'Jamal Murray', GS: 'Jimmy Butler', OKC: 'Jalen Williams', DAL: 'Kyrie Irving', NY: 'Karl-Anthony Towns', MIA: 'Bam Adebayo', PHX: 'Kevin Durant', MIL: 'Damian Lillard' };
+  const ptsFor = (abbr, id) => 18 + (hash(abbr + id) % 20);
   const FIXTURES = [
     ['LAL', 'BOS', -1, 'post', 118, 112], ['NY', 'MIA', -1, 'post', 104, 99], ['GS', 'DEN', 0, 'in', 87, 91, 3, '4:12'], ['OKC', 'DAL', 0, 'in', 52, 49, 2, '1:05'],
     ['PHX', 'MIL', 0, 'pre'], ['CLE', 'ORL', 0, 'pre'], ['BOS', 'PHI', 1, 'pre'], ['LAL', 'SAC', 1, 'pre'], ['MIN', 'HOU', 1, 'pre'],
@@ -160,6 +170,10 @@
         status: { displayClock: clock || '0:00', period: period || 0, type: { state: st, completed: st === 'post', shortDetail: detail, detail } },
         competitions: [{
           venue: { fullName: `${home.short} Arena` }, broadcasts: [{ names: [i % 2 ? 'NBA TV' : 'ESPN'] }],
+          // As ESPN's scoreboard does for games under way or finished: the game's top scorer
+          leaders: st === 'pre' ? [] : [{ name: 'points', displayName: 'Points', leaders: [[a, away], [h, home]]
+            .map(([ab, t]) => ({ value: ptsFor(ab, i), displayValue: String(ptsFor(ab, i)), athlete: { displayName: STAR[ab], shortName: STAR[ab] }, team: { id: t.id } }))
+            .sort((x, y) => y.value - x.value).slice(0, 1) }],
           competitors: [
             { homeAway: 'home', score: hs != null ? String(hs) : '', team: espnTeam(home), records: [{ summary: record(home) }] },
             { homeAway: 'away', score: as != null ? String(as) : '', team: espnTeam(away), records: [{ summary: record(away) }] },
@@ -197,16 +211,20 @@
     const ev = scoreboard().events.find((e) => e.id === eventId);
     if (!ev) return {};
     const [home, away] = ev.competitions[0].competitors;
-    const leader = (c, who, pts) => ({ team: { abbreviation: c.team.abbreviation }, leaders: [
-      { name: 'points', displayName: 'Points', leaders: [{ displayValue: `${pts} PTS`, athlete: { displayName: who } }] },
-      { name: 'rebounds', displayName: 'Rebounds', leaders: [{ displayValue: `${7 + (pts % 6)} REB`, athlete: { displayName: `${c.team.shortDisplayName} forward` } }] },
-      { name: 'assists', displayName: 'Assists', leaders: [{ displayValue: `${5 + (pts % 5)} AST`, athlete: { displayName: `${c.team.shortDisplayName} guard` } }] },
-    ] });
+    const leader = (c) => {
+      const ab = c.team.abbreviation;
+      const pts = ptsFor(ab, Number(eventId) - 4000);
+      return { team: { abbreviation: ab }, leaders: [
+        { name: 'points', displayName: 'Points', leaders: [{ displayValue: `${pts} PTS`, athlete: { displayName: STAR[ab] } }] },
+        { name: 'rebounds', displayName: 'Rebounds', leaders: [{ displayValue: `${7 + (pts % 6)} REB`, athlete: { displayName: SIDEKICK[ab] || STAR[ab] } }] },
+        { name: 'assists', displayName: 'Assists', leaders: [{ displayValue: `${5 + (pts % 5)} AST`, athlete: { displayName: STAR[ab] } }] },
+      ] };
+    };
     const done = ev.status.type.state !== 'pre';
     return {
       header: { competitions: [{ competitors: [home, away], status: ev.status }] },
-      leaders: done ? [leader(away, `${away.team.shortDisplayName} star`, 31), leader(home, `${home.team.shortDisplayName} star`, 27)] : [],
-      article: ev.status.type.state === 'post' ? { headline: `${away.team.shortDisplayName} beat ${home.team.shortDisplayName} ${away.score}-${home.score}`, description: `A strong fourth quarter decided it as the ${away.team.shortDisplayName} closed out the win on the road.` } : null,
+      leaders: done ? [leader(away), leader(home)] : [],
+      article: ev.status.type.state === 'post' ? { headline: `${away.team.shortDisplayName} beat ${home.team.shortDisplayName} ${away.score}-${home.score}`, description: `${STAR[away.team.abbreviation]} scored ${ptsFor(away.team.abbreviation, Number(eventId) - 4000)} as a strong fourth quarter decided it and the ${away.team.shortDisplayName} closed out the win on the road.` } : null,
       videos: done ? [{ headline: `${away.team.shortDisplayName} vs ${home.team.shortDisplayName}: full highlights`, duration: 214, thumbnail: picture(`${away.team.abbreviation} ${home.team.abbreviation}`, true, hash(ev.id) % 360), links: { source: { href: 'clips/sample-highlight.mp4' } } }, { headline: 'Best of the fourth quarter', duration: 75, thumbnail: picture('Fourth quarter', true, (hash(ev.id) + 90) % 360), links: { source: { href: 'clips/sample-highlight.mp4' } } }] : [],
     };
   }

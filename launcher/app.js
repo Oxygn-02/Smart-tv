@@ -871,6 +871,21 @@
     };
   }
 
+  // The game's top scorer from the scoreboard (ESPN lists leaders for games under
+  // way or finished), else the higher of the two teams' points leaders.
+  function topScorer(comp) {
+    const pick = (cats) => {
+      const cat = (cats || []).find((c) => c.name === 'points' || c.abbreviation === 'PTS');
+      const l = cat && cat.leaders && cat.leaders[0];
+      return l && l.athlete ? { name: String(l.athlete.displayName || l.athlete.shortName || ''), pts: Number(l.value) || parseInt(l.displayValue, 10) || 0, teamId: l.team && String(l.team.id) } : null;
+    };
+    const all = [pick(comp.leaders), ...(comp.competitors || []).map((c) => { const t = pick(c.leaders); if (t) t.abbr = c.team && c.team.abbreviation; return t; })].filter((x) => x && x.name);
+    const best = all.sort((a, b) => b.pts - a.pts)[0];
+    if (!best) return null;
+    if (!best.abbr && best.teamId) best.abbr = ((comp.competitors || []).find((c) => c.team && String(c.team.id) === best.teamId) || {}).team?.abbreviation || '';
+    return best;
+  }
+
   function parseGames(sb) {
     return ((sb && sb.events) || []).map((e) => {
       const comp = (e.competitions && e.competitions[0]) || {};
@@ -880,6 +895,7 @@
         id: String(e.id), date: new Date(e.date), state: st.state || 'pre', detail: st.shortDetail || '',
         home: parseTeam(cs.find((c) => c.homeAway === 'home')), away: parseTeam(cs.find((c) => c.homeAway === 'away')),
         venue: (comp.venue && comp.venue.fullName) || '',
+        top: st.state === 'pre' ? null : topScorer(comp),
       };
     }).filter((g) => !isNaN(g.date));
   }
@@ -1006,6 +1022,7 @@
         <span class="sp-row${win(g.away.score, g.home.score)}">${teamBadge(g.away, 30)}<span class="sp-abbr">${esc(g.away.abbr)}</span><span class="sp-score">${scores ? esc(g.away.score) : ''}</span></span>
         <span class="sp-row${win(g.home.score, g.away.score)}">${teamBadge(g.home, 30)}<span class="sp-abbr">${esc(g.home.abbr)}</span><span class="sp-score">${scores ? esc(g.home.score) : ''}</span></span>
         <span class="sp-status">${live ? '<span class="sp-dot"></span>' : ''}${esc(statusText(g))}</span>
+        ${g.top ? `<span class="sp-top">${esc(g.top.name)} <b>${g.top.pts}</b> pts</span>` : ''}
       </button>`;
   }
 
@@ -1020,6 +1037,7 @@
           <span class="sp-f-label">${g.state === 'in' ? '<span class="sp-dot"></span>Live' : g.state === 'post' ? 'Final' : followed(g) ? 'Your team next' : 'Next game'}</span>
           <span class="sp-f-score">${scores ? `${esc(g.away.score)}<span class="sp-f-dash">–</span>${esc(g.home.score)}` : esc(clockText(g.date))}</span>
           <span class="small">${esc(g.state === 'pre' ? whenText(g.date).replace(/ \d.*$/, '') : g.detail)}${g.venue ? ` · ${esc(g.venue)}` : ''}</span>
+          ${g.top ? `<span class="sp-f-top">Top scorer: ${esc(g.top.name)}${g.top.abbr ? ` (${esc(g.top.abbr)})` : ''}, ${g.top.pts} pts</span>` : ''}
           <div class="sp-f-actions">
             <button class="btn lg btn-primary" data-focus data-action="sp-watch">${app ? `Watch on ${esc(app.short || app.name)}` : `Watch: ${esc(watchInfo().name)}`}</button>
             <button class="btn lg" data-focus data-action="sp-game" data-id="${g.id}">Game details</button>
