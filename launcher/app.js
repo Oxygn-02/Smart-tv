@@ -530,7 +530,7 @@
 
   function cwShape(it) {
     const app = appByPkg(it.pkg);
-    const poster = safeUrl(it.poster) ? `url("${safeUrl(it.poster)}") center / cover no-repeat, ` : '';
+    const poster = safeUrl(it.poster) ? `url('${safeUrl(it.poster)}') center / cover no-repeat, ` : '';
     return {
       title: it.title,
       subtitle: it.sub,
@@ -580,8 +580,8 @@
 
   // Wide thumbnail: the landscape still when TMDB has one, else the poster.
   function artStyle(h) {
-    if (tmdbImg('w780', h.backdrop_path)) return `background:url("${tmdbImg('w780', h.backdrop_path)}") center / cover`;
-    if (tmdbImg('w342', h.poster_path)) return `background:url("${tmdbImg('w342', h.poster_path)}") center top / cover`;
+    if (tmdbImg('w780', h.backdrop_path)) return `background:url('${tmdbImg('w780', h.backdrop_path)}') center / cover`;
+    if (tmdbImg('w342', h.poster_path)) return `background:url('${tmdbImg('w342', h.poster_path)}') center top / cover`;
     return 'background:linear-gradient(135deg,#2a2a38,#14141c)';
   }
 
@@ -598,7 +598,7 @@
     const mine = nativeJson('recommendations') || { items: [] };
     const fromApps = (mine.items || []).filter((i) => safeUrl(i.art) && appByPkg(i.pkg)).slice(0, 8).map((i) => {
       const app = appByPkg(i.pkg);
-      return { title: i.title, line: `Open ${app.name}`, art: `background:url("${i.art}") center / cover`, appId: app.id, uri: i.uri, pkg: i.pkg };
+      return { title: i.title, line: app.name, art: `background:url('${i.art}') center / cover`, appId: app.id, uri: i.uri, pkg: i.pkg };
     });
     items = fromApps;
     if (tmdbReady()) {
@@ -631,6 +631,7 @@
   }
 
   function renderForYou() {
+    refreshEdges();
     const el = stage.querySelector('[data-shows="foryou"]');
     const head = stage.querySelector('[data-fy-head]');
     if (!el) return;
@@ -855,6 +856,7 @@
   }
 
   function renderTitles(rows, q) {
+    refreshEdges();
     const el = stage.querySelector('[data-shows="titles"]');
     const head = stage.querySelector('[data-titles-head]');
     const note = stage.querySelector('[data-titles-note]');
@@ -979,6 +981,7 @@
   }
 
   function renderDiag() {
+    refreshEdges();
     const list = stage.querySelector('[data-diag-list]');
     const d = nativeJson('diagnostics') || {};
     const row = (label, value) => `<div class="set-row diag-row" data-focus tabindex="0"><span class="set-label">${esc(label)}</span><span class="set-val">${esc(value)}</span></div>`;
@@ -994,6 +997,7 @@
   }
 
   function renderMyScenes() {
+    refreshEdges();
     const list = stage.querySelector('[data-scenes-list]');
     list.innerHTML = state.myScenes.length ? '<p class="small cleanup-note">Press OK on a scene to delete it.</p>' + state.myScenes.map((sc) => `
       <button class="set-row" data-focus data-action="scene-del" data-id="${sc.id}">
@@ -1481,6 +1485,7 @@
   }
 
   function renderDeep() {
+    refreshEdges();
     const list = stage.querySelector('[data-deep-list]');
     const items = nativeJson('deepCleanList') || [];
     const a = state.adb || {};
@@ -1526,6 +1531,7 @@
   }
 
   function renderCleanup() {
+    refreshEdges();
     const list = stage.querySelector('[data-cleanup-list]');
     const items = cleanupItems();
     if (!items.length) {
@@ -2207,7 +2213,7 @@
         title: np.title,
         artist: np.artist || '',
         durationSec: Math.max(0, Math.round((np.durationMs || 0) / 1000)),
-        art: np.art ? `center / cover no-repeat url("${np.art}")` : 'linear-gradient(140deg,#3a3a48,#121218)',
+        art: np.art ? `center / cover no-repeat url('${np.art}')` : 'linear-gradient(140deg,#3a3a48,#121218)',
         palette: np.colors && np.colors.length === 3 ? np.colors : null,
         source: np.source || '',
         icon: np.icon || '',
@@ -2253,6 +2259,7 @@
         </div>
       </header>
 
+      <div class="bottom-blur" aria-hidden="true"></div>
       <div class="views">
         ${homeView()}${searchView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}${wallpapersView()}${cleanupView()}${rolesView()}${guestView()}${deepView()}${scenesView()}${diagView()}
       </div>
@@ -2284,6 +2291,7 @@
       toast: stage.querySelector('.toast'),
     };
 
+    stage.addEventListener('scroll', (e) => edgeFade(e.target), { capture: true, passive: true });
     refs.townInput.value = state.town;
     showPhoto();
     applyState();
@@ -2729,6 +2737,34 @@
     glowShown = true;
   }
 
+  // ---------- Edges of scrolling content ----------
+  // Content that carries on past the bottom (or top) of a scrolling area fades
+  // out instead of being cut off; on a photo wallpaper the bottom of the screen
+  // also blurs (the pre-blurred wallpaper, so nothing is blurred live).
+  function edgeFade(el) {
+    if (!el || !el.classList) return;
+    const below = el.scrollHeight - el.clientHeight - el.scrollTop > 4;
+    el.classList.toggle('more-below', below);
+    el.classList.toggle('more-above', el.scrollTop > 4);
+    if (el.classList.contains('view')) stage.classList.toggle('more-below', below);
+  }
+
+  let edgesQueued = false;
+  function refreshEdges() {
+    if (edgesQueued) return;
+    edgesQueued = true;
+    requestAnimationFrame(() => {
+      edgesQueued = false;
+      const view = stage.querySelector(`[data-view="${state.view}"]`);
+      stage.classList.remove('more-below');
+      if (!view) return;
+      [view, ...view.querySelectorAll('.cleanup, .wp-grid')].forEach((el) => {
+        const y = getComputedStyle(el).overflowY;
+        if (y === 'auto' || y === 'scroll') edgeFade(el);
+      });
+    });
+  }
+
   function openView(id) {
     const from = TAB_ORDER.indexOf(state.view);
     const to = TAB_ORDER.indexOf(id);
@@ -2745,6 +2781,7 @@
     if (id === 'guest') renderGuest();
     animateView(id);
     moveTabGlow();
+    refreshEdges();
     alignFrost(100);
     setTimeout(() => alignFrost(0), 900); // again once the entry animation has settled
     if (id === 'games' && state.games.autoSwitch) startSwitch();

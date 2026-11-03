@@ -4376,3 +4376,77 @@ button.w-empty {
   padding-top: 6px;
   padding-bottom: 6px;
 }
+
+/* ---------- Edges of scrolling content ----------
+   Search scrolls like Apps (the page itself never does). Anything that carries
+   on past an edge fades out instead of being cut off. */
+.view-search {
+  inset: -10px;
+  padding: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.view-search::-webkit-scrollbar {
+  display: none;
+}
+
+.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 96px), rgba(0, 0, 0, 0.4) calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 96px), rgba(0, 0, 0, 0.4) calc(100% - 36px), transparent);
+}
+
+.more-above {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 48px);
+  mask-image: linear-gradient(to bottom, transparent, #000 48px);
+}
+
+.more-above.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 96px), rgba(0, 0, 0, 0.4) calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 96px), rgba(0, 0, 0, 0.4) calc(100% - 36px), transparent);
+}
+
+/* The bottom of the screen: the pre-blurred wallpaper, rising out of the edge,
+   so the faded content reads as carrying on under frosted glass. Placed with
+   plain stage coordinates (the stage is always 1280x720). */
+.bottom-blur {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 132px;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.75) 60%, #000);
+  mask-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.75) 60%, #000);
+}
+
+#stage.photo .bottom-blur {
+  background:
+    var(--photo-scrim),
+    var(--frost) 0 -588px / 1280px 720px no-repeat;
+}
+
+#stage.photo.more-below .bottom-blur {
+  opacity: 1;
+}
+
+/* For you titles stay on one line so every card's text lines up */
+[data-shows="foryou"] .show-title,
+[data-shows="titles"] .show-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Moving focus scrolls far enough that the focused item sits clear of the fades */
+.view-search,
+.view-apps,
+.cleanup,
+.wp-grid {
+  scroll-padding-top: 56px;
+  scroll-padding-bottom: 104px;
+}

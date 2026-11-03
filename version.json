@@ -1,7 +1,7 @@
 {
-  "versionCode": 28,
-  "versionName": "0.18",
+  "versionCode": 29,
+  "versionName": "0.19",
   "apk": "tv.apk",
-  "sha256": "1723c603c82732580fd39d3756ccf1787ca703eaacbaa04b5f613666a6c1ee48",
-  "notes": "Safety and security update: stronger safety net, safe mode (hold Back), encrypted keys, checked updates, Diagnostics page."
+  "sha256": "7569ba78cf8055deeab4072a72e7ff13c88d1340938e9e80e31f3d18d560ce16",
+  "notes": "Search and For you pictures now show, and scrolling pages fade and blur at the edges instead of cutting off."
 }
