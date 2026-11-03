@@ -1,7 +1,7 @@
 {
-  "versionCode": 30,
-  "versionName": "0.20",
+  "versionCode": 31,
+  "versionName": "0.21",
   "apk": "tv.apk",
-  "sha256": "64525399911ca7daeb36321b3d06f83fb1f16c605852ab8e089a206f98bf27fc",
-  "notes": "New look: focus lifts like Apple TV, a welcome on first start, Settings in plain words, and developer options hidden (press the Settings icon 3 times)."
+  "sha256": "6fd0c4ef92b56b8edb2fea334978797fbbd1f94f67754e807f500122737cc9fe",
+  "notes": "New: NBA centre (scores, standings, news, highlights with previews), star shows to hear when they're on your apps, and choose what each Home card shows."
 }
