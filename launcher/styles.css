@@ -4448,5 +4448,48 @@ button.w-empty {
 .cleanup,
 .wp-grid {
   scroll-padding-top: 56px;
-  scroll-padding-bottom: 104px;
+  scroll-padding-bottom: 72px;
+}
+
+/* ---------- Bottom edge: a thin strip of white liquid glass ----------
+   Replaces the tall dark band. Content fades out over a short distance and
+   passes under a slim frosted strip with a lit top edge, like the bottom of
+   a glass panel. Shows only while there is more below. */
+.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), rgba(0, 0, 0, 0.3) calc(100% - 14px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), rgba(0, 0, 0, 0.3) calc(100% - 14px), transparent);
+}
+
+.more-above.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 56px), rgba(0, 0, 0, 0.3) calc(100% - 14px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 56px), rgba(0, 0, 0, 0.3) calc(100% - 14px), transparent);
+}
+
+.bottom-blur,
+#stage.photo .bottom-blur {
+  height: 34px;
+  -webkit-mask-image: none;
+  mask-image: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 -10px 24px -14px rgba(255, 255, 255, 0.35);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1)),
+    var(--frost, none) 0 -686px / 1280px 720px no-repeat;
+}
+
+#stage.more-below .bottom-blur {
+  opacity: 1;
+}
+
+.bottom-blur,
+#stage.photo .bottom-blur {
+  height: 30px;
+  border-top: 0;
+  box-shadow: none;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.55)) top / 100% 1px no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.2)),
+    var(--frost, none) 0 -690px / 1280px 720px no-repeat;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
 }
