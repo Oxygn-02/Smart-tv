@@ -27,6 +27,9 @@
         android:name="com.android.providers.tv.permission.READ_EPG_DATA"
         tools:ignore="ProtectedPermissions" />
 
+    <!-- Updating itself: downloads tv.apk and asks Android to install it -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <uses-feature android:name="android.software.leanback" android:required="true" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -64,6 +67,16 @@
 
         <!-- Lets the launcher read what's playing. Granted once over ADB:
              adb shell cmd notification allow_listener io.github.oxygn02.smarttv/io.github.oxygn02.smarttv.MediaListener -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <service
             android:name=".MediaListener"
             android:exported="true"

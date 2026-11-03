@@ -9,7 +9,10 @@
 
 set -euo pipefail
 
-STOCK_LAUNCHER=com.google.android.apps.tv.launcherx
+# Google's home screen is com.google.android.tvlauncher on the Logik 4K Android TV (Android TV 11);
+# newer Google TV firmware uses com.google.android.apps.tv.launcherx. Enabling a package that isn't
+# there is harmless.
+STOCK_LAUNCHERS=(com.google.android.tvlauncher com.google.android.tvrecommendations com.google.android.apps.tv.launcherx)
 
 if ! adb get-state >/dev/null 2>&1; then
   echo "No TV connected. Run: adb connect <tv-ip>:5555" >&2
@@ -17,7 +20,9 @@ if ! adb get-state >/dev/null 2>&1; then
 fi
 
 if [[ "${1:-}" == "--launcher-only" ]]; then
-  adb shell pm enable "$STOCK_LAUNCHER"
+  for pkg in "${STOCK_LAUNCHERS[@]}"; do adb shell pm enable "$pkg" || true; done
+  # Make the TV answer the Home button with Google's home screen again.
+  adb shell cmd package set-home-activity com.google.android.tvlauncher/.MainActivity 2>/dev/null || true
   exit 0
 fi
 

@@ -1,2 +1,31 @@
-# Packages disabled on the TV with `pm disable-user --user 0`, one per line,
-# each with the reason. Nothing disabled yet. Undo with ./restore.sh.
+# Packages the launcher can switch off with `pm disable-user --user 0`
+# (Settings > Home and apps > Clean up apps > Clean up the TV), each with the reason.
+# Nothing here is switched off until you press the buttons on the TV and confirm.
+# Undo from the TV ("Switch back on what I switched off") or with ./restore.sh.
+#
+# Recommended: leftovers from the factory and the shop
+com.google.android.feedback            Sends feedback and crash data to Google
+com.google.android.partnersetup        Only used during first-time setup
+com.google.android.onetimeinitializer  Runs once at setup
+android.autoinstalls.config.JVC        The maker's retail auto-install settings
+com.google.android.leanbacklauncher.partnercustomizer  Lets the maker add promoted rows to Google's home
+fusion.android.tv.demo                 Shop demo mode
+mediatek.factorymenu.ui                Technician menu
+com.mediatek.testpq                    Factory picture test
+com.mediatek.mtc.factory               Factory test service
+com.mstar.android.tv.disclaimercustomization  First-run legal screens
+com.google.android.sss.authbridge      Phone-to-TV setup helper
+com.google.android.backdrop            Google's screensaver (the ambient screen replaces it)
+com.google.android.syncadapters.calendar  Calendar sync, which a TV does not use
+com.android.dynsystem                  A developer feature
+#
+# Careful, one at a time (test the TV after each)
+com.mediatek.network                   Wi-Fi monitor
+com.google.android.katniss             The Google app: voice search and Assistant (keep if you use the voice button)
+#
+# Only once this launcher is the home screen and working
+com.google.android.tvlauncher          Google's home screen, where the ads come from
+com.google.android.tvrecommendations   Google's recommendations for its home screen
+#
+# Never touched: Android and Google core services, TV inputs and the MediaTek TV services,
+# Freeview Play background services, the keyboard, Cast, Downloader, the update service.

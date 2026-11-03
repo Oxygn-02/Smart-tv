@@ -1,5 +1,7 @@
 // Line icons from mockup/index.html. 24x24 grid, 1.5px stroke.
 const ICON_PATHS = {
+  sports: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5v17"/><path d="M6 5.8c2.2 1.6 3.4 3.8 3.4 6.2S8.2 16.6 6 18.2M18 5.8c-2.2 1.6-3.4 3.8-3.4 6.2s1.2 4.6 3.4 6.2"/>',
+  star: '<path d="M12 3.6l2.5 5.1 5.6.8-4 3.9.9 5.6L12 16.4 7 19l.9-5.6-4-3.9 5.6-.8z"/>',
   home: '<path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
   music: '<path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
@@ -208,6 +210,7 @@ function ensureGlyphs() {
 
 // Filled glyphs for the play/pause control.
 const ICON_FILLED = {
+  star: '<path d="M12 3.6l2.5 5.1 5.6.8-4 3.9.9 5.6L12 16.4 7 19l.9-5.6-4-3.9 5.6-.8z" fill="currentColor"/>',
   pause: '<rect x="7" y="5.5" width="3.2" height="13" rx="1"/><rect x="13.8" y="5.5" width="3.2" height="13" rx="1"/>',
   play: '<path d="M8 5.5v13l10.5-6.5z"/>',
 };

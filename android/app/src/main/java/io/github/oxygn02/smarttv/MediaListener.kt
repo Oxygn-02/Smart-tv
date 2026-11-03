@@ -18,12 +18,17 @@ class MediaListener : NotificationListenerService() {
 
     class MediaNote(val pkg: String, val title: String, val text: String, val art: Bitmap?)
 
+    private var keeper: MusicKeeper? = null
+
     override fun onListenerConnected() {
         instance = this
+        keeper = MusicKeeper(this).also { it.start() }
     }
 
     override fun onListenerDisconnected() {
         if (instance === this) instance = null
+        keeper?.stop()
+        keeper = null
     }
 
     /** What the system's media notifications currently say. */

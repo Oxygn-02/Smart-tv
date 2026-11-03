@@ -11,7 +11,8 @@
   }
 
   const state = {
-    appearance: 'auto', // 'auto' (follow the TV/host) | 'light' | 'dark'
+    forYou: [], // recommendations for the Search tab
+    appearance: 'dark', // 'auto' (follow the TV/host) | 'light' | 'dark'
     theme: initialTheme(), // resolved 'dark' | 'light'
     iconStyle: 'default', // 'default' | 'dark' | 'clear' | 'tinted'
     sampleData: true, // off = preview the empty states real data may need
@@ -25,6 +26,24 @@
     // Tinted icons (Customize): colour from the room light or a hue of your own,
     // warmth 0 (cool) to 100 (warm), opacity 10 to 100.
     tint: { source: 'room', hue: 200, warmth: 50, opacity: 60 },
+    myScenes: [], // scenes you saved: {id, name, backlight, lights}
+    edge: 'lights', // the glow round the screen: 'lights' (follows the backlight), 'custom' (your colour) or 'off'
+    updateChannel: 'stable', // 'stable' or 'beta'
+    updateNotes: '',
+    dev: false, // developer options shown in Settings (press the Settings icon 3 times)
+    welcomed: false, // the first-run welcome has been seen
+    homeLayout: null, // what each place on Home shows (see applyHomeLayout)
+    homeEdit: false,
+    starred: [], // films and series you starred: {id, type, title, poster, backdrop, seen, badge, line}
+    nbaTeams: [], // NBA teams you follow (abbreviations)
+    nbaWatch: 'leaguepass', // where you watch the NBA
+    nbaTab: 'games',
+    nbaNews: [],
+    clipPreviews: true, // a few muted seconds when you stop on a highlight
+    trailers: false, // play a muted trailer (off until the speed test shows room for it) behind a title's page
+    titleRows: [], // the search results, so a card can open its page
+    edgeHue: 330,
+    edgeInt: 42, // how strong the glow is, 10 to 100 (60 is the original strength)
     view: 'home',
     playing: true,
     track: 0,
@@ -68,7 +87,7 @@
 
   // ---------- Saved settings ----------
   // Remembered on the TV between launches (browser storage inside the app).
-  const SAVED = ['clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
+  const SAVED = ['myScenes', 'edge', 'edgeHue', 'edgeInt', 'trailers', 'updateChannel', 'dev', 'welcomed', 'nbaTeams', 'nbaWatch', 'starred', 'homeLayout', 'clipPreviews', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
 
   function loadSaved() {
     try {
@@ -90,6 +109,7 @@
         const o = Object.fromEntries(SAVED.map((k) => [k, state[k]]));
         o.games = { hdmiPort: state.games.hdmiPort, autoSwitch: state.games.autoSwitch, countdownSec: state.games.countdownSec };
         localStorage.setItem('settings', JSON.stringify(o));
+        nativeCall('saveBackup', JSON.stringify(o)); // so the phone page can offer a copy
       } catch {
         // Not saved; it just won't be remembered.
       }
@@ -99,6 +119,17 @@
   // ---------- Colours ----------
   // Everything derived from the light colour, the theme or the tint sliders is
   // worked out here and handed to the CSS as plain values (see color.js).
+  // The colour of the glow round the screen: the lights, the media playing, or one you pick.
+  function edgeColour(glow, dark) {
+    if (state.edge === 'custom') return hslToHex(state.edgeHue, 0.85, dark ? 0.58 : 0.5);
+    if (state.edge === 'media') {
+      const t = state.live && D.music.tracks[state.track];
+      const c = t && t.palette && t.palette[0];
+      if (c) return c;
+    }
+    return glow;
+  }
+
   function applyColors() {
     const dark = state.theme === 'dark';
     const [c0, c1, c2] = BACKLIGHT[state.home.lastScene].colors;
@@ -106,6 +137,8 @@
     const set = (k, v) => stage.style.setProperty(k, v);
 
     set('--glowc', glow);
+    // The glow round the screen: the lights' colour, or one you pick.
+    set('--edge-a', withAlpha(edgeColour(glow, dark), Math.min(1, (dark ? 0.8 : 0.55) * state.edgeInt / 60)));
     set('--glow-a', withAlpha(glow, dark ? 0.8 : 0.55));
     set('--focus', dark ? mixHex(glow, '#ffffff', 0.45) : mixHex(glow, '#15151d', 0.55));
     set('--focus-glow', withAlpha(glow, dark ? 0.5 : 0.35));
@@ -221,6 +254,9 @@
             </div>
           </section>
 
+          <button class="widget glass w-game off-layout" data-focus data-nav-to="sports" aria-label="NBA"></button>
+          <button class="widget glass w-starred off-layout" data-focus data-nav-to="search" aria-label="Starred"></button>
+
           <section class="widget glass w-scenes" data-scenes hidden aria-label="Scenes">
             <span class="w-label">Scenes</span>
             <div class="scene-grid">
@@ -278,6 +314,10 @@
         </label>
         ${NATIVE ? `
         <div class="search-section">
+          <div class="eyebrow" data-sr-head hidden>Starred</div>
+          <div class="shows" data-shows="starred" hidden></div>
+          <div class="eyebrow" data-fy-head hidden>For you</div>
+          <div class="shows" data-shows="foryou"></div>
           <div class="eyebrow" data-titles-head hidden>Shows and films</div>
           <div class="shows" data-shows="titles"></div>
           <p class="small" data-titles-note></p>
@@ -384,10 +424,20 @@
   function appsView() {
     return `
       <section class="view view-apps" data-view="apps" hidden>
+        <div class="input-row" data-inputs hidden></div>
         <div class="app-grid">
           ${D.apps.map((a) => appTile(a, 'app-card glass', 68)).join('')}
         </div>
       </section>`;
+  }
+
+  // The TV's inputs (HDMI, aerial) as a row above the apps.
+  function renderInputs() {
+    const el = stage.querySelector('[data-inputs]');
+    if (!el || !NATIVE) return;
+    const list = (nativeJson('inputs') || []).filter((i) => i.label);
+    el.hidden = !list.length;
+    el.innerHTML = list.map((i) => `<button class="pillbtn" data-focus data-action="input" data-id="${esc(i.id)}">${esc(i.label)}</button>`).join('');
   }
 
   function gamesView() {
@@ -442,6 +492,8 @@
             </div>
             <div class="pill-row">
               ${H.scenes.map((sc) => `<button class="pillbtn" data-focus data-action="room-scene" data-id="${sc.id}">${sc.name}</button>`).join('')}
+              <span class="my-scenes" data-my-scenes></span>
+              <button class="pillbtn" data-focus data-expand="savescene">Save this as a scene</button>
               <button class="pillbtn" data-focus data-action="sleep"><span data-sleep-label>Sleep timer: Off</span></button>
             </div>
             <div class="light-list" data-light-list></div>
@@ -476,6 +528,13 @@
 
   // ---------- Continue watching (the TV's Watch Next list) ----------
   const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // Addresses from outside (TMDB, other apps) go into the page only if they are plain https
+  // addresses with nothing that could end an attribute or a CSS url().
+  // The browser preview's pretend TV (demo-bridge.js) draws its own pictures as SVG data.
+  const DEMO = !!(NATIVE && NATIVE.__demo);
+  const demoPic = (u) => DEMO && typeof u === 'string' && /^data:image\/svg\+xml,[^\s"'()<>\\]+$/.test(u);
+  const safeUrl = (u) => (demoPic(u) || (typeof u === 'string' && /^https:\/\/[^\s"'()<>\\]+$/.test(u)) ? u : '');
+  const tmdbImg = (size, path) => (demoPic(path) ? path : typeof path === 'string' && /^\/[A-Za-z0-9_.-]+$/.test(path) ? `https://image.tmdb.org/t/p/${size}${path}` : '');
   const appByPkg = (pkg) => D.apps.find((a) => a.pkg === pkg);
 
   function leftText(pos, dur) {
@@ -486,7 +545,7 @@
 
   function cwShape(it) {
     const app = appByPkg(it.pkg);
-    const poster = /^https?:/.test(it.poster) ? `url("${it.poster}") center / cover no-repeat, ` : '';
+    const poster = safeUrl(it.poster) ? `url('${safeUrl(it.poster)}') center / cover no-repeat, ` : '';
     return {
       title: it.title,
       subtitle: it.sub,
@@ -534,20 +593,946 @@
     applyState();
   }
 
+  // Wide thumbnail: the landscape still when TMDB has one, else the poster.
+  function artStyle(h) {
+    if (tmdbImg('w780', h.backdrop_path)) return `background:url('${tmdbImg('w780', h.backdrop_path)}') center / cover`;
+    if (tmdbImg('w342', h.poster_path)) return `background:url('${tmdbImg('w342', h.poster_path)}') center top / cover`;
+    return 'background:linear-gradient(135deg,#2a2a38,#14141c)';
+  }
+
+
+  // ---------- For you ----------
+  // Two sources, woven into one row: what your apps recommend on the TV's home
+  // channels, and what is popular right now on the services you have.
+  const PROVIDER_IDS = { prime: [9, 119], disney: [337], crunchyroll: [283], iplayer: [38], itvx: [41], c4: [103], my5: [333], netflix: [8] };
+  const FY_KEY = 'foryou-v1';
+
+  async function loadForYou() {
+    if (!NATIVE) return;
+    let items = [];
+    const mine = nativeJson('recommendations') || { items: [] };
+    const fromApps = (mine.items || []).filter((i) => safeUrl(i.art) && appByPkg(i.pkg)).slice(0, 8).map((i) => {
+      const app = appByPkg(i.pkg);
+      return { title: i.title, line: app.name, art: `background:url('${i.art}') center / cover`, appId: app.id, uri: i.uri, pkg: i.pkg };
+    });
+    items = fromApps;
+    if (tmdbReady()) {
+      try {
+        let cached = null;
+        try { cached = JSON.parse(localStorage.getItem(FY_KEY) || 'null'); } catch { /* none */ }
+        const ids = D.apps.flatMap((a) => PROVIDER_IDS[a.id] || []);
+        const sig = ids.join(',');
+        let pop = cached && cached.sig === sig && Date.now() - cached.at < 6 * 3600e3 ? cached.items : null;
+        if (!pop && ids.length) {
+          const q = { watch_region: 'GB', with_watch_providers: ids.join('|'), with_watch_monetization_types: 'flatrate|free|ads', sort_by: 'popularity.desc', language: 'en-GB', include_adult: 'false' };
+          const [m, t] = await Promise.all([tmdb('discover/movie', q), tmdb('discover/tv', q)]);
+          const take = (r, type) => (r.results || []).filter((x) => x.backdrop_path || x.poster_path).slice(0, 6).map((x) => ({ ...x, media_type: type }));
+          const a = take(m, 'movie'), b = take(t, 'tv');
+          pop = [];
+          for (let i = 0; i < 6; i++) { if (b[i]) pop.push(b[i]); if (a[i]) pop.push(a[i]); }
+          try { localStorage.setItem(FY_KEY, JSON.stringify({ sig, at: Date.now(), items: pop })); } catch { /* not saved */ }
+        }
+        const seen = new Set(items.map((i) => normName(i.title)));
+        // Which of your apps carries each one is looked up when it is chosen.
+        (pop || []).forEach((h) => {
+          const title = h.title || h.name || '';
+          if (seen.has(normName(title))) return;
+          items.push({ title, line: [(h.release_date || h.first_air_date || '').slice(0, 4), h.media_type === 'tv' ? 'Series' : 'Film', h.vote_average > 0 ? `★ ${h.vote_average.toFixed(1)}` : ''].filter(Boolean).join(' · '), art: artStyle(h), tmdb: h });
+        });
+      } catch { /* the apps' own rows still show */ }
+    }
+    state.forYou = items.slice(0, 10);
+    renderSearch();
+  }
+
+  function renderForYou() {
+    refreshEdges();
+    const el = stage.querySelector('[data-shows="foryou"]');
+    const head = stage.querySelector('[data-fy-head]');
+    if (!el) return;
+    const show = !state.query.trim() && state.forYou.length;
+    const why = !state.query.trim() && !state.forYou.length && NATIVE ? (tmdbReady() ? '' : 'Add a TMDB key on the phone setup page to see films and series here.') : '';
+    head.hidden = !show && !why;
+    el.hidden = !show && !why;
+    el.classList.toggle('shows-note', !!why);
+    if (why) { el.innerHTML = `<p class="small fy-why">${why}</p>`; return; }
+    el.innerHTML = show ? state.forYou.slice(0, 5).map((it, i) => {
+      const app = it.appId ? APP[it.appId] : null;
+      return `
+        <button class="show glass" data-focus data-action="foryou" data-i="${i}" aria-label="${esc(it.title)}">
+          <div class="show-art" style="${it.art}">${app ? `<span class="show-app">${appIcon(app, 34)}</span>` : ''}</div>
+          <div class="show-body"><div class="show-title">${esc(it.title)}</div><div class="small show-meta">${esc(it.line)}</div></div>
+        </button>`;
+    }).join('') : '';
+  }
+
+  // Opens a For you item: the app's own link, or the service that carries a popular title.
+  async function openForYou(it) {
+    if (!it) return;
+    if (it.uri) { nativeCall('watchNextOpen', it.uri, it.pkg); return; }
+    if (it.tmdb) { openTitle(it.tmdb); return; }
+    try {
+      const p = await tmdb(`${it.tmdb.media_type}/${it.tmdb.id}/watch/providers`);
+      const pick = pickApp((p.results || {}).GB || {});
+      if (pick) { toast(`Opening ${it.title} in ${pick.app.name}`); launchApp(pick.app.id); return; }
+    } catch { /* fall through */ }
+    toast(`${it.title} isn't on one of your apps right now`);
+  }
+
+
+  // ---------- A title's page ----------
+  // Where it can be watched (free first), what it costs, the rating, a short
+  // description and, if switched on, a muted trailer fading in behind it.
+  // Free/subscription/rent/buy come from TMDB (JustWatch). TMDB has no prices,
+  // so those come from Watchmode when its key has been added on the phone page.
+  const STORE_PKG = {
+    netflix: 'com.netflix.ninja', disneyplus: 'com.disney.disneyplus', amazonprimevideo: 'com.amazon.amazonvideo.livingroom',
+    amazonvideo: 'com.amazon.amazonvideo.livingroom', primevideo: 'com.amazon.amazonvideo.livingroom', appletv: 'com.apple.atve.androidtv.appletv',
+    appletvplus: 'com.apple.atve.androidtv.appletv', googleplaymovies: 'com.google.android.videos', youtube: 'com.google.android.youtube.tv',
+    crunchyroll: 'com.crunchyroll.crunchyroid', paramountplus: 'com.cbs.ott',
+    bbciplayer: 'uk.co.bbc.iplayer', itvx: 'air.ITVMobilePlayer', channel4: 'com.channel4.ondemand',
+  };
+  const money = (v) => (typeof v === 'number' && v > 0 ? `£${v.toFixed(2).replace(/\.00$/, '')}` : '');
+
+  function providerRows(g, prices) {
+    const by = new Map();
+    const add = (list, kind) => (list || []).forEach((x) => {
+      const key = normName(x.provider_name);
+      const r = by.get(key) || { name: x.provider_name, logo: x.logo_path, kinds: {} };
+      r.kinds[kind] = true;
+      by.set(key, r);
+    });
+    add(g.free, 'free'); add(g.ads, 'ads'); add(g.flatrate, 'sub'); add(g.rent, 'rent'); add(g.buy, 'buy');
+    return [...by.values()].map((r) => {
+      const app = appForProvider(r.name);
+      const price = (prices || []).filter((s) => normName(s.name) === normName(r.name) || (ALIAS[normName(s.name)] || normName(s.name)) === (ALIAS[normName(r.name)] || normName(r.name)));
+      const lowest = (type) => Math.min(...price.filter((s) => s.type === type && s.price > 0).map((s) => s.price));
+      const parts = [];
+      if (r.kinds.free) parts.push('Free');
+      else if (r.kinds.ads) parts.push('Free with ads');
+      if (r.kinds.sub) parts.push('With subscription');
+      if (r.kinds.rent) parts.push(`Rent ${money(lowest('rent')) || ''}`.trim());
+      if (r.kinds.buy) parts.push(`Buy ${money(lowest('buy')) || ''}`.trim());
+      const rank = r.kinds.free || r.kinds.ads ? 0 : r.kinds.sub ? 1 : 2;
+      return { ...r, app, pkg: app ? app.pkg : STORE_PKG[ALIAS[normName(r.name)] || normName(r.name)] || '', line: parts.join(' · '), rank: rank + (app ? 0 : 3) };
+    }).sort((a, b) => a.rank - b.rank);
+  }
+
+  let titleSeq = 0;
+  let titleRowsNow = [];
+
+  function titleHead(h, d) {
+    const type = h.media_type === 'tv' ? 'tv' : 'movie';
+    const year = (h.release_date || h.first_air_date || '').slice(0, 4);
+    const runtime = d && (d.runtime || (d.episode_run_time || [])[0]);
+    const meta = [year, type === 'tv' ? (d && d.number_of_seasons ? `${d.number_of_seasons} season${d.number_of_seasons === 1 ? '' : 's'}` : 'Series') : 'Film',
+      runtime ? (runtime >= 60 ? `${Math.floor(runtime / 60)}h ${runtime % 60}m` : `${runtime}m`) : '', ...((d && d.genres) || []).slice(0, 2).map((x) => x.name)].filter(Boolean);
+    const rating = h.vote_average > 0 ? `<span class="t-rating">★ ${h.vote_average.toFixed(1)}</span>` : '';
+    return `<div class="t-title">${esc(h.title || h.name || '')}</div>
+      <div class="t-meta">${rating}<span>${esc(meta.join(' · '))}</span></div>`;
+  }
+
+  function renderTitleRows(rows) {
+    const el = refs.xpanel.querySelector('[data-t-rows]');
+    if (!el) return;
+    titleRowsNow = rows;
+    el.innerHTML = rows.length ? rows.map((r, i) => {
+      const icon36 = r.app ? appIcon(r.app, 40) : tmdbImg('w92', r.logo) ? `<img class="t-logo" src="${tmdbImg('w92', r.logo)}" alt="">` : `<span class="t-logo t-letter">${esc(r.name.slice(0, 1))}</span>`;
+      const act = r.app ? 'Open' : r.pkg ? 'Install' : 'Not on this TV';
+      return `<button class="t-row" data-focus data-action="title-go" data-i="${i}" ${r.app || r.pkg ? '' : 'disabled'}>
+        ${icon36}<span class="t-row-name">${esc(r.name)}<span class="small">${esc(r.line)}</span></span><span class="t-row-act">${act}</span></button>`;
+    }).join('') : '<p class="small">Not on any streaming or rental service in the UK right now.</p>';
+  }
+
+  function trailerFor(d) {
+    const v = ((d && d.videos && d.videos.results) || []).filter((x) => x.site === 'YouTube' && /trailer|teaser/i.test(x.type));
+    return (v.find((x) => x.official && x.type === 'Trailer') || v.find((x) => x.type === 'Trailer') || v[0] || {}).key || '';
+  }
+
+  function startTrailer(key, seq) {
+    const box = refs.xpanel.querySelector('[data-t-trailer]');
+    if (!/^[A-Za-z0-9_-]{6,20}$/.test(key || '') || !box || !state.trailers || seq !== titleSeq) return;
+    const f = document.createElement('iframe');
+    f.setAttribute('allow', 'autoplay; encrypted-media');
+    f.setAttribute('tabindex', '-1');
+    f.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(key)}?autoplay=1&mute=1&controls=0&disablekb=1&fs=0&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&loop=1&playlist=${encodeURIComponent(key)}&enablejsapi=1`;
+    f.addEventListener('load', () => { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*'); } catch { /* none */ } });
+    box.append(f);
+    // Only shown once YouTube says it is playing, so an error page never appears.
+    const onMsg = (e) => {
+      if (e.source !== f.contentWindow) return;
+      let m; try { m = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch { return; }
+      const st = m && (m.event === 'onStateChange' ? m.info : m.info && m.info.playerState);
+      if (st === 1) box.classList.add('playing');
+    };
+    window.addEventListener('message', onMsg);
+    box.__off = () => window.removeEventListener('message', onMsg);
+  }
+
+  let titleNow = null;
+  async function openTitle(h) {
+    if (!h) return;
+    const seq = ++titleSeq;
+    titleNow = h;
+    xFrom = document.activeElement;
+    const type = h.media_type === 'tv' ? 'tv' : 'movie';
+    const art = tmdbImg('w1280', h.backdrop_path);
+    refs.xpanel.className = 'xpanel xwide';
+    refs.xpanel.innerHTML = `
+      <div class="t-bg" data-t-trailer><div class="t-still" style="${art ? `background-image:url('${art}')` : ''}"></div></div>
+      <div class="t-body">
+        <div class="t-actions">${starButton(h)}<button class="btn lg x-close" data-focus data-action="x-close">Close</button></div>
+        <div class="t-top">
+          ${tmdbImg('w342', h.poster_path) ? `<img class="t-poster" src="${tmdbImg('w342', h.poster_path)}" alt="">` : ''}
+          <div class="t-info"><div data-t-head>${titleHead(h, null)}</div>
+            <p class="t-over" data-t-over>${esc(h.overview || '')}</p></div>
+        </div>
+        <div class="t-where"><div class="eyebrow">Where to watch</div><div class="t-rows" data-t-rows><div class="t-row skeleton"></div><div class="t-row skeleton"></div></div></div>
+      </div>`;
+    refs.x.hidden = false;
+    refs.x.classList.remove('closing');
+    applyState();
+    refs.xpanel.querySelector('[data-focus]')?.focus();
+
+    try {
+      const priceKey = nativeCall('pricesReady') === true;
+      const [d, p] = await Promise.all([
+        tmdb(`${type}/${h.id}`, { append_to_response: 'videos', include_video_language: 'en,null', language: 'en-GB' }).catch(() => null),
+        tmdb(`${type}/${h.id}/watch/providers`).catch(() => ({})),
+      ]);
+      if (seq !== titleSeq) return;
+      const g = (p.results || {}).GB || {};
+      if (d) {
+        refs.xpanel.querySelector('[data-t-head]').innerHTML = titleHead({ ...h, vote_average: d.vote_average || h.vote_average }, d);
+        refs.xpanel.querySelector('[data-t-over]').textContent = d.overview || h.overview || '';
+        startTrailer(trailerFor(d), seq);
+      }
+      renderTitleRows(providerRows(g, null));
+      if (!refs.xpanel.contains(document.activeElement) || document.activeElement.classList.contains('t-close')) refs.xpanel.querySelector('.t-row:not([disabled])')?.focus();
+      if (priceKey) {
+        try {
+          const find = await nativeFetch('pricesFetch', 'search/', { search_field: type === 'tv' ? 'tmdb_tv_id' : 'tmdb_movie_id', search_value: String(h.id) });
+          const wid = (find.title_results || [])[0]?.id;
+          if (wid) {
+            const src = await nativeFetch('pricesFetch', `title/${Number(wid)}/sources/`, { regions: 'GB' });
+            if (seq !== titleSeq) return;
+            const focusedAt = document.activeElement?.dataset?.i;
+            renderTitleRows(providerRows(g, (src || []).map((s) => ({ name: s.name, type: s.type === 'sub' ? 'sub' : s.type, price: s.price }))));
+            if (focusedAt !== undefined) refs.xpanel.querySelector(`.t-row[data-i="${focusedAt}"]`)?.focus();
+          }
+        } catch { /* the apps are listed without prices */ }
+      }
+    } catch {
+      if (seq === titleSeq) renderTitleRows([]);
+    }
+  }
+
+  function goTitleRow(r) {
+    if (!r) return;
+    if (r.app) { closeExpand(); launchApp(r.app.id); } else if (r.pkg) nativeCall('openStore', r.pkg);
+  }
+
+  // ---------- Sports: the NBA centre ----------
+  // Games, live scores, standings, news and highlights from ESPN's public NBA
+  // feed, fetched by the Android side (sportsFetch) and kept for a while, so
+  // nothing polls in the background. Where to watch is your choice: UK rights
+  // change by season, and no free source lists UK channels per game.
+  const NBA_WATCH = [
+    { id: 'leaguepass', name: 'NBA League Pass', app: /^nba/i },
+    { id: 'sky', name: 'Sky Sports', app: /(^now\b|sky)/i },
+    { id: 'prime', name: 'Prime Video', app: /prime video/i },
+  ];
+  const sportsCache = new Map();
+  const sportsWaiting = new Map();
+
+  function sportsGet(kind, params = {}, maxAgeMs = 600000) {
+    const key = kind + JSON.stringify(params);
+    const hit = sportsCache.get(key);
+    if (hit && Date.now() - hit.at < maxAgeMs) return Promise.resolve(hit.data);
+    if (sportsWaiting.has(key)) return sportsWaiting.get(key);
+    const p = nativeFetch('sportsFetch', kind, params).then((data) => {
+      sportsCache.set(key, { at: Date.now(), data });
+      sportsWaiting.delete(key);
+      return data;
+    }, (e) => { sportsWaiting.delete(key); if (hit) return hit.data; throw e; });
+    sportsWaiting.set(key, p);
+    return p;
+  }
+
+  const ymd = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+  const sportsImg = (u) => safeUrl(u);
+
+  function parseTeam(c) {
+    const t = (c && c.team) || {};
+    return {
+      abbr: String(t.abbreviation || '?').slice(0, 5), name: String(t.displayName || ''), short: String(t.shortDisplayName || t.name || t.abbreviation || ''),
+      logo: sportsImg(t.logo || (t.logos && t.logos[0] && t.logos[0].href)), color: /^[0-9a-f]{6}$/i.test(t.color || '') ? `#${t.color}` : '#555a66',
+      score: c && c.score !== undefined && c.score !== '' ? String(c.score) : '', record: (c && c.records && c.records[0] && c.records[0].summary) || '',
+    };
+  }
+
+  // The game's top scorer from the scoreboard (ESPN lists leaders for games under
+  // way or finished), else the higher of the two teams' points leaders.
+  function topScorer(comp) {
+    const pick = (cats) => {
+      const cat = (cats || []).find((c) => c.name === 'points' || c.abbreviation === 'PTS');
+      const l = cat && cat.leaders && cat.leaders[0];
+      return l && l.athlete ? { name: String(l.athlete.displayName || l.athlete.shortName || ''), pts: Number(l.value) || parseInt(l.displayValue, 10) || 0, teamId: l.team && String(l.team.id) } : null;
+    };
+    const all = [pick(comp.leaders), ...(comp.competitors || []).map((c) => { const t = pick(c.leaders); if (t) t.abbr = c.team && c.team.abbreviation; return t; })].filter((x) => x && x.name);
+    const best = all.sort((a, b) => b.pts - a.pts)[0];
+    if (!best) return null;
+    if (!best.abbr && best.teamId) best.abbr = ((comp.competitors || []).find((c) => c.team && String(c.team.id) === best.teamId) || {}).team?.abbreviation || '';
+    return best;
+  }
+
+  function parseGames(sb) {
+    return ((sb && sb.events) || []).map((e) => {
+      const comp = (e.competitions && e.competitions[0]) || {};
+      const cs = comp.competitors || [];
+      const st = (e.status && e.status.type) || {};
+      return {
+        id: String(e.id), date: new Date(e.date), state: st.state || 'pre', detail: st.shortDetail || '',
+        home: parseTeam(cs.find((c) => c.homeAway === 'home')), away: parseTeam(cs.find((c) => c.homeAway === 'away')),
+        venue: (comp.venue && comp.venue.fullName) || '',
+        top: st.state === 'pre' ? null : topScorer(comp),
+      };
+    }).filter((g) => !isNaN(g.date));
+  }
+
+  function parseStandings(s) {
+    return ((s && s.children) || []).map((c) => ({
+      name: String(c.name || c.abbreviation || ''),
+      rows: (((c.standings && c.standings.entries) || []).map((en) => {
+        const stat = (n) => (en.stats || []).find((x) => x.name === n) || {};
+        const t = en.team || {};
+        return {
+          abbr: String(t.abbreviation || '?'), name: String(t.shortDisplayName || t.displayName || ''), logo: sportsImg(t.logos && t.logos[0] && t.logos[0].href),
+          w: Number(stat('wins').value) || 0, l: Number(stat('losses').value) || 0, pct: Number(stat('winPercent').value) || 0,
+          gb: stat('gamesBehind').displayValue || '-', streak: stat('streak').displayValue || '', seed: Number(stat('playoffSeed').value) || 99,
+        };
+      })).sort((a, b) => a.seed - b.seed || b.pct - a.pct),
+    }));
+  }
+
+  // A highlight's video: the first https .mp4 address anywhere in the item
+  // (ESPN puts it under links.source or video[].links). The preview's pretend
+  // TV uses a bundled sample clip.
+  function findClip(o, depth = 0) {
+    if (!o || depth > 5) return '';
+    if (typeof o === 'string') return (/^https:\/\/[^\s"'()<>\\]+\.mp4(\?[^\s"'()<>\\]*)?$/.test(o) || (DEMO && /^clips\/[\w-]+\.mp4$/.test(o))) ? o : '';
+    if (Array.isArray(o)) { for (const x of o) { const c = findClip(x, depth + 1); if (c) return c; } return ''; }
+    if (typeof o === 'object') { for (const k of Object.keys(o)) { const c = findClip(o[k], depth + 1); if (c) return c; } }
+    return '';
+  }
+
+  function parseNews(n) {
+    return ((n && n.articles) || []).slice(0, 14).map((a) => ({
+      id: String(a.id || a.headline), headline: String(a.headline || ''), description: String(a.description || ''),
+      published: new Date(a.published || Date.now()),
+      image: sportsImg((a.images && a.images[0] && a.images[0].url) || (a.video && a.video[0] && (a.video[0].thumbnail || a.video[0].posterImages?.default?.href))),
+      video: a.type === 'Media' || !!(a.video || (a.videos && a.videos.length)),
+      clip: findClip(a.video || a.videos || a.links || null),
+    })).filter((a) => a.headline);
+  }
+
+  function ago(d) {
+    const m = Math.max(1, Math.round((Date.now() - d) / 60000));
+    return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
+  }
+
+  // "Tonight 12:30 am", "Tomorrow 1:00 am", "Sat 2:30 am" in your own time
+  function whenText(d) {
+    const day = new Date(d); day.setHours(0, 0, 0, 0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const diff = Math.round((day - today) / 86400000);
+    const label = diff === 0 ? (d.getHours() >= 17 ? 'Tonight' : 'Today') : diff === 1 ? 'Tomorrow' : d.toLocaleDateString('en-GB', { weekday: 'short' });
+    return `${label} ${clockText(d)}`;
+  }
+
+  const followed = (g) => state.nbaTeams.includes(g.home.abbr) || state.nbaTeams.includes(g.away.abbr);
+  const watchInfo = () => NBA_WATCH.find((w) => w.id === state.nbaWatch) || NBA_WATCH[0];
+  const watchApp = () => D.apps.find((a) => watchInfo().app.test(a.name));
+
+  // A team's logo in a light glass circle. Under it sit the team's colour and
+  // initials, which show if the logo can't load (see the error listener below).
+  function teamBadge(t, size = 44) {
+    return `<span class="sp-logo" style="--tc:${t.color};width:${size}px;height:${size}px;font-size:${Math.max(9, Math.round(size * 0.27))}px"><span class="sp-initials">${esc(t.abbr)}</span>${t.logo ? `<img class="sp-img" src="${t.logo}" alt="" loading="lazy">` : ''}</span>`;
+  }
+
+  function statusText(g) {
+    if (g.state === 'pre') return whenText(g.date);
+    if (g.state === 'post') return 'Final';
+    return g.detail.replace(' - ', ' · ');
+  }
+
+  // The game to put first: your team live, then your team next, then anything live, then the next game.
+  function featuredGame(games) {
+    const soon = games.filter((g) => g.state !== 'post').sort((a, b) => a.date - b.date);
+    return soon.find((g) => g.state === 'in' && followed(g)) || soon.find(followed) || soon.find((g) => g.state === 'in') || soon[0] || games[games.length - 1] || null;
+  }
+
+  let nbaGames = [];
+  let nbaLoadedAt = 0;
+  async function loadNba(force = false) {
+    if (!NATIVE) return [];
+    const from = new Date(Date.now() - 86400000);
+    const to = new Date(Date.now() + 6 * 86400000);
+    const live = nbaGames.some((g) => g.state === 'in');
+    try {
+      const sb = await sportsGet('scoreboard', { dates: `${ymd(from)}-${ymd(to)}`, limit: '200' }, force ? 0 : live ? 60000 : 600000);
+      nbaGames = parseGames(sb).sort((a, b) => a.date - b.date);
+      nbaLoadedAt = Date.now();
+      remindGames();
+    } catch { /* keep what we had */ }
+    renderGameWidget();
+    if (state.view === 'sports') renderSports();
+    return nbaGames;
+  }
+
+  const reminded = new Set();
+  function remindGames() {
+    nbaGames.filter(followed).forEach((g) => {
+      const mins = (g.date - Date.now()) / 60000;
+      if (g.state === 'pre' && mins > 0 && mins <= 30 && !reminded.has(g.id)) {
+        reminded.add(g.id);
+        toast(`${g.away.short} at ${g.home.short} starts in ${Math.round(mins)} min. ${watchInfo().name}`);
+      }
+    });
+  }
+
+  function sportsView() {
+    return `
+      <section class="view view-sports" data-view="sports" hidden>
+        <div class="sp-head">
+          <span class="sp-title">NBA</span>
+          <div class="segmented sp-tabs">${[['games', 'Games'], ['standings', 'Standings'], ['news', 'News and highlights'], ['teams', 'Your teams']].map(([id, label]) => `<button class="seg" data-focus data-action="sp-tab" data-id="${id}">${label}</button>`).join('')}</div>
+          <span class="small sp-updated" data-sp-updated></span>
+        </div>
+        <div class="sp-body" data-sp-body></div>
+      </section>`;
+  }
+
+  function gameCard(g) {
+    const live = g.state === 'in';
+    const scores = g.state !== 'pre';
+    const win = (a, b) => (g.state === 'post' && Number(a) > Number(b) ? ' win' : '');
+    return `
+      <button class="sp-game glass${live ? ' live' : ''}${followed(g) ? ' mine' : ''}" data-focus data-action="sp-game" data-id="${g.id}" aria-label="${esc(g.away.name)} at ${esc(g.home.name)}, ${esc(statusText(g))}">
+        <span class="sp-row${win(g.away.score, g.home.score)}">${teamBadge(g.away, 30)}<span class="sp-abbr">${esc(g.away.abbr)}</span><span class="sp-score">${scores ? esc(g.away.score) : ''}</span></span>
+        <span class="sp-row${win(g.home.score, g.away.score)}">${teamBadge(g.home, 30)}<span class="sp-abbr">${esc(g.home.abbr)}</span><span class="sp-score">${scores ? esc(g.home.score) : ''}</span></span>
+        <span class="sp-status">${live ? '<span class="sp-dot"></span>' : ''}${esc(statusText(g))}</span>
+        ${g.top ? `<span class="sp-top">${esc(g.top.name)} <b>${g.top.pts}</b> pts</span>` : ''}
+      </button>`;
+  }
+
+  function featureCard(g) {
+    if (!g) return '<div class="sp-empty glass"><span class="w-empty-title">No games this week</span><span class="small">The NBA season runs from October to June.</span></div>';
+    const scores = g.state !== 'pre';
+    const app = watchApp();
+    return `
+      <section class="sp-feature glass${g.state === 'in' ? ' live' : ''}" style="--ta:${g.away.color};--th:${g.home.color}">
+        <div class="sp-f-team">${teamBadge(g.away, 84)}<span class="sp-f-name">${esc(g.away.short)}</span><span class="small">${esc(g.away.record)}</span></div>
+        <div class="sp-f-mid">
+          <span class="sp-f-label">${g.state === 'in' ? '<span class="sp-dot"></span>Live' : g.state === 'post' ? 'Final' : followed(g) ? 'Your team next' : 'Next game'}</span>
+          <span class="sp-f-score">${scores ? `${esc(g.away.score)}<span class="sp-f-dash">–</span>${esc(g.home.score)}` : esc(clockText(g.date))}</span>
+          <span class="small">${esc(g.state === 'pre' ? whenText(g.date).replace(/ \d.*$/, '') : g.detail)}${g.venue ? ` · ${esc(g.venue)}` : ''}</span>
+          ${g.top ? `<span class="sp-f-top">Top scorer: ${esc(g.top.name)}${g.top.abbr ? ` (${esc(g.top.abbr)})` : ''}, ${g.top.pts} pts</span>` : ''}
+          <div class="sp-f-actions">
+            <button class="btn lg btn-primary" data-focus data-action="sp-watch">${app ? `Watch on ${esc(app.short || app.name)}` : `Watch: ${esc(watchInfo().name)}`}</button>
+            <button class="btn lg" data-focus data-action="sp-game" data-id="${g.id}">Game details</button>
+          </div>
+        </div>
+        <div class="sp-f-team">${teamBadge(g.home, 84)}<span class="sp-f-name">${esc(g.home.short)}</span><span class="small">${esc(g.home.record)}</span></div>
+      </section>`;
+  }
+
+  async function renderSports() {
+    const body = stage.querySelector('[data-sp-body]');
+    if (!body) return;
+    all('[data-action="sp-tab"]').forEach((b) => { const on = b.dataset.id === state.nbaTab; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+    const upd = stage.querySelector('[data-sp-updated]');
+    const tab = state.nbaTab;
+    if (tab === 'games') {
+      if (!nbaGames.length && NATIVE) body.innerHTML = `<div class="sp-feature glass skeleton"></div><div class="sp-grid">${'<div class="sp-game glass skeleton"></div>'.repeat(4)}</div>`;
+      const games = nbaGames;
+      const today = games.filter((g) => new Date(g.date).toDateString() === new Date().toDateString() || g.state === 'in');
+      const yesterday = games.filter((g) => g.state === 'post' && !today.includes(g));
+      const coming = games.filter((g) => g.state === 'pre' && !today.includes(g) && (!state.nbaTeams.length || followed(g))).slice(0, 8);
+      if (games.length || !NATIVE) {
+        body.innerHTML = featureCard(featuredGame(games))
+          + (today.length ? `<div class="eyebrow">Today</div><div class="sp-grid">${today.map(gameCard).join('')}</div>` : '')
+          + (coming.length ? `<div class="eyebrow">${state.nbaTeams.length ? 'Your teams, coming up' : 'Coming up'}</div><div class="sp-grid">${coming.map(gameCard).join('')}</div>` : '')
+          + (yesterday.length ? `<div class="eyebrow">Last night</div><div class="sp-grid">${yesterday.map(gameCard).join('')}</div>` : '');
+      }
+      upd.textContent = nbaLoadedAt ? `Updated ${clockText(new Date(nbaLoadedAt))}` : '';
+      if (!nbaLoadedAt || Date.now() - nbaLoadedAt > 60000) loadNba();
+    } else if (tab === 'standings') {
+      body.innerHTML = '<div class="sp-tables"><div class="sp-table glass skeleton"></div><div class="sp-table glass skeleton"></div></div>';
+      try {
+        const confs = parseStandings(await sportsGet('standings', {}, 3 * 3600000));
+        if (state.nbaTab !== 'standings') return;
+        body.innerHTML = `<div class="sp-tables">${confs.map((c) => `
+          <section class="sp-table glass" data-focus tabindex="0" aria-label="${esc(c.name)} standings">
+            <div class="sp-t-title">${esc(c.name)}</div>
+            <div class="sp-t-row sp-t-head"><span></span><span>Team</span><span>W</span><span>L</span><span>PCT</span><span>GB</span><span>Strk</span></div>
+            ${c.rows.map((r, i) => `<div class="sp-t-row${state.nbaTeams.includes(r.abbr) ? ' mine' : ''}${i === 5 || i === 9 ? ' cut' : ''}"><span class="sp-seed">${i + 1}</span><span class="sp-t-team">${teamBadge(r, 22)}${esc(r.name)}</span><span>${r.w}</span><span>${r.l}</span><span>${r.pct.toFixed(3).replace(/^0/, '')}</span><span>${esc(r.gb)}</span><span>${esc(r.streak)}</span></div>`).join('')}
+          </section>`).join('')}</div>
+          <p class="small sp-note">Top 6 go straight to the play-offs; 7 to 10 play in.</p>`;
+      } catch { body.innerHTML = '<p class="small sp-note">Couldn\'t load the standings. Is the TV online?</p>'; }
+    } else if (tab === 'news') {
+      body.innerHTML = `<div class="sp-grid">${'<div class="sp-game glass skeleton"></div>'.repeat(4)}</div>`;
+      try {
+        const items = parseNews(await sportsGet('news', { limit: '20' }, 1800000));
+        if (state.nbaTab !== 'news') return;
+        state.nbaNews = items;
+        const vids = items.filter((a) => a.video);
+        const reads = items.filter((a) => !a.video);
+        body.innerHTML = (vids.length ? `<div class="eyebrow">Highlights</div><div class="sp-vids">${vids.slice(0, 4).map((a) => `
+            <button class="show glass sp-vid" data-focus data-action="sp-video" data-id="${esc(a.id)}" ${a.clip ? `data-clip="${esc(a.clip)}"` : ''} aria-label="Watch: ${esc(a.headline)}">
+              <div class="show-art" style="${a.image ? `background:url('${a.image}') center / cover` : ''}"><span class="sp-play">${filledIcon('play', 18)}</span></div>
+              <div class="show-body"><div class="show-title">${esc(a.headline)}</div><div class="small show-meta">${esc(ago(a.published))}</div></div>
+            </button>`).join('')}</div>` : '')
+          + (reads.length ? `<div class="eyebrow">Reports</div><div class="sp-news">${reads.map((a) => `
+            <button class="sp-story glass" data-focus data-action="sp-story" data-id="${esc(a.id)}">
+              ${a.image ? `<span class="sp-story-img" style="background:url('${a.image}') center / cover"></span>` : ''}
+              <span class="sp-story-text"><span class="sp-story-head">${esc(a.headline)}</span><span class="small">${esc(a.description)}</span><span class="small sp-ago">${esc(ago(a.published))}</span></span>
+            </button>`).join('')}</div>` : '');
+      } catch { body.innerHTML = '<p class="small sp-note">Couldn\'t load the news. Is the TV online?</p>'; }
+    } else if (tab === 'teams') {
+      let teams = [];
+      try {
+        const t = await sportsGet('teams', {}, 24 * 3600000);
+        teams = ((((t.sports || [])[0] || {}).leagues || [])[0] || {}).teams || [];
+      } catch { /* none */ }
+      if (state.nbaTab !== 'teams') return;
+      body.innerHTML = `
+        <div class="sp-watch glass">
+          <span class="set-label">Where you watch the NBA<span class="small">The Watch button opens this. UK rights change each season, so pick yours.</span></span>
+          <div class="segmented">${NBA_WATCH.map((w) => `<button class="seg${w.id === state.nbaWatch ? ' on' : ''}" data-focus data-action="sp-watch-pick" data-id="${w.id}">${w.name}</button>`).join('')}</div>
+        </div>
+        <div class="eyebrow">Follow teams for reminders and your own fixtures</div>
+        <div class="sp-teams">${teams.map((x) => parseTeam(x)).sort((a, b) => a.name.localeCompare(b.name)).map((t) => `
+          <button class="sp-team glass${state.nbaTeams.includes(t.abbr) ? ' on' : ''}" data-focus data-action="sp-follow" data-id="${esc(t.abbr)}" aria-pressed="${state.nbaTeams.includes(t.abbr)}">
+            ${teamBadge(t, 40)}<span>${esc(t.short)}</span>${state.nbaTeams.includes(t.abbr) ? `<span class="sp-star">${filledIcon('star', 16)}</span>` : ''}
+          </button>`).join('') || '<p class="small sp-note">Couldn\'t load the teams. Is the TV online?</p>'}</div>`;
+    }
+    refreshEdges();
+  }
+
+  function openStory(id) {
+    const a = state.nbaNews.find((x) => x.id === id);
+    if (!a) return;
+    xFrom = document.activeElement;
+    refs.xpanel.className = 'xpanel xwide xstory';
+    refs.xpanel.innerHTML = `
+      ${a.image ? `<div class="t-bg"><div class="t-still" style="background-image:url('${a.image}')"></div></div>` : ''}
+      <div class="t-body">
+        <button class="btn lg x-close t-close" data-focus data-action="x-close">Close</button>
+        <div class="st-text"><span class="small">${esc(ago(a.published))}</span><div class="t-title">${esc(a.headline)}</div><p class="t-over st-over">${esc(a.description)}</p>
+          <div class="sp-f-actions"><button class="btn lg btn-primary" data-focus data-action="sp-highlights" data-q="${esc(a.headline)}">Find the video on YouTube</button></div></div>
+      </div>`;
+    refs.x.hidden = false;
+    refs.x.classList.remove('closing');
+    refs.xpanel.querySelector('[data-action="sp-highlights"]').focus();
+  }
+
+  async function openGame(id) {
+    const g = nbaGames.find((x) => x.id === id);
+    if (!g) return;
+    xFrom = document.activeElement;
+    const app = watchApp();
+    refs.xpanel.className = 'xpanel xwide xgame';
+    refs.xpanel.style.setProperty('--ta', g.away.color);
+    refs.xpanel.style.setProperty('--th', g.home.color);
+    refs.xpanel.innerHTML = `
+      <div class="t-body">
+        <button class="btn lg x-close t-close" data-focus data-action="x-close">Close</button>
+        <div class="g-head">
+          <div class="sp-f-team">${teamBadge(g.away, 96)}<span class="sp-f-name">${esc(g.away.name)}</span><span class="small">${esc(g.away.record)}</span></div>
+          <div class="sp-f-mid"><span class="sp-f-label">${g.state === 'in' ? '<span class="sp-dot"></span>Live' : g.state === 'post' ? 'Final' : esc(whenText(g.date))}</span>
+            <span class="sp-f-score">${g.state !== 'pre' ? `${esc(g.away.score)}<span class="sp-f-dash">–</span>${esc(g.home.score)}` : 'vs'}</span>
+            <span class="small">${esc(g.venue)}</span></div>
+          <div class="sp-f-team">${teamBadge(g.home, 96)}<span class="sp-f-name">${esc(g.home.name)}</span><span class="small">${esc(g.home.record)}</span></div>
+        </div>
+        <div class="g-cols">
+          <div class="g-col" data-g-main><div class="t-row skeleton"></div><div class="t-row skeleton"></div></div>
+          <div class="g-col g-side">
+            <div class="eyebrow">Where to watch</div>
+            <button class="t-row" data-focus data-action="sp-watch">${app ? appIcon(app, 40) : `<span class="t-logo t-letter">${esc(watchInfo().name.slice(0, 1))}</span>`}<span class="t-row-name">${esc(watchInfo().name)}<span class="small">${app ? 'On this TV' : 'Not on this TV. Change in Sports, Your teams'}</span></span><span class="t-row-act">${app ? 'Watch' : 'Change'}</span></button>
+            <button class="t-row" data-focus data-action="sp-highlights" data-q="${esc(`${g.away.name} vs ${g.home.name} highlights`)}"><span class="t-logo t-letter">▶</span><span class="t-row-name">Highlights<span class="small">On YouTube</span></span><span class="t-row-act">Open</span></button>
+          </div>
+        </div>
+      </div>`;
+    refs.x.hidden = false;
+    refs.x.classList.remove('closing');
+    refs.xpanel.querySelector('[data-action="sp-watch"]')?.focus();
+    try {
+      const s = await sportsGet('summary', { event: g.id }, g.state === 'in' ? 30000 : 600000);
+      const main = refs.xpanel.querySelector('[data-g-main]');
+      if (!main) return;
+      const art = s.article && (s.article.headline || s.article.description) ? `<div class="eyebrow">Report</div><div class="g-report"><div class="g-r-head">${esc(s.article.headline || '')}</div><p class="small">${esc(String(s.article.description || '').slice(0, 320))}</p></div>` : '';
+      const leaders = (s.leaders || []).map((tm) => {
+        const pts = ((tm.leaders || []).find((x) => x.name === 'points') || (tm.leaders || [])[0] || {});
+        const top = (pts.leaders || [])[0];
+        return top ? `<div class="g-leader"><span class="g-l-team">${esc((tm.team && tm.team.abbreviation) || '')}</span><span>${esc((top.athlete && top.athlete.displayName) || '')}</span><span class="g-l-val">${esc(top.displayValue || '')}</span></div>` : '';
+      }).join('');
+      const vids = (s.videos || []).slice(0, 3).map((v) => {
+        const clip = findClip(v);
+        const thumb = sportsImg(v.thumbnail || (v.posterImages && v.posterImages.default && v.posterImages.default.href));
+        const title = v.headline || `${g.away.name} ${g.home.name} highlights`;
+        return `<button class="t-row g-vid" data-focus ${clip ? `data-action="sp-clip" data-clip="${esc(clip)}" data-title="${esc(title)}"` : `data-action="sp-highlights" data-q="${esc(title)}"`}>
+          <span class="g-thumb" style="${thumb ? `background:url('${thumb}') center / cover` : ''}"><span class="sp-play">${filledIcon('play', 14)}</span></span>
+          <span class="t-row-name">${esc(title)}<span class="small">${clip ? (v.duration ? `${Math.floor(v.duration / 60)}:${pad(v.duration % 60)}` : 'Video') : 'On YouTube'}</span></span><span class="t-row-act">Play</span></button>`;
+      }).join('');
+      main.innerHTML = (art || '') + (leaders ? `<div class="eyebrow">Top scorers</div><div class="g-leaders">${leaders}</div>` : '') + (vids ? `<div class="eyebrow">Highlights</div>${vids}` : '')
+        || `<p class="small">${g.state === 'pre' ? `Tip-off ${esc(whenText(g.date))}. The report and highlights appear here after the game.` : 'No report yet.'}</p>`;
+    } catch {
+      const main = refs.xpanel.querySelector('[data-g-main]');
+      if (main) main.innerHTML = '<p class="small">Couldn\'t load the game details. Is the TV online?</p>';
+    }
+  }
+
+  // ---------- Highlights: a muted preview, and the full clip ----------
+  // Stopping on a highlight for a moment plays a few muted seconds in its
+  // picture, fading in over the thumbnail. OK plays the whole clip here; Back
+  // closes it. Without a clip, highlights open in YouTube instead.
+  let previewTimer = 0;
+  function stopPreview() {
+    clearTimeout(previewTimer);
+    stage.querySelectorAll('.previewing').forEach((b) => b.classList.remove('previewing'));
+    stage.querySelectorAll('video.clip-preview').forEach((v) => { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); });
+  }
+
+  function startPreview(el) {
+    stopPreview();
+    if (!state.clipPreviews || state.motion === 'fast' || !el.dataset.clip) return;
+    previewTimer = setTimeout(() => {
+      const box = el.querySelector('.show-art, .g-thumb');
+      if (!box || document.activeElement !== el) return;
+      const v = document.createElement('video');
+      v.className = 'clip-preview';
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = 'auto';
+      v.src = el.dataset.clip;
+      v.addEventListener('playing', () => { v.classList.add('on'); box.classList.add('previewing'); }, { once: true });
+      box.append(v);
+      v.play().catch(() => v.remove());
+      previewTimer = setTimeout(() => { v.classList.remove('on'); box.classList.remove('previewing'); setTimeout(() => { if (v.isConnected) { v.pause(); v.remove(); } }, 600); }, 5600);
+    }, 700);
+  }
+
+  function playClip(url, title) {
+    if (!url) return;
+    stopPreview();
+    xFrom = document.activeElement;
+    refs.xpanel.className = 'xpanel xvideo';
+    refs.xpanel.innerHTML = `
+      <video class="clip-full" autoplay playsinline src="${esc(url)}"></video>
+      <div class="clip-bar"><span class="clip-title">${esc(title)}</span><span class="small">OK to pause · Back to close</span></div>
+      <button class="clip-focus" data-focus data-action="clip-toggle" aria-label="Pause or play"></button>`;
+    refs.x.hidden = false;
+    refs.x.classList.remove('closing');
+    const v = refs.xpanel.querySelector('video');
+    v.addEventListener('error', () => { closeExpand(); toast('That clip wouldn\'t play. Opening YouTube'); openHighlights(title); }, { once: true });
+    v.addEventListener('ended', () => closeExpand(), { once: true });
+    refs.xpanel.querySelector('.clip-focus').focus();
+  }
+
+  // Highlights open in YouTube, searched for the game or the clip's title.
+  function openHighlights(q) {
+    const yt = D.apps.find((a) => a.id === 'youtube');
+    if (!yt || !yt.pkg) { toast('YouTube isn\'t on this TV'); return; }
+    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+    nativeCall('watchNextOpen', `intent://${url.replace(/^https:\/\//, '')}#Intent;scheme=https;package=${yt.pkg};end`, yt.pkg);
+  }
+
+  function watchNow() {
+    const app = watchApp();
+    if (app) launchApp(app.id);
+    else { state.nbaTab = 'teams'; openView('sports'); renderSports(); toast(`${watchInfo().name} isn't on this TV. Pick where you watch`); }
+  }
+
+  // ---------- The NBA card on Home ----------
+  function renderGameWidget() {
+    const el = stage.querySelector('.w-game');
+    if (!el) return;
+    const size = el.dataset.size || 'wide';
+    const g = featuredGame(nbaGames);
+    if (!g) {
+      el.innerHTML = `<span class="w-label">NBA</span><span class="w-empty-title">No games this week</span>`;
+      return;
+    }
+    const sc = g.state !== 'pre';
+    if (size === 'small') {
+      el.innerHTML = `<span class="w-label">${g.state === 'in' ? '<span class="sp-dot"></span>Live' : 'NBA'}</span>
+        <span class="wg-line">${teamBadge(g.away, 26)}<b>${esc(g.away.abbr)}</b><span>${sc ? esc(g.away.score) : ''}</span></span>
+        <span class="wg-line">${teamBadge(g.home, 26)}<b>${esc(g.home.abbr)}</b><span>${sc ? esc(g.home.score) : ''}</span></span>
+        <span class="small">${esc(statusText(g))}</span>`;
+    } else if (size === 'big') {
+      const list = [g, ...nbaGames.filter((x) => x !== g && x.state !== 'post')].slice(0, 5);
+      el.innerHTML = `<span class="w-label">NBA tonight</span><div class="wg-list">${list.map((x) => `
+        <span class="wg-item${followed(x) ? ' mine' : ''}">${teamBadge(x.away, 28)}<b>${esc(x.away.abbr)}</b><span class="wg-sc">${x.state !== 'pre' ? `${esc(x.away.score)}–${esc(x.home.score)}` : '@'}</span><b>${esc(x.home.abbr)}</b>${teamBadge(x.home, 28)}<span class="small wg-when">${x.state === 'in' ? '<span class="sp-dot"></span>' : ''}${esc(statusText(x))}</span></span>`).join('')}</div>`;
+    } else {
+      el.innerHTML = `<span class="w-label">${g.state === 'in' ? '<span class="sp-dot"></span>Live now' : followed(g) ? 'Your team next' : 'NBA next'}</span>
+        <span class="wg-wide">${teamBadge(g.away, 52)}<span class="wg-mid"><span class="wg-score">${sc ? `${esc(g.away.score)} – ${esc(g.home.score)}` : esc(clockText(g.date))}</span><span class="small">${esc(g.away.short)} at ${esc(g.home.short)}</span></span>${teamBadge(g.home, 52)}</span>
+        <span class="small wg-foot">${esc(g.state === 'pre' ? whenText(g.date).replace(/ \d.*$/, '') : statusText(g))} · ${esc(watchInfo().name)}</span>`;
+    }
+  }
+
+
+  // ---------- Your Home layout ----------
+  // Home has five places: two small ones on the left, a big one in the middle,
+  // and two wide ones on the right. Each can show one of the cards that fit
+  // it. Edit Home (Customize, or Settings > Appearance), then OK on a card
+  // changes what that place shows; Back when you're done.
+  const SLOT_GRID = { a: '1 / 1', b: '2 / 1', c: '1 / 2 / 3 / 4', d: '1 / 4 / 2 / 6', e: '2 / 4 / 3 / 6' };
+  const SLOT_SIZE = { a: 'small', b: 'small', c: 'big', d: 'wide', e: 'wide' };
+  const SLOT_KINDS = {
+    a: ['room', 'weather', 'game', 'starred'], b: ['weather', 'room', 'game', 'starred'],
+    c: ['music', 'game', 'starred'], d: ['hero', 'game', 'starred'], e: ['auto', 'game', 'starred', 'scenes'],
+  };
+  const KIND_LABEL = { room: 'Room', weather: 'Weather', music: 'Now playing', hero: 'Continue watching', game: 'NBA', starred: 'Starred', scenes: 'Scenes', auto: 'Continue watching' };
+  const KIND_SEL = { room: '.w-room', weather: '.w-weather', music: '.w-music', hero: '.w-hero', game: '.w-game', starred: '.w-starred', scenes: '.w-scenes' };
+  const DEFAULT_LAYOUT = { a: 'room', b: 'weather', c: 'music', d: 'hero', e: 'auto' };
+
+  function homeLayout() {
+    const l = { ...DEFAULT_LAYOUT, ...(state.homeLayout || {}) };
+    // A card can only be in one place: a repeat falls back to the first card not shown yet.
+    const used = new Set();
+    Object.keys(SLOT_KINDS).forEach((k) => {
+      if (!SLOT_KINDS[k].includes(l[k])) l[k] = DEFAULT_LAYOUT[k];
+      if (l[k] !== 'auto' && used.has(l[k])) l[k] = SLOT_KINDS[k].find((x) => x === 'auto' || !used.has(x)) || DEFAULT_LAYOUT[k];
+      used.add(l[k]);
+    });
+    return l;
+  }
+
+  function applyHomeLayout() {
+    const home = stage.querySelector('.view-home .widgets');
+    if (!home) return;
+    const l = homeLayout();
+    const slotOf = {};
+    Object.entries(l).forEach(([slot, kind]) => { if (kind !== 'auto') slotOf[kind] = slot; });
+    Object.entries(KIND_SEL).forEach(([kind, sel]) => {
+      const el = home.querySelector(sel);
+      if (!el) return;
+      const slot = slotOf[kind];
+      el.classList.toggle('off-layout', !slot && !(kind === 'scenes' && l.e === 'auto'));
+      if (slot) {
+        el.style.gridArea = SLOT_GRID[slot];
+        el.dataset.slot = slot;
+        el.dataset.size = SLOT_SIZE[slot];
+        el.dataset.kindLabel = KIND_LABEL[kind];
+        if (kind === 'scenes') el.hidden = false;
+      } else if (kind === 'scenes' && l.e === 'auto') {
+        el.style.gridArea = '';
+        el.dataset.slot = 'e';
+        el.dataset.kindLabel = KIND_LABEL.auto;
+      } else {
+        delete el.dataset.slot;
+      }
+    });
+    home.querySelectorAll('[data-cw]').forEach((el) => {
+      el.classList.toggle('off-layout', l.e !== 'auto');
+      el.dataset.slot = 'e';
+      el.dataset.kindLabel = KIND_LABEL.auto;
+    });
+    const sizes = [home.querySelector('.w-game')?.dataset.size, home.querySelector('.w-starred')?.dataset.size].join();
+    if (sizes !== applyHomeLayout.last) { applyHomeLayout.last = sizes; renderGameWidget(); renderStarWidget(); }
+  }
+
+  function cycleSlot(slot) {
+    const l = homeLayout();
+    const kinds = SLOT_KINDS[slot];
+    const used = new Set(Object.entries(l).filter(([k]) => k !== slot).map(([, v]) => v));
+    let i = kinds.indexOf(l[slot]);
+    for (let n = 0; n < kinds.length; n++) {
+      i = (i + 1) % kinds.length;
+      if (!used.has(kinds[i]) || kinds[i] === 'auto') break;
+    }
+    l[slot] = kinds[i];
+    state.homeLayout = l;
+    saveSoon();
+    applyHomeLayout();
+    const el = stage.querySelector(`.view-home .widgets [data-slot="${slot}"]:not(.off-layout):not([hidden])`);
+    el?.focus();
+    toast(`${KIND_LABEL[l[slot]]}`);
+  }
+
+  function startHomeEdit() {
+    if (!refs.sheet.hidden) closeSheet();
+    if (state.view !== 'home') openView('home');
+    state.homeEdit = true;
+    stage.classList.add('home-edit');
+    stage.querySelectorAll('.view-home .widgets .widget').forEach((w) => { if (!w.hasAttribute('tabindex')) { w.setAttribute('tabindex', '0'); w.dataset.editTab = '1'; } w.setAttribute('data-focus', ''); });
+    applyHomeLayout();
+    setTimeout(() => stage.querySelector('.view-home .widgets [data-slot]:not(.off-layout):not([hidden])')?.focus(), 50);
+    toast('Press OK on a card to change what it shows. Back when you\'re done');
+  }
+
+  function endHomeEdit() {
+    state.homeEdit = false;
+    stage.classList.remove('home-edit');
+    toast('Home saved');
+  }
+
+  // ---------- Starred ----------
+  // Star a film or series on its page. Once a day (and at start) each one is
+  // checked: when it arrives on one of your apps, goes free, or gets a new
+  // episode, it is marked on the Starred row and you're told when the TV
+  // comes on. What was seen last time is kept with the star, so each change
+  // is only announced once.
+  const isStarred = (h) => state.starred.some((x) => x.id === h.id && x.type === (h.media_type === 'tv' ? 'tv' : 'movie'));
+
+  function toggleStar(h) {
+    const type = h.media_type === 'tv' ? 'tv' : 'movie';
+    if (isStarred(h)) {
+      state.starred = state.starred.filter((x) => !(x.id === h.id && x.type === type));
+      toast(`Removed ${h.title || h.name} from Starred`);
+    } else {
+      if (state.starred.length >= 40) { toast('Starred is full (40). Remove one first'); return; }
+      state.starred = [{ id: h.id, type, title: String(h.title || h.name || '').slice(0, 80), poster: h.poster_path || null, backdrop: h.backdrop_path || null, seen: null, badge: '', line: '', added: Date.now() }, ...state.starred];
+      toast(`Starred. You'll hear when ${h.title || h.name} is on your apps or has a new episode`);
+      checkStarred([state.starred[0]]);
+    }
+    saveSoon();
+    renderStarred();
+    const btn = refs.xpanel.querySelector('[data-action="title-star"]');
+    if (btn) btn.outerHTML = starButton(h);
+    refs.xpanel.querySelector('[data-action="title-star"]')?.focus();
+  }
+
+  const starButton = (h) => `<button class="btn lg t-star${isStarred(h) ? ' on' : ''}" data-focus data-action="title-star">${isStarred(h) ? filledIcon('star', 16) : icon('star', 16)} ${isStarred(h) ? 'Starred' : 'Star'}</button>`;
+
+  const dayStr = (d) => d.toISOString().slice(0, 10);
+  const prettyDay = (s) => { const d = new Date(`${s}T12:00:00`); return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); };
+
+  let starCheckAt = 0;
+  async function checkStarred(only) {
+    if (!tmdbReady()) return;
+    const list = only || state.starred;
+    if (!only) starCheckAt = Date.now();
+    const news = [];
+    for (const s of list.slice(0, 40)) {
+      try {
+        const [p, d] = await Promise.all([
+          tmdb(`${s.type}/${s.id}/watch/providers`),
+          s.type === 'tv' ? tmdb(`tv/${s.id}`, { language: 'en-GB' }) : Promise.resolve(null),
+        ]);
+        const g = (p.results || {}).GB || {};
+        // On your apps: free first, then subscription.
+        const mine = [];
+        [['free', 'free'], ['ads', 'free'], ['flatrate', 'sub']].forEach(([k, kind]) => (g[k] || []).forEach((x) => {
+          const app = appForProvider(x.provider_name);
+          if (app && !mine.some((m) => m.app === app.id)) mine.push({ app: app.id, name: app.short || app.name, kind });
+        }));
+        const keys = mine.map((m) => `${m.kind}:${m.app}`);
+        const last = d && d.last_episode_to_air && d.last_episode_to_air.air_date;
+        const next = d && d.next_episode_to_air && d.next_episode_to_air.air_date;
+        const seen = s.seen;
+        let badge = s.badge || '';
+        if (seen) {
+          const added = mine.filter((m) => !seen.keys.includes(`${m.kind}:${m.app}`));
+          if (added.length) badge = added[0].kind === 'free' ? `Now free on ${added[0].name}` : `Now on ${added[0].name}`;
+        }
+        // A new episode: aired since we last looked, or this week the first time.
+        if (s.type === 'tv' && last && last <= dayStr(new Date()) && (seen ? last > (seen.ep || '') : last >= dayStr(new Date(Date.now() - 2 * 86400000)))) {
+          const ep = d.last_episode_to_air;
+          badge = `New episode${ep.season_number ? ` S${ep.season_number} E${ep.episode_number}` : ''}`;
+        }
+        s.line = mine.length ? `${mine[0].kind === 'free' ? 'Free on' : 'On'} ${mine.map((m) => m.name).slice(0, 2).join(', ')}`
+          : next ? `Next episode ${prettyDay(next)}` : 'Not on your apps yet';
+        if (next && mine.length && s.type === 'tv') s.line += ` · next ${prettyDay(next)}`;
+        if (badge && badge !== s.badge) news.push(`${s.title}, ${badge.charAt(0).toLowerCase()}${badge.slice(1)}`);
+        s.badge = badge;
+        s.seen = { keys, ep: last || (seen && seen.ep) || '' };
+      } catch { /* try again next time */ }
+    }
+    saveSoon();
+    renderStarred();
+    if (news.length && !only) toast(news.length === 1 ? `Starred: ${news[0]}` : `Starred: ${news.length} updates. ${news.slice(0, 2).join('; ')}`);
+  }
+
+  function starCard(s, i) {
+    const art = tmdbImg('w780', s.backdrop) || tmdbImg('w342', s.poster);
+    return `
+      <button class="show glass sr-card" data-focus data-action="star-open" data-i="${i}" aria-label="${esc(s.title)}${s.badge ? `. ${esc(s.badge)}` : ''}">
+        <div class="show-art" style="${art ? `background:url('${art}') center / cover` : ''}">${s.badge ? `<span class="sr-badge">${esc(s.badge)}</span>` : ''}</div>
+        <div class="show-body"><div class="show-title">${esc(s.title)}</div><div class="small show-meta">${esc(s.line || (s.type === 'tv' ? 'Series' : 'Film'))}</div></div>
+      </button>`;
+  }
+
+  function renderStarred() {
+    const el = stage.querySelector('[data-shows="starred"]');
+    const head = stage.querySelector('[data-sr-head]');
+    if (el) {
+      const show = !state.query.trim() && state.starred.length;
+      head.hidden = !show;
+      el.hidden = !show;
+      // Changes first, then the newest stars.
+      const order = state.starred.map((s, i) => [s, i]).sort((a, b) => (b[0].badge ? 1 : 0) - (a[0].badge ? 1 : 0));
+      el.innerHTML = show ? order.slice(0, 5).map(([s, i]) => starCard(s, i)).join('') : '';
+    }
+    renderStarWidget();
+  }
+
+  function openStarred(i) {
+    const s = state.starred[i];
+    if (!s) return;
+    s.badge = ''; // seen
+    saveSoon();
+    openTitle({ id: s.id, media_type: s.type, title: s.title, name: s.title, poster_path: s.poster, backdrop_path: s.backdrop });
+    setTimeout(renderStarred, 400);
+  }
+
+  // ---------- The Starred card on Home ----------
+  function renderStarWidget() {
+    const el = stage.querySelector('.w-starred');
+    if (!el) return;
+    const size = el.dataset.size || 'wide';
+    const list = [...state.starred].sort((a, b) => (b.badge ? 1 : 0) - (a.badge ? 1 : 0));
+    if (!list.length) {
+      el.innerHTML = `<span class="w-label">Starred</span><span class="w-empty-title">Nothing starred yet</span><span class="small">Press Star on a film or series in Search</span>`;
+      return;
+    }
+    const news = list.filter((s) => s.badge).length;
+    if (size === 'small') {
+      el.innerHTML = `<span class="w-label">Starred</span><span class="ws-count">${list.length}</span><span class="small">${news ? `${news} with news` : 'Nothing new'}</span>${list[0].badge ? `<span class="small ws-first">${esc(list[0].title)}: ${esc(list[0].badge)}</span>` : ''}`;
+      return;
+    }
+    const n = size === 'big' ? 6 : 3;
+    el.innerHTML = `<span class="w-label">Starred${news ? ` · ${news} new` : ''}</span><div class="ws-grid ws-${size}">${list.slice(0, n).map((s) => {
+      const art = tmdbImg('w342', s.poster) || tmdbImg('w780', s.backdrop);
+      return `<span class="ws-item"><span class="ws-art" style="${art ? `background:url('${art}') center / cover` : ''}">${s.badge ? `<span class="sr-badge">${esc(s.badge)}</span>` : ''}</span><span class="ws-title">${esc(s.title)}</span></span>`;
+    }).join('')}</div>`;
+  }
+
   // ---------- Show search (TMDB) ----------
   // Titles come from TMDB, and which services carry them from its watch
   // provider data (supplied by JustWatch). Only services you have installed
   // are offered. TMDB gives no prices.
-  let tmdbKey = '';
-  const tmdbReady = () => NATIVE && !!tmdbKey;
+  // The keys stay on the Android side: it makes these calls and sends the answer back as a "net" event.
+  let tmdbOn = false;
+  const tmdbReady = () => NATIVE && tmdbOn;
+  const netWaiting = new Map();
+  let netSeq = 0;
 
-  function tmdb(path, params = {}) {
-    const url = new URL(`https://api.themoviedb.org/3/${path}`);
-    const bearer = tmdbKey.length > 40;
-    if (!bearer) url.searchParams.set('api_key', tmdbKey);
-    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-    return getJson(url.toString(), bearer ? { Authorization: `Bearer ${tmdbKey}` } : undefined);
+  function nativeFetch(method, path, params = {}) {
+    return new Promise((resolve, reject) => {
+      const id = ++netSeq;
+      const timer = setTimeout(() => { netWaiting.delete(id); reject(new Error('timeout')); }, 15000);
+      netWaiting.set(id, (r) => {
+        clearTimeout(timer);
+        if (!r.ok) return reject(new Error(`status ${r.status}`));
+        try { resolve(JSON.parse(r.body)); } catch (e) { reject(e); }
+      });
+      nativeCall(method, id, path, JSON.stringify(params));
+    });
   }
+
+  const tmdb = (path, params = {}) => nativeFetch('tmdbFetch', path, params);
 
   const normName = (t) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
   const ALIAS = { amazonvideo: 'primevideo', amazonprimevideo: 'primevideo', amazonprimevideowithads: 'primevideo' };
@@ -568,21 +1553,26 @@
   }
 
   function renderTitles(rows, q) {
+    refreshEdges();
     const el = stage.querySelector('[data-shows="titles"]');
     const head = stage.querySelector('[data-titles-head]');
     const note = stage.querySelector('[data-titles-note]');
     if (!el) return;
     head.hidden = !rows.length && !note.textContent;
+    state.titleRows = [];
     el.innerHTML = rows.map(({ h, g }) => {
+      state.titleRows.push(h);
       const pick = pickApp(g);
       const title = h.title || h.name || '';
       const year = (h.release_date || h.first_air_date || '').slice(0, 4);
-      const poster = h.poster_path ? `background:url("https://image.tmdb.org/t/p/w342${h.poster_path}") center / cover` : 'background:linear-gradient(135deg,#2a2a38,#14141c)';
-      const line = pick ? `${pick.how} ${pick.app.name}` : 'Not on your apps';
+      const poster = artStyle(h);
+      const rating = h.vote_average > 0 ? `★ ${h.vote_average.toFixed(1)}` : '';
+      const free = [...(g.free || []), ...(g.ads || [])].map((x) => x.provider_name);
+      const line = free.length ? `Free on ${free.slice(0, 2).join(', ')}` : pick ? `${pick.how} ${pick.app.name}` : 'Rent, buy or other apps';
       return `
-        <button class="show glass" data-focus ${pick ? `data-app="${pick.app.id}"` : 'data-toast="That title isn\'t on any of your apps"'} aria-label="${esc(title)}. ${esc(line)}">
+        <button class="show glass" data-focus data-action="title" data-i="${state.titleRows.length - 1}" aria-label="${esc(title)}. ${esc(line)}">
           <div class="show-art" style="${poster}">${pick ? `<span class="show-app">${appIcon(pick.app, 34)}</span>` : ''}</div>
-          <div class="show-body"><div class="show-title">${esc(title)}</div><div class="small show-meta">${[year, h.media_type === 'tv' ? 'Series' : 'Film'].filter(Boolean).join(' · ')}<br>${esc(line)}</div></div>
+          <div class="show-body"><div class="show-title">${esc(title)}</div><div class="small show-meta">${[year, h.media_type === 'tv' ? 'Series' : 'Film', rating].filter(Boolean).join(' · ')}<br>${esc(line)}</div></div>
         </button>`;
     }).join('');
 
@@ -601,7 +1591,10 @@
     }
     tmdbTimer = setTimeout(async () => {
       const seq = ++tmdbSeq;
-      note.textContent = 'Searching...';
+      note.textContent = '';
+      const tl = stage.querySelector('[data-shows="titles"]');
+      stage.querySelector('[data-titles-head]').hidden = false;
+      tl.innerHTML = Array.from({ length: 5 }, () => '<div class="show skeleton" aria-hidden="true"><div class="show-art"></div><div class="sk-line"></div><div class="sk-line short"></div></div>').join('');
       try {
         const r = await tmdb('search/multi', { query: q, include_adult: 'false', language: 'en-GB' });
         const words = q.toLowerCase().normalize('NFKD').replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(Boolean);
@@ -621,9 +1614,11 @@
         }));
         if (seq !== tmdbSeq) return;
         // Only titles one of your installed apps carries.
-        const onYourApps = rows.filter(({ g }) => pickApp(g)).slice(0, 5);
-        note.textContent = onYourApps.length ? '' : `Nothing on your apps matches “${q}”.`;
-        renderTitles(onYourApps, q);
+        // Titles on your apps first, then anything with an app that carries it.
+        const any = (g) => ['flatrate', 'free', 'ads', 'rent', 'buy'].some((k) => (g[k] || []).length);
+        const found = rows.filter(({ g }) => any(g)).sort((a, b) => (pickApp(a.g) ? 0 : 1) - (pickApp(b.g) ? 0 : 1)).slice(0, 5);
+        note.textContent = found.length ? '' : `Nothing matches “${q}”.`;
+        renderTitles(found, q);
       } catch {
         if (seq === tmdbSeq) {
           note.textContent = "Couldn't reach TMDB. Check the key on the phone page and the connection.";
@@ -631,6 +1626,85 @@
         }
       }
     }, 600);
+  }
+
+  // ---------- Scenes you save ----------
+  function saveScene() {
+    const h = state.home;
+    const input = stage.querySelector('#scene-name');
+    const name = (input?.value || '').trim() || `Scene ${state.myScenes.length + 1}`;
+    const keepsBacklight = ['sync', 'off'].includes(h.backlight) || (BACKLIGHT[h.backlight] && !['none', 'live'].includes(h.backlight));
+    state.myScenes.push({
+      id: `s${Date.now()}`,
+      name,
+      backlight: keepsBacklight ? h.backlight : null,
+      lights: Object.fromEntries(roomLights().map((l) => [l.id, !!h.lights[l.id]])),
+    });
+    saveSoon();
+    closeExpand();
+    applyState();
+    toast(`Saved "${name}"`);
+  }
+
+  function applyMyScene(sc) {
+    const h = state.home;
+    if (sc.backlight) {
+      setBacklight(sc.backlight);
+      h.scene = null;
+      sendBacklight(); // the backlight first, so lights switched off below stay off
+    }
+    roomLights().forEach((l) => {
+      if (sc.lights[l.id] === undefined) return;
+      h.lights[l.id] = !!sc.lights[l.id];
+      if (NATIVE) nativeCall('goveePower', l.id, !!sc.lights[l.id]);
+    });
+    applyState();
+    toast(sc.name);
+  }
+
+  // The list for deleting them (Settings > Lights > My scenes).
+  function scenesView() {
+    return `
+      <section class="view view-myscenes" data-view="myscenes" hidden>
+        <section class="card glass cleanup" data-scenes-list aria-label="My scenes"></section>
+      </section>`;
+  }
+
+  // ---------- Diagnostics ----------
+  // What the TV says about the launcher: memory, storage, versions, why it last
+  // closed, and the safety net's log. No keys, passwords or searches.
+  function diagView() {
+    return `
+      <section class="view view-diag" data-view="diag" hidden>
+        <section class="card glass cleanup" data-diag-list aria-label="Diagnostics"></section>
+      </section>`;
+  }
+
+  function renderDiag() {
+    refreshEdges();
+    const list = stage.querySelector('[data-diag-list]');
+    const d = nativeJson('diagnostics') || {};
+    const row = (label, value) => `<div class="set-row diag-row" data-focus tabindex="0"><span class="set-label">${esc(label)}</span><span class="set-val">${esc(value)}</span></div>`;
+    const lines = (title, items) => `<div class="set-head deep-head">${esc(title)}</div>` + (items && items.length
+      ? items.map((t) => `<div class="set-row diag-row" data-focus tabindex="0"><span class="set-label small">${esc(t)}</span></div>`).join('')
+      : '<p class="small cleanup-note">Nothing recorded.</p>');
+    list.innerHTML = '<p class="small cleanup-note">A copy can be downloaded from the phone setup page (Backup, diagnostics report).</p>'
+      + row('Launcher', d.app || '?') + row('Firmware', d.firmware || '?') + row('Android', d.android || '?')
+      + row('WebView', d.webview || '?') + row('Free memory', d.memory || '?') + row('Free storage', d.storage || '?')
+      + row('On for', d.uptime || '?') + row('Debug connection', d.adb || '?') + row('Now playing access', d.listener ? 'Allowed' : 'Not allowed')
+      + row('Apps switched off by the launcher', String(d.switchedOff ?? '?'))
+      + lines('Why the launcher last closed', d.exits) + lines('Safety net', d.events);
+  }
+
+  function renderMyScenes() {
+    refreshEdges();
+    const list = stage.querySelector('[data-scenes-list]');
+    list.innerHTML = state.myScenes.length ? '<p class="small cleanup-note">Press OK on a scene to delete it.</p>' + state.myScenes.map((sc) => `
+      <button class="set-row" data-focus data-action="scene-del" data-id="${sc.id}">
+        <span class="lg chip set-chip">${icon('lamp')}</span>
+        <span class="set-label">${esc(sc.name)}<span class="small">${state.delConfirm === sc.id ? 'Press OK again to delete' : `${Object.values(sc.lights).filter(Boolean).length} lights on`}</span></span>
+        <span class="set-val">${state.delConfirm === sc.id ? 'Confirm' : 'Delete'}</span>
+      </button>`).join('') : '<div class="cleanup-empty"><span class="w-empty-title">No saved scenes</span><span class="small">On the Room tab, set the lights how you like, then press Save this as a scene.</span></div>';
   }
 
   // ---------- Frost that lines up with the wallpaper ----------
@@ -672,6 +1746,34 @@
       el.style.setProperty('--fx', `${-x}px`);
       el.style.setProperty('--fy', `${-y}px`);
     });
+  }
+
+  // ---------- Updates ----------
+  // version.json in the repository says what the newest launcher is.
+  const UPDATE_BASE = 'https://raw.githubusercontent.com/Oxygn-02/Smart-tv/main/';
+  async function checkUpdate(quiet = false) {
+    if (state.updateFound && !quiet) {
+      nativeCall('installUpdate', state.updateChannel); // Android checks the checksum, version and signature
+      return;
+    }
+    if (!quiet) { state.update = 'Checking...'; applyState(); }
+    try {
+      const mine = nativeJson('appVersion') || { code: 0, name: '' };
+      const r = await getJson(`${UPDATE_BASE}${state.updateChannel === 'beta' ? 'version-beta.json' : 'version.json'}?t=${Date.now()}`);
+      if (r.versionCode > mine.code) {
+        state.updateFound = r;
+        const notes = typeof r.notes === 'string' ? r.notes.slice(0, 140) : '';
+        state.update = `Update to ${r.versionName}. Press OK`;
+        state.updateNotes = notes;
+        toast(`Update available: ${r.versionName}${notes ? `. ${notes}` : ''}`);
+      } else {
+        state.updateFound = null;
+        state.update = `Up to date (${mine.name})`;
+      }
+    } catch {
+      state.update = quiet ? '' : "Couldn't check. Is the TV online?";
+    }
+    applyState();
   }
 
   // ---------- Speed test ----------
@@ -747,6 +1849,13 @@
         </div>
         <div class="x-foot"><span class="small">${lights.filter((l) => h.lights[l.id]).length} of ${lights.length} lights on</span><button class="btn lg" data-focus data-nav-to="room">All room controls</button></div>`;
     }
+    if (kind === 'savescene') {
+      return `
+        <div class="x-head"><span class="x-title">Save this scene</span>${close}</div>
+        <p class="small">Saves the backlight and which lights are on, so one press brings them back.</p>
+        <input id="scene-name" class="set-input scene-input" data-focus autocomplete="off" spellcheck="false" maxlength="24" placeholder="Name, like Film night">
+        <button class="btn lg btn-primary" data-focus data-action="scene-save">Save</button>`;
+    }
     if (kind === 'weather') {
       const w = state.weather;
       if (!w) return `<div class="x-head"><span class="x-title">Weather</span>${close}</div><p class="small">No weather yet. Check the TV is online, or add your town in Settings.</p><button class="btn lg" data-focus data-nav-to="settings">Open Settings</button>`;
@@ -787,6 +1896,7 @@
 
   function openExpand(card) {
     xFrom = card;
+    refs.xpanel.className = 'xpanel';
     refs.xpanel.innerHTML = xContent(card.dataset.expand);
     refs.x.hidden = false;
     refs.x.classList.remove('closing');
@@ -811,10 +1921,14 @@
   function closeExpand() {
     if (refs.x.hidden) return;
     refs.x.classList.add('closing');
+    titleSeq++;
+    refs.xpanel.querySelectorAll('video').forEach((v) => { v.pause(); v.removeAttribute('src'); v.load(); });
+    refs.xpanel.querySelector('[data-t-trailer]')?.__off?.();
     setTimeout(() => {
       refs.x.hidden = true;
       refs.x.classList.remove('closing');
       refs.xpanel.innerHTML = '';
+      refs.xpanel.className = 'xpanel';
       (xFrom && xFrom.isConnected ? xFrom : stage.querySelector('.dock-app'))?.focus();
       xFrom = null;
     }, 280);
@@ -931,37 +2045,49 @@
       </label>`;
     // Settings are grouped: a short list of categories, each opening its own rows.
     const cats = [
-      { id: 'display', icon: icon('image'), title: 'Display', help: 'Appearance, wallpaper, screen size, ambient screen', rows: [
-        row('theme', '<span data-theme-icon></span>', 'Appearance', 'Light, dark, or follow the TV', 'theme'),
-        row('wallpaper', icon('image'), 'Wallpaper', 'Photo, gradient, or your light colours', 'wallpaper'),
-        row('open-wallpapers', icon('image'), 'Wallpaper photos', 'Choose one, or add your own', 'wp'),
-        row('screen-fit', icon('live'), 'Screen size', 'Resize if the edges are cropped', 'fit'),
-        row('cycle-ambient', icon('moon'), 'Ambient screen', 'Photos and clock when idle', 'ambient'),
+      { id: 'display', icon: icon('image'), title: 'Appearance', help: 'Light or dark, wallpaper, clock, screen size', rows: [
+        row('theme', '<span data-theme-icon></span>', 'Light or dark', 'Auto follows the TV', 'theme'),
+        row('wallpaper', icon('image'), 'Wallpaper', 'A photo, a gradient, or your light colours', 'wallpaper'),
+        row('open-wallpapers', icon('image'), 'Wallpaper photos', 'Choose one, or add your own from your phone', 'wp'),
+        row('cycle-ambient', icon('moon'), 'Screensaver', 'Photos and the clock when nothing is happening', 'ambient'),
         row('cycle-clock', icon('timer'), 'Clock', '12-hour or 24-hour', 'clock'),
+        row('edit-home', icon('home'), 'Home layout', 'Choose what each card on Home shows', 'homelayout'),
+        row('cycle-previews', icon('live'), 'Highlight previews', 'A few muted seconds when you stop on a highlight', 'previews'),
+        row('screen-fit', icon('live'), 'Fit to screen', 'If the edges are cut off', 'fit'),
         row('cycle-motion', icon('live'), 'Animations', 'Fast turns them off, for a slow TV', 'motion'),
-        row('speed-test', icon('timer'), 'Speed test', 'Moves around by itself for about 20 seconds. Hands off', 'speed'),
         NATIVE ? '' : row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to see empty widgets', 'sample'),
       ] },
-      { id: 'home', icon: icon('home'), title: 'Home and apps', help: 'Home button, clean up apps', rows: [
-        row('home-role', icon('home'), 'Home button', 'Which app opens on Home', 'home'),
-        row('open-cleanup', icon('power'), 'Clean up apps', 'Switch off apps you don\'t want', 'cleanup'),
-        NATIVE ? row('grant-np', icon('music'), 'Now playing access', 'Show what is playing', 'np-access') : '',
-        NATIVE ? row('wn-check', icon('live'), 'Continue watching check', 'What the TV shares from your apps', 'wn') : '',
+      { id: 'home', icon: icon('home'), title: 'Apps', help: 'Home button, apps you don\'t use, music, updates', rows: [
+        row('home-role', icon('home'), 'Home button', 'Which screen the Home button opens', 'home'),
+        row('open-cleanup', icon('power'), 'Apps you don\'t use', 'Switch them off. You can switch them back on', 'cleanup'),
+        NATIVE ? row('keep-front', icon('music'), 'Music in the background', 'When a song starts, come back here and let it play', 'keep') : '',
+        NATIVE ? row('update-check', icon('sync'), 'Check for updates', 'Get the newest version of this home screen', 'update') : '',
       ] },
-      { id: 'lights', icon: icon('lamp'), title: 'Lights', help: 'Govee account, light roles', rows: [
-        row('open-setup', icon('lamp'), 'Govee account', 'Lights and backlight', 'govee'),
-        row('open-roles', icon('room'), 'Light roles', 'Where each light is in the room', 'roles'),
+      { id: 'lights', icon: icon('lamp'), title: 'Lights', help: 'Govee lights, where they are, your scenes', rows: [
+        row('open-setup', icon('lamp'), 'Connect Govee', 'Your lights and the TV backlight', 'govee'),
+        row('open-roles', icon('room'), 'Where your lights are', 'So scenes light the room the right way', 'roles'),
+        row('open-myscenes', icon('lamp'), 'My scenes', 'Scenes you saved in Room', 'myscenes'),
       ] },
-      { id: 'games', icon: icon('games'), title: 'Games', help: 'Console input and switching', rows: [
-        row('cycle-hdmi', icon('hdmi'), 'Games input', `Where the ${state.games.device} is plugged in`, 'hdmi'),
-        row('toggle-auto', icon('games'), 'Switch input for Games', 'Turn off to stay here', 'auto'),
-        row('cycle-countdown', icon('timer'), 'Switch countdown', 'Time to cancel first', 'countdown'),
+      { id: 'games', icon: icon('games'), title: 'Games', help: 'Your console and switching to it', rows: [
+        row('cycle-hdmi', icon('hdmi'), 'Console input', `Where the ${state.games.device} is plugged in`, 'hdmi'),
+        row('toggle-auto', icon('games'), 'Switch when I open Games', 'Turn off to stay on this screen', 'auto'),
+        row('cycle-countdown', icon('timer'), 'Countdown before switching', 'Time to change your mind', 'countdown'),
       ] },
-      { id: 'connect', icon: icon('phone'), title: 'Network and phone', help: 'Phone setup, guest Wi-Fi, weather town, Wi-Fi', rows: [
-        row('open-setup', icon('phone'), 'Set up from your phone', 'Govee key, wallpapers, apps, Wi-Fi code', 'setup'),
+      { id: 'connect', icon: icon('phone'), title: 'Phone and Wi-Fi', help: 'Set up from your phone, guest Wi-Fi, weather', rows: [
+        row('open-setup', icon('phone'), 'Set up from your phone', 'Keys, photos and apps, typed on your phone', 'setup'),
         row('open-guest', icon('wifi'), 'Guest Wi-Fi', 'A code guests scan to join', 'guest'),
         town,
-        row('wifi', icon('wifi'), 'Wi-Fi', 'Opens the TV network settings', 'wifi'),
+        row('wifi', icon('wifi'), 'Wi-Fi', 'Opens the TV\'s network settings', 'wifi'),
+      ] },
+      { id: 'dev', icon: icon('live'), title: 'Developer options', help: 'Debug connection, diagnostics, tests', rows: [
+        NATIVE ? row('open-devclean', icon('power'), 'Debug connection and clean-up', 'Connect to the TV, switch off background parts, home screen', 'devclean') : '',
+        NATIVE ? row('open-diag', icon('live'), 'Diagnostics', 'Memory, storage, crashes and safety-net events', 'diag') : '',
+        NATIVE ? row('grant-np', icon('music'), 'Now playing access', 'Lets this screen see what is playing', 'np-access') : '',
+        NATIVE ? row('update-channel', icon('sync'), 'Update channel', 'Beta gets new versions before Stable', 'channel') : '',
+        NATIVE ? row('wn-check', icon('live'), 'Continue watching check', 'What the TV shares from your apps', 'wn') : '',
+        row('speed-test', icon('timer'), 'Speed test', 'Moves around by itself for about 20 seconds. Hands off', 'speed'),
+        row('show-welcome', icon('home'), 'Show the welcome again', 'The first-run screen', 'welcome'),
+        row('hide-dev', icon('power'), 'Hide developer options', 'Press the Settings icon 3 times to show them again', 'hidedev'),
       ] },
     ];
     return `
@@ -1025,11 +2151,99 @@
     return items;
   }
 
+  // Rows shown once the launcher is connected to the TV: the home screen and the deeper clean-up.
+  function homeRows() {
+    const isHome = nativeCall('isDefaultHome') === true;
+    const left = (nativeJson('deepCleanList') || []).filter((d) => d.tier !== 'google' && d.installed && d.enabled).length;
+    return `
+      <button class="set-row" data-focus data-action="adb-sethome">
+        <span class="lg chip set-chip">${icon('home')}</span>
+        <span class="set-label">${state.homeConfirm ? 'Press OK again to switch' : 'Make this my home screen'}<span class="small">${isHome ? 'It already is. The Home button opens this launcher' : state.homeConfirm ? 'You can put Google\'s home screen back from here' : 'The Home button will open this launcher'}</span></span>
+        <span class="set-val">${isHome ? 'Done' : state.homeConfirm ? 'Confirm' : 'Press OK'}</span>
+      </button>
+      ${nativeCall('hasPrevHome') === true ? `<button class="set-row" data-focus data-action="adb-restorehome">
+        <span class="lg chip set-chip">${icon('home')}</span>
+        <span class="set-label">Put Google's home screen back<span class="small">Undoes the switch above</span></span>
+        <span class="set-val">Press OK</span>
+      </button>` : ''}
+      <button class="set-row" data-focus data-action="open-deepclean">
+        <span class="lg chip set-chip">${icon('power')}</span>
+        <span class="set-label">Clean up the TV<span class="small">${left ? `${left} background items you can switch off, each with a reason` : 'Everything on the list is already switched off'}</span></span>
+        <span class="set-val">Open</span>
+      </button>`;
+  }
+
+  // The deeper clean-up: background packages with no icon, grouped by how careful to be.
+  function deepView() {
+    return `
+      <section class="view view-deep" data-view="deepclean" hidden>
+        <section class="card glass cleanup" data-deep-list aria-label="Clean up the TV"></section>
+      </section>`;
+  }
+
+  // If this launcher ever fails to start three times, Google's home screen is switched back on by itself.
+  // This proves that can work on this TV before Google's home screen is switched off.
+  function safetyRow(safe, ready) {
+    return `
+      <button class="set-row" data-focus data-action="adb-safety" ${ready ? '' : 'disabled'}>
+        <span class="lg chip set-chip">${icon('power')}</span>
+        <span class="set-label">Test the safety net<span class="small">${safe ? 'Works. If this launcher fails to start three times, Google\'s home screen comes back by itself' : ready ? 'Checks that Google\'s home screen can be switched back on. Changes nothing' : 'Connect to the TV first'}</span></span>
+        <span class="set-val">${safe ? 'Ready' : 'Press OK'}</span>
+      </button>`;
+  }
+
+  function renderDeep() {
+    refreshEdges();
+    const list = stage.querySelector('[data-deep-list]');
+    const items = nativeJson('deepCleanList') || [];
+    const a = state.adb || {};
+    const ready = ['ready', 'done'].includes(a.state);
+    const isHome = nativeCall('isDefaultHome') === true;
+    const safe = nativeCall('safetyReady') === true;
+    const confirm = state.deepConfirm;
+    const group = (tier, title, note) => {
+      const rows = items.filter((d) => d.tier === tier && d.installed);
+      if (!rows.length) return '';
+      const on = rows.filter((d) => d.enabled);
+      const head = tier === 'safe'
+        ? `<button class="set-row" data-focus data-action="adb-deep" data-tier="safe" ${on.length && ready ? '' : 'disabled'}>
+            <span class="lg chip set-chip">${icon('power')}</span>
+            <span class="set-label">${confirm === 'safe' ? 'Press OK again to switch off' : on.length ? `Switch off all ${on.length} recommended` : 'All recommended switched off'}<span class="small">${ready ? (on.length ? 'Reversible. Switch them back on from Clean up apps' : 'All switched off') : 'Connect to the TV first'}</span></span>
+            <span class="set-val">${confirm === 'safe' ? 'Confirm' : on.length ? 'Press OK' : 'Done'}</span>
+          </button>` : '';
+      const locked = tier === 'google' && !(isHome && safe);
+      return `<div class="set-head deep-head">${title}</div><p class="small cleanup-note">${note}${locked ? ' Not available until this launcher is your home screen and the safety net below has been tested.' : ''}</p>${tier === 'google' ? safetyRow(safe, ready) : ''}${head}`
+        + rows.map((d) => `
+          <button class="set-row" data-focus data-action="adb-deep" data-tier="${tier}" data-pkg="${d.pkg}" ${tier === 'safe' || locked || !ready || !d.enabled ? 'disabled' : ''}>
+            <span class="lg chip set-chip">${icon('power')}</span>
+            <span class="set-label">${esc(d.label)}<span class="small">${esc(d.reason)}</span></span>
+            <span class="set-val">${d.enabled ? (tier === 'safe' ? 'On' : confirm === d.pkg ? 'Confirm' : 'Switch off') : 'Off'}</span>
+          </button>`).join('');
+    };
+    list.innerHTML = adbRow()
+      + group('safe', 'Recommended', 'Leftovers from the factory and the shop. Nothing you use depends on them.')
+      + group('careful', 'Careful, one at a time', 'Switch off one, then test the TV.')
+      + group('google', 'Google\'s home screen', 'Where the ads come from. Switch off only once this launcher is working as your home screen.');
+  }
+
+  // A firmware update can switch apps back on. Only apps this launcher switched off are offered.
+  function reapplyRow(ready) {
+    const fw = NATIVE ? nativeJson('firmwareCheck') || {} : {};
+    const n = (fw.reenabled || []).length;
+    if (!n) return '';
+    return `<button class="set-row" data-focus data-action="adb-reapply" ${ready ? '' : 'disabled'}>
+        <span class="lg chip set-chip">${icon('power')}</span>
+        <span class="set-label">${fw.changed ? 'A TV update' : 'Something'} switched ${n} app${n === 1 ? '' : 's'} back on<span class="small">${ready ? esc(fw.reenabled.map((x) => x.label).slice(0, 4).join(', ')) : 'Connect to the TV first'}</span></span>
+        <span class="set-val">Switch off again</span>
+      </button>`;
+  }
+
   function renderCleanup() {
+    refreshEdges();
     const list = stage.querySelector('[data-cleanup-list]');
     const items = cleanupItems();
     if (!items.length) {
-      list.innerHTML = adbRow() + `
+      list.innerHTML = (state.devClean ? adbRow() + reapplyRow(['ready', 'done'].includes((state.adb || {}).state)) + ((NATIVE && ['ready', 'done'].includes((state.adb || {}).state)) ? homeRows() : '') : '') + `
         <div class="cleanup-empty">
           <span class="w-empty-title">No apps chosen</span>
           <span class="small">Open Set up from your phone, go to Apps to switch off, tick the apps you don't want and send them over. They are listed here, and you switch them off from this screen.</span>
@@ -1039,7 +2253,8 @@
     const states = NATIVE ? nativeJson('packageStates', JSON.stringify(items.map((c) => c.pkg))) || [] : [];
     const a = state.adb || {};
     const live = states.filter((st) => st.installed && st.enabled).length;
-    const ready = ['ready', 'done'].includes(a.state);
+    const ready = state.devClean && ['ready', 'done'].includes(a.state);
+    const home = NATIVE && ready ? homeRows() : '';
     const actions = ready ? `
       ${live ? `<button class="set-row" data-focus data-action="adb-disable">
         <span class="lg chip set-chip">${icon('power')}</span>
@@ -1051,7 +2266,7 @@
         <span class="set-label">Switch back on what I switched off<span class="small">${a.ours} app${a.ours === 1 ? '' : 's'}</span></span>
         <span class="set-val">Press OK</span>
       </button>` : ''}` : '';
-    list.innerHTML = adbRow() + actions + '<p class="small cleanup-note">Press OK on an app to open its page. Disable switches it off; Enable brings it back, so nothing here is permanent.</p>' + items.map((c) => {
+    list.innerHTML = (state.devClean ? adbRow() + reapplyRow(ready) : '') + home + actions + '<p class="small cleanup-note">Press OK on an app to open its page. Disable switches it off; Enable brings it back, so nothing here is permanent.</p>' + items.map((c) => {
       const st = states.find((x) => x.pkg === c.pkg);
       const value = !NATIVE ? 'On the TV' : !st || !st.installed ? 'Not on this TV' : st.enabled ? 'On' : 'Off';
       return `
@@ -1171,6 +2386,8 @@
   // Slider positions are 0 to 100 for all three; hue is 0 to 360 underneath.
   const sliderValue = {
     hue: () => state.tint.hue / 3.6,
+    edgehue: () => state.edgeHue / 3.6,
+    edgeint: () => (state.edgeInt - 10) / 0.9,
     warmth: () => state.tint.warmth,
     opacity: () => state.tint.opacity,
   };
@@ -1192,7 +2409,12 @@
   function setSlider(id, value) {
     const t = state.tint;
     const v = clamp(Math.round(value), id === 'opacity' ? 10 : 0, 100);
-    if (id === 'hue') {
+    if (id === 'edgeint') {
+      state.edgeInt = Math.round(10 + v * 0.9);
+    } else if (id === 'edgehue') {
+      state.edgeHue = v * 3.6;
+      state.edge = 'custom';
+    } else if (id === 'hue') {
       t.hue = v * 3.6;
       t.source = 'custom';
     } else {
@@ -1204,7 +2426,7 @@
   }
 
   function nudgeSlider(id, dir) {
-    setSlider(id, sliderValue[id]() + dir * 5);
+    setSlider(id, sliderValue[id]() + dir * (id === 'edgehue' ? 2 : 5));
   }
 
   function wallpaperLabel() {
@@ -1250,6 +2472,26 @@
           <div class="sheet-row">
             <span class="sheet-label">Appearance<span class="sheet-help">Auto follows the TV</span></span>
             ${seg('appearance', [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto']])}
+          </div>
+          <div class="sheet-row">
+            <span class="sheet-label">Edge glow<span class="sheet-help">Round the screen</span></span>
+            ${seg('edge-mode', [['lights', 'Lights'], ['media', 'Media'], ['custom', 'My colour'], ['off', 'Off']])}
+          </div>
+          <div class="sheet-row" data-edge-int>
+            <span class="sheet-label">Glow strength</span>
+            <span class="slider-wrap">${sliderMarkup('edgeint', 'Glow strength')}</span>
+          </div>
+          <div class="sheet-row" data-edge-hue hidden>
+            <span class="sheet-label">Glow colour</span>
+            <span class="slider-wrap">${sliderMarkup('edgehue', 'Glow colour')}</span>
+          </div>
+          <div class="sheet-row">
+            <span class="sheet-label">Home<span class="sheet-help">Choose what each card shows</span></span>
+            <button class="btn lg" data-focus data-action="edit-home">Edit Home</button>
+          </div>
+          <div class="sheet-row">
+            <span class="sheet-label">Trailers<span class="sheet-help">Behind a film's page</span></span>
+            ${seg('trailers', [['on', 'On'], ['off', 'Off']])}
           </div>
           <div class="sheet-row">
             <span class="sheet-label">Wallpaper</span>
@@ -1439,7 +2681,8 @@
   // Messages from the Android side: the phone page was used, Govee answered.
   window.onNative = (name, data) => {
     if (name === 'setup') {
-      tmdbKey = nativeCall('tmdbKey') || '';
+      tmdbOn = nativeCall('tmdbReady') === true;
+      if (tmdbOn && !state.forYou.length) loadForYou();
       refreshWallpapers();
       if (state.view === 'wallpapers') renderWallpapers();
       if (data?.town !== undefined) {
@@ -1450,9 +2693,26 @@
       }
     }
     if (name === 'govee') applyGovee(data);
+    if (name === 'net') {
+      const done = netWaiting.get(data.id);
+      if (done) { netWaiting.delete(data.id); done(data); }
+      return;
+    }
+    if (name === 'restore') {
+      try { localStorage.setItem('settings', JSON.stringify(data)); } catch { /* not saved */ }
+      location.reload();
+      return;
+    }
+    if (name === 'update') {
+      state.update = { downloading: 'Downloading...', installing: 'Installing. Confirm on the TV', permission: 'Allow installs, then press OK again', error: data.message || "Couldn't update" }[data.state] || '';
+      applyState();
+    }
     if (name === 'adb') {
       state.adb = { ...(state.adb || {}), ...data };
       state.adbConfirm = false;
+      state.homeConfirm = false;
+      state.deepConfirm = null;
+      if (state.view === 'deepclean') renderDeep();
       if (state.view === 'cleanup') {
         renderCleanup();
         stage.querySelector('[data-action="adb-connect"]')?.focus();
@@ -1462,7 +2722,11 @@
     applyState();
   };
 
+  let devTaps = 0;
+  let devTapAt = 0;
+  let launchedFrom = null; // Back from an app lands on the tile that opened it
   function launchApp(id) {
+    launchedFrom = document.activeElement;
     const a = APP[id];
     if (!a) {
       toast('That app isn\'t installed');
@@ -1663,7 +2927,7 @@
         title: np.title,
         artist: np.artist || '',
         durationSec: Math.max(0, Math.round((np.durationMs || 0) / 1000)),
-        art: np.art ? `center / cover no-repeat url("${np.art}")` : 'linear-gradient(140deg,#3a3a48,#121218)',
+        art: np.art ? `center / cover no-repeat url('${np.art}')` : 'linear-gradient(140deg,#3a3a48,#121218)',
         palette: np.colors && np.colors.length === 3 ? np.colors : null,
         source: np.source || '',
         icon: np.icon || '',
@@ -1698,17 +2962,20 @@
         <nav class="tabbar glass" aria-label="Main">
           ${D.nav.map((n) => `
             <button class="tab" data-focus data-nav="${n.id}" aria-label="${n.label}">${icon(n.id, 22)}</button>`).join('')}
+          <span class="tab-glow" aria-hidden="true"></span>
         </nav>
         <div class="tools">
           <span class="status-wifi" title="Wi-Fi connected">${icon('wifi', 18)}</span>
           <button class="tool" data-focus data-action="match-lights" aria-label="Match wallpaper to backlights">${icon('drop', 20)}</button>
           <button class="tool" data-focus data-action="customize" aria-label="Customize">${icon('sun', 20)}</button>
+          <button class="tool update-badge" data-focus data-action="update-check" aria-label="Update available" hidden>${icon('sync', 20)}</button>
           <button class="tool" data-focus data-nav="settings" aria-label="Settings">${icon('gear', 20)}</button>
         </div>
       </header>
 
+      <div class="bottom-blur" aria-hidden="true"></div>
       <div class="views">
-        ${homeView()}${searchView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}${wallpapersView()}${cleanupView()}${rolesView()}${guestView()}
+        ${homeView()}${searchView()}${sportsView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}${wallpapersView()}${cleanupView()}${rolesView()}${guestView()}${deepView()}${scenesView()}${diagView()}
       </div>
 
       ${overlay()}
@@ -1738,6 +3005,11 @@
       toast: stage.querySelector('.toast'),
     };
 
+    stage.addEventListener('scroll', (e) => edgeFade(e.target), { capture: true, passive: true });
+    stage.addEventListener('focusin', (e) => { if (e.target.dataset && e.target.dataset.clip) startPreview(e.target); else if (previewTimer) stopPreview(); });
+    // A team logo that can't load is removed, leaving the team's colour and initials.
+    stage.addEventListener('error', (e) => { if (e.target.classList && e.target.classList.contains('sp-img')) { e.target.parentElement?.classList.remove('has-img'); e.target.remove(); } }, true);
+    stage.addEventListener('load', (e) => { if (e.target.classList && e.target.classList.contains('sp-img')) e.target.parentElement?.classList.add('has-img'); }, true);
     refs.townInput.value = state.town;
     showPhoto();
     applyState();
@@ -1782,6 +3054,10 @@
     const wp = state.matchLights ? 'lights' : state.wallpaper;
     pressed('[data-action="icon-style"]', (id) => id === state.iconStyle);
     stage.querySelector('[data-tint-block]').hidden = state.iconStyle !== 'tinted';
+    stage.querySelector('[data-edge-hue]').hidden = state.edge !== 'custom';
+    stage.querySelector('[data-edge-int]').hidden = state.edge === 'off';
+    pressed('[data-action="edge-mode"]', (id) => id === state.edge);
+    pressed('[data-action="trailers"]', (id) => (id === 'on') === state.trailers);
     renderSliders();
     pressed('[data-action="appearance"]', (id) => id === state.appearance);
     pressed('[data-action="wallpaper-set"]', (id) => id === wp);
@@ -1801,6 +3077,7 @@
     const values = {
       theme: { auto: `Auto (${dark ? 'dark' : 'light'})`, light: 'Light', dark: 'Dark' }[state.appearance],
       wallpaper: { lights: 'Matches lights', photo: 'Photo', gradient: 'Gradient' }[wp],
+      keep: ['Off', 'Casts only', 'Casts and YouTube Music'][Number(nativeCall('keepMode')) || 0],
       hdmi: `HDMI ${g.hdmiPort}`,
       auto: g.autoSwitch ? 'On' : 'Off',
       countdown: g.countdownSec ? `${g.countdownSec} s` : 'None',
@@ -1813,6 +3090,14 @@
       clock: state.clock24 ? '24-hour' : '12-hour',
       motion: state.motion === 'fast' ? 'Fast' : 'Smooth',
       wn: state.wnCheck || 'Press OK',
+      update: state.update || 'Press OK',
+      devclean: 'Open',
+      homelayout: 'Edit',
+      previews: state.clipPreviews ? 'On' : 'Off',
+      hidedev: '',
+      welcome: '',
+      channel: state.updateChannel === 'beta' ? 'Beta' : 'Stable',
+      diag: 'Open',
       speed: state.speed || 'Press OK',
       guest: NATIVE ? (guestInfo().ssid || 'Add from your phone') : 'Sample',
       spread: state.spread ? 'On' : 'Off',
@@ -1822,12 +3107,15 @@
         : state.govee.connected ? `Connected, ${state.govee.devices.length} devices`
           : state.govee.hasKey ? (state.govee.error || 'Connecting') : 'Not connected',
       roles: `${Object.keys(state.roles).length} set`,
+      myscenes: state.myScenes.length ? `${state.myScenes.length} saved` : 'None yet',
       home: !NATIVE ? 'On the TV' : state.homeDefault ? 'This launcher' : 'Google TV. Press OK',
       fit: `${Math.round((userFit || 1) * 100)}%`,
       'np-access': access.nowPlaying ? 'Allowed' : 'Off. Press OK to allow',
       'usage-access': access.recentApps ? 'Allowed' : 'Off. Press OK to allow',
     };
     all('[data-val]').forEach((el) => { el.textContent = values[el.dataset.val]; });
+    all('.update-badge').forEach((el) => { el.hidden = !state.updateFound; });
+    all('[data-action="settings-cat"][data-cat="dev"]').forEach((el) => { el.hidden = !state.dev; });
     all('.tog').forEach((el) => el.classList.toggle('on', el.querySelector('[data-val]').textContent === 'On'));
     renderWeather();
 
@@ -1856,6 +3144,7 @@
     all('[data-cw]').forEach((el) => { el.hidden = NATIVE ? Number(el.dataset.i) >= state.cw.length - 1 : !sample; });
     all('[data-scenes]').forEach((el) => { el.hidden = NATIVE ? state.cw.length >= 3 : sample; });
     all('[data-recent]').forEach((el) => { el.hidden = sample || (NATIVE && state.cw.length > 1); });
+    applyHomeLayout();
 
     stage.querySelector('[data-games-sub]').textContent = g.autoSwitch
       ? `Opening Games switches the TV to HDMI ${g.hdmiPort}${g.countdownSec ? ` after a ${g.countdownSec} second countdown` : ' straight away'}.`
@@ -1890,7 +3179,7 @@
     // TV" mode the focused item's colour takes over (see syncGlow below).
     if ((h.backlight !== 'sync' || NATIVE) && !h.drift) state.glow = null;
     applyColors();
-    stage.querySelector('.edge').classList.toggle('off', h.backlight === 'off');
+    stage.querySelector('.edge').classList.toggle('off', state.edge === 'off' || (state.edge === 'lights' && h.backlight === 'off'));
     stage.classList.toggle('lights', state.matchLights && h.backlight !== 'off');
     const matchBtn = stage.querySelector('.tool[data-action="match-lights"]');
     matchBtn.classList.toggle('on', state.matchLights);
@@ -1906,6 +3195,11 @@
     swatch.style.background = h.backlight === 'off' ? 'var(--track)' : `linear-gradient(135deg, ${colors.join(',')})`;
     stage.querySelector('[data-room-scene]').textContent = h.backlight === 'off'
       ? 'Backlight off' : h.backlight === 'sync' ? 'Synced to TV' : BACKLIGHT[h.backlight].name;
+    const mine = stage.querySelector('[data-my-scenes]');
+    if (mine) {
+      const html = state.myScenes.map((sc) => `<button class="pillbtn" data-focus data-action="my-scene" data-id="${sc.id}">${esc(sc.name)}</button>`).join('');
+      if (mine.__html !== html) { mine.__html = html; mine.innerHTML = html; }
+    }
     if (NATIVE) state.sleepAt = Number(nativeCall('goveeSleepAt')) || 0;
     const sl = stage.querySelector('[data-sleep-label]');
     if (sl) sl.textContent = state.sleepAt > Date.now() ? `Lights off in ${Math.max(1, Math.round((state.sleepAt - Date.now()) / 60000))} min` : 'Sleep timer: Off';
@@ -2014,7 +3308,7 @@
 
   function renderSearch() {
     const q = state.query.trim().toLowerCase();
-    if (NATIVE) return renderTvSearch(q);
+    if (NATIVE) { renderForYou(); renderStarred(); return renderTvSearch(q); }
     const results = D.catalogue.filter((s) => APP[s.app] && (!q
       || s.title.toLowerCase().includes(q)
       || s.meta.toLowerCase().includes(q)
@@ -2136,15 +3430,84 @@
     view.querySelectorAll(ANIM_SELECTOR).forEach((el) => el.classList.add('anim'));
   }
 
+  // The light bar under the current tab slides there, stretching across as it goes.
+  const TAB_ORDER = [...D.nav.map((n) => n.id), 'settings'];
+  let glowX = null;
+  let glowShown = false;
+
+  function moveTabGlow(animate = true) {
+    const bar = stage.querySelector('.tab-glow');
+    const tab = stage.querySelector(`.tab[data-nav="${state.view}"]`);
+    if (!bar) return;
+    if (!tab) { // a view that isn't a tab (Settings and its pages): the bar rests
+      bar.style.opacity = '0';
+      glowShown = false;
+      return;
+    }
+    const w = 18;
+    const x = tab.offsetLeft + tab.offsetWidth / 2 - w / 2;
+    const reduce = state.motion === 'fast';
+    if (glowX !== null && glowShown && animate && !reduce && bar.animate && x !== glowX) {
+      const lo = Math.min(glowX, x);
+      const span = Math.abs(x - glowX) + w;
+      bar.animate([
+        { transform: `translateX(${glowX}px) scaleX(1)` },
+        { transform: `translateX(${lo}px) scaleX(${span / w})`, offset: 0.45 },
+        { transform: `translateX(${x}px) scaleX(1)` },
+      ], { duration: 520, easing: 'cubic-bezier(0.3, 0.8, 0.3, 1)' });
+    }
+    bar.style.transform = `translateX(${x}px)`;
+    bar.style.opacity = '1';
+    glowX = x;
+    glowShown = true;
+  }
+
+  // ---------- Edges of scrolling content ----------
+  // Content that carries on past the bottom (or top) of a scrolling area fades
+  // out instead of being cut off; on a photo wallpaper the bottom of the screen
+  // also blurs (the pre-blurred wallpaper, so nothing is blurred live).
+  function edgeFade(el) {
+    if (!el || !el.classList) return;
+    const below = el.scrollHeight - el.clientHeight - el.scrollTop > 4;
+    el.classList.toggle('more-below', below);
+    el.classList.toggle('more-above', el.scrollTop > 4);
+    if (el.classList.contains('view')) stage.classList.toggle('more-below', below);
+  }
+
+  let edgesQueued = false;
+  function refreshEdges() {
+    if (edgesQueued) return;
+    edgesQueued = true;
+    requestAnimationFrame(() => {
+      edgesQueued = false;
+      const view = stage.querySelector(`[data-view="${state.view}"]`);
+      stage.classList.remove('more-below');
+      if (!view) return;
+      [view, ...view.querySelectorAll('.cleanup, .wp-grid')].forEach((el) => {
+        const y = getComputedStyle(el).overflowY;
+        if (y === 'auto' || y === 'scroll') edgeFade(el);
+      });
+    });
+  }
+
   function openView(id) {
+    const from = TAB_ORDER.indexOf(state.view);
+    const to = TAB_ORDER.indexOf(id);
+    stage.dataset.dir = from >= 0 && to >= 0 && to < from ? 'l' : 'r'; // which way the page slides in
     if (state.view === 'wallpapers' && id !== 'wallpapers') stage.querySelector('[data-wp-grid]').innerHTML = '';
     state.view = id;
     applyState();
     if (id === 'wallpapers') renderWallpapers();
     if (id === 'cleanup') renderCleanup();
     if (id === 'roles') renderRoles();
+    if (id === 'deepclean') renderDeep();
+    if (id === 'myscenes') renderMyScenes();
+    if (id === 'diag') renderDiag();
+    if (id === 'sports') renderSports();
     if (id === 'guest') renderGuest();
     animateView(id);
+    moveTabGlow();
+    refreshEdges();
     alignFrost(100);
     setTimeout(() => alignFrost(0), 900); // again once the entry animation has settled
     if (id === 'games' && state.games.autoSwitch) startSwitch();
@@ -2233,6 +3596,10 @@
   // ---------- Input ----------
 
   stage.addEventListener('click', (e) => {
+    if (state.homeEdit) {
+      const w = e.target.closest('.view-home .widgets [data-slot]');
+      if (w) { e.preventDefault(); cycleSlot(w.dataset.slot); return; }
+    }
     const card = e.target.closest('[data-expand]');
     const inner = e.target.closest('button');
     if (card && (!inner || inner === card) && refs.x.hidden) {
@@ -2251,13 +3618,58 @@
       if (it) { nativeCall('watchNextOpen', it.uri, it.pkg); return; }
     }
     if (b.dataset.action === 'x-close') { closeExpand(); return; }
-    if ((b.dataset.nav || b.dataset.navTo) && !refs.x.hidden) { refs.x.hidden = true; refs.xpanel.innerHTML = ''; xFrom = null; }
-    if (b.dataset.nav === 'settings') state.settingsCat = null;
+    if ((b.dataset.nav || b.dataset.navTo) && !refs.x.hidden) { titleSeq++; refs.x.hidden = true; refs.xpanel.innerHTML = ''; refs.xpanel.className = 'xpanel'; xFrom = null; }
+    if (b.dataset.nav === 'settings') {
+      state.settingsCat = null;
+      // Developer options: press the Settings icon 3 times in a row.
+      const now = Date.now();
+      devTaps = now - devTapAt < 900 ? devTaps + 1 : 1;
+      devTapAt = now;
+      if (devTaps >= 3 && !state.dev) {
+        state.dev = true;
+        saveSoon();
+        toast('Developer options are on. They are at the end of Settings');
+      }
+    }
     if (b.dataset.nav) openView(b.dataset.nav);
     else if (b.dataset.navTo) openView(b.dataset.navTo);
     else if (b.dataset.app) launchApp(b.dataset.app);
     else if (b.dataset.track) setTrack(Number(b.dataset.track));
     else if (b.dataset.toast) toast(b.dataset.toast);
+    else if (act === 'input') { if (!nativeCall('switchInput', b.dataset.id)) toast("Couldn't switch to that input"); }
+    else if (act === 'update-channel') { state.updateChannel = state.updateChannel === 'beta' ? 'stable' : 'beta'; state.updateFound = null; state.update = ''; saveSoon(); checkUpdate(true); }
+    else if (act === 'open-diag') openView('diag');
+    else if (act === 'hide-dev') { state.dev = false; state.devClean = false; state.settingsCat = null; saveSoon(); toast('Developer options are hidden'); }
+    else if (act === 'open-devclean') { state.devClean = true; openView('cleanup'); }
+    else if (act === 'welcome-setup') { closeWelcome(); openSetup(); }
+    else if (act === 'welcome-later') closeWelcome();
+    else if (act === 'show-welcome') openWelcome();
+    else if (act === 'welcome-fit') { closeWelcome(); openFit(); }
+    else if (act === 'keep-front') { const m = ((Number(nativeCall('keepMode')) || 0) + 1) % 3; nativeCall('setKeepMode', m); toast(['Off', 'On for songs cast to the TV. Music you start in YouTube Music stays put', 'On for cast songs and for music you start in YouTube Music'][m]); }
+    else if (act === 'title') openTitle(state.titleRows[Number(b.dataset.i)]);
+    else if (act === 'title-go') goTitleRow(titleRowsNow[Number(b.dataset.i)]);
+    else if (act === 'trailers') state.trailers = b.dataset.id === 'on';
+    else if (act === 'edit-home') startHomeEdit();
+    else if (act === 'title-star') { if (titleNow) toggleStar(titleNow); }
+    else if (act === 'star-open') openStarred(Number(b.dataset.i));
+    else if (act === 'sp-tab') { state.nbaTab = b.dataset.id; renderSports(); }
+    else if (act === 'sp-game') openGame(b.dataset.id);
+    else if (act === 'sp-watch') { if (!refs.x.hidden) closeExpand(); watchNow(); }
+    else if (act === 'sp-highlights') openHighlights(b.dataset.q || 'NBA highlights');
+    else if (act === 'sp-video') { const a = state.nbaNews.find((x) => x.id === b.dataset.id); if (a && a.clip) playClip(a.clip, a.headline); else openHighlights(a ? a.headline : 'NBA highlights'); }
+    else if (act === 'clip-toggle') { const v = refs.xpanel.querySelector('video'); if (v) { if (v.paused) v.play(); else v.pause(); } }
+    else if (act === 'sp-clip') playClip(b.dataset.clip, b.dataset.title || 'Highlights');
+    else if (act === 'cycle-previews') { state.clipPreviews = !state.clipPreviews; saveSoon(); }
+    else if (act === 'sp-story') openStory(b.dataset.id);
+    else if (act === 'sp-watch-pick') { state.nbaWatch = b.dataset.id; saveSoon(); renderSports(); renderGameWidget(); }
+    else if (act === 'sp-follow') {
+      const id = b.dataset.id;
+      state.nbaTeams = state.nbaTeams.includes(id) ? state.nbaTeams.filter((x) => x !== id) : [...state.nbaTeams, id];
+      saveSoon();
+      renderSports().then(() => stage.querySelector(`[data-action="sp-follow"][data-id="${id}"]`)?.focus());
+      renderGameWidget();
+    }
+    else if (act === 'foryou') openForYou(state.forYou[Number(b.dataset.i)]);
     else if (act === 'theme') state.appearance = { auto: 'light', light: 'dark', dark: 'auto' }[state.appearance];
     else if (act === 'customize') openSheet();
     else if (act === 'toggle-sample') state.sampleData = !state.sampleData;
@@ -2273,7 +3685,7 @@
       markWallpaper();
       toast(`Wallpaper: ${wallpaperLabel()}`);
     } else if (act === 'open-setup') openSetup();
-    else if (act === 'open-cleanup') openView('cleanup');
+    else if (act === 'open-cleanup') { state.devClean = false; openView('cleanup'); }
     else if (act === 'open-app-info') nativeCall('openAppInfo', b.dataset.pkg);
     else if (act === 'close-setup') closeSetup();
     else if (act === 'wn-check') {
@@ -2305,8 +3717,55 @@
         state.adbConfirm = false;
         nativeCall('adbDisable');
       }
+    } else if (act === 'adb-reapply') {
+      nativeCall('adbReapply');
     } else if (act === 'adb-restore') {
       nativeCall('adbRestore');
+    } else if (act === 'scene-save') {
+      saveScene();
+    } else if (act === 'my-scene') {
+      const sc = state.myScenes.find((x) => x.id === b.dataset.id);
+      if (sc) applyMyScene(sc);
+    } else if (act === 'open-myscenes') {
+      openView('myscenes');
+    } else if (act === 'scene-del') {
+      if (state.delConfirm !== b.dataset.id) {
+        state.delConfirm = b.dataset.id;
+      } else {
+        state.myScenes = state.myScenes.filter((x) => x.id !== b.dataset.id);
+        state.delConfirm = null;
+        saveSoon();
+        applyState();
+      }
+      renderMyScenes();
+      stage.querySelector(`[data-action="scene-del"]`)?.focus();
+    } else if (act === 'adb-safety') {
+      nativeCall('adbSafetyTest');
+    } else if (act === 'adb-sethome') {
+      if (!state.homeConfirm) {
+        state.homeConfirm = true;
+        renderCleanup();
+        stage.querySelector('[data-action="adb-sethome"]')?.focus();
+      } else {
+        state.homeConfirm = false;
+        nativeCall('adbSetHome');
+      }
+    } else if (act === 'adb-restorehome') {
+      nativeCall('adbRestoreHome');
+    } else if (act === 'open-deepclean') {
+      openView('deepclean');
+    } else if (act === 'adb-deep') {
+      const key = b.dataset.pkg || b.dataset.tier;
+      if (state.deepConfirm !== key) {
+        state.deepConfirm = key;
+        renderDeep();
+        stage.querySelector(`[data-action="adb-deep"]${b.dataset.pkg ? `[data-pkg="${b.dataset.pkg}"]` : '[data-tier="safe"]'}`)?.focus();
+      } else {
+        state.deepConfirm = null;
+        nativeCall('adbDeepClean', b.dataset.tier, b.dataset.pkg || '');
+      }
+    } else if (act === 'update-check') {
+      checkUpdate();
     } else if (act === 'adb-connect') {
       state.adb = { state: 'connecting' };
       renderCleanup();
@@ -2327,6 +3786,7 @@
     }
     else if (act === 'appearance') state.appearance = b.dataset.id;
     else if (act === 'wallpaper-set') setWallpaper(b.dataset.id);
+    else if (act === 'edge-mode') state.edge = b.dataset.id;
     else if (act === 'wallpaper') {
       const cur = state.matchLights ? 'lights' : state.wallpaper;
       setWallpaper({ photo: 'gradient', gradient: 'lights', lights: 'photo' }[cur]);
@@ -2487,7 +3947,7 @@
   const visible = (el) => el.getClientRects().length > 0;
 
   function focusables(scope) {
-    return [...scope.querySelectorAll('[data-focus]')].filter(visible);
+    return [...scope.querySelectorAll('[data-focus]:not([disabled])')].filter(visible);
   }
 
   function centre(el) {
@@ -2581,8 +4041,10 @@
   }
 
   function goBack() {
-    if (!refs.x.hidden) {
-      closeExpand();
+    if (state.homeEdit) {
+      endHomeEdit();
+    } else if (!refs.x.hidden) {
+      if (refs.xpanel.classList.contains('xwelcome')) closeWelcome(); else closeExpand();
     } else if (!refs.setup.hidden) {
       closeSetup();
     } else if (!refs.fit.hidden) {
@@ -2596,6 +4058,10 @@
       state.settingsCat = null;
       applyState();
       stage.querySelector(`[data-action="settings-cat"][data-cat="${was}"]`)?.focus();
+    } else if (state.view === 'deepclean') {
+      openView('cleanup');
+    } else if (state.view === 'myscenes' || state.view === 'diag') {
+      openView('settings');
     } else if (state.view === 'roles') {
       openView(state.rolesFrom || 'room');
     } else if (state.view === 'wallpapers' || state.view === 'cleanup' || state.view === 'guest') {
@@ -2616,6 +4082,11 @@
     if (e.key === 'Enter' && e.target.matches?.('[data-expand]:not(button)')) {
       e.preventDefault();
       e.target.click();
+      return;
+    }
+    if (e.key === 'Enter' && e.target.id === 'scene-name') {
+      e.preventDefault();
+      saveScene();
       return;
     }
     if (e.key === 'Enter' && e.target.id === 'search-input') {
@@ -2715,6 +4186,36 @@
   function fitText() {
     const val = stage.querySelector('[data-fit-val]');
     if (val) val.textContent = `${Math.round((userFit || 1) * 100)}%`;
+  }
+
+  // ---------- First run ----------
+  function openWelcome() {
+    const g = state.govee || {};
+    const items = [
+      ['Lights', g.connected ? 'Connected' : 'Add your Govee key', !!g.connected],
+      ['Films and series', tmdbReady() ? 'Ready' : 'Add a TMDB key', tmdbReady()],
+      ['Weather', state.weather ? `${state.weather.town}` : 'Uses where the TV is, or a town you choose', !!state.weather],
+    ];
+    xFrom = document.activeElement;
+    refs.xpanel.className = 'xpanel xwelcome';
+    refs.xpanel.innerHTML = `
+      <div class="wel-title">Welcome to your new home screen</div>
+      <p class="wel-lead">A few things work best once they're set up. Type them on your phone instead of the remote.</p>
+      <ul class="wel-list">${items.map(([t, d, ok]) => `<li class="${ok ? 'ok' : ''}"><span class="wel-dot"></span><span class="wel-name">${t}</span><span class="wel-state">${esc(d)}</span></li>`).join('')}</ul>
+      <div class="wel-actions">
+        <button class="btn lg btn-primary" data-focus data-action="welcome-setup">Set up with my phone</button>
+        <button class="btn lg" data-focus data-action="welcome-later">Later</button>
+      </div>
+      <button class="wel-fit" data-focus data-action="welcome-fit">Edges of the picture cut off? Fit to screen</button>`;
+    refs.x.hidden = false;
+    refs.x.classList.remove('closing');
+    refs.xpanel.querySelector('[data-action="welcome-setup"]').focus();
+  }
+
+  function closeWelcome() {
+    state.welcomed = true;
+    saveSoon();
+    closeExpand();
   }
 
   function openFit() {
@@ -2827,6 +4328,10 @@
     applyState();
   }
 
+  // The native heartbeat asks this whenever the launcher comes back to the front:
+  // "ok" only if the page is drawn (see MainActivity.heartbeat).
+  window.launcherAlive = () => (stage.querySelector('.topbar') && stage.getBoundingClientRect().width > 0 ? 'ok' : 'blank');
+
   window.launcherResume = () => {
     if (!NATIVE) return;
     lastInput = Date.now();
@@ -2834,12 +4339,17 @@
     readBacklight();
     leaveGaming();
     renderContinue();
-    tmdbKey = nativeCall('tmdbKey') || '';
+    tmdbOn = nativeCall('tmdbReady') === true;
+    if (!state.forYou.length) loadForYou();
+    if (Date.now() - nbaLoadedAt > 10 * 60000) loadNba();
+    if (Date.now() - starCheckAt > 12 * 3600000) checkStarred();
     pollNowPlaying();
     refreshNativeStatus();
     if (state.view === 'cleanup') renderCleanup(); // back from the TV's Settings
     if (Date.now() - weatherAt > 15 * 60 * 1000 || state.locationPending) loadWeather();
     applyState();
+    if (launchedFrom && launchedFrom.isConnected && visible(launchedFrom) && refs.x.hidden) launchedFrom.focus();
+    launchedFrom = null;
   };
 
   // Things Android can change while we're in another app (a permission, the
@@ -2861,10 +4371,11 @@
     } catch {}
   }
   build();
+  moveTabGlow(false);
   ensureGlyphs();
   new MutationObserver(() => alignFrost()).observe(stage, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
   stage.addEventListener('scroll', () => alignFrost(60), true);
-  window.addEventListener('resize', () => alignFrost());
+  window.addEventListener('resize', () => { alignFrost(); moveTabGlow(false); });
   alignFrost();
   let glyphTimer = 0;
   new MutationObserver(() => {
@@ -2880,7 +4391,25 @@
   if (NATIVE) {
     try {
       syncVolume();
-      tmdbKey = nativeCall('tmdbKey') || '';
+      tmdbOn = nativeCall('tmdbReady') === true;
+      setTimeout(loadForYou, 1500);
+      setTimeout(loadNba, 2500);
+      setTimeout(checkStarred, 4000);
+      setInterval(() => { if (!document.hidden && Date.now() - starCheckAt > 12 * 3600000) checkStarred(); }, 3600000);
+      setInterval(() => { if (!document.hidden && (state.view === 'sports' || nbaGames.some((g) => g.state === 'in'))) loadNba(); }, 5 * 60000);
+      renderInputs();
+      nativeCall('launcherReady'); // tells the start-up watchdog the page is working
+      nativeCall('saveBackup', localStorage.getItem('settings') || '{}');
+      if (nativeCall('wasRescued') === true) {
+        setTimeout(() => toast('The launcher had trouble starting, so Google\'s home screen was switched back on'), 1500);
+        nativeCall('clearRescued');
+      }
+      setTimeout(() => checkUpdate(true), 8000);
+      setTimeout(() => {
+        const fw = nativeJson('firmwareCheck') || {};
+        if (fw.changed && (fw.reenabled || []).length) toast(`A TV update switched ${fw.reenabled.length} app${fw.reenabled.length === 1 ? '' : 's'} back on. Settings, Clean up apps to switch them off again`);
+      }, 12000);
+      setInterval(() => { if (!document.hidden) checkUpdate(true); }, 6 * 3600 * 1000);
       renderContinue();
       pollNowPlaying();
       applyGovee(nativeJson('goveeStatus'));
@@ -2889,7 +4418,7 @@
     } catch (e) {
       console.warn('start-up calls failed', e);
     }
-    if (userFit === null) openFit(); // first run: set the screen size
+    if (!state.welcomed) setTimeout(openWelcome, 700); // first run: a welcome, not a settings screen
   }
   [100, 500, 1500].forEach((ms) => setTimeout(fit, ms));
 })();

@@ -1,0 +1,13 @@
+# Build output
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+
+# Secrets: never commit these
+android/keystore.properties
+*.keystore
+*.jks
+keys.json
+.env
+*.env

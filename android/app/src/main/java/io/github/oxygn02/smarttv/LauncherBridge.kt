@@ -44,6 +44,9 @@ interface BridgeHost {
     /** Sends an event to the page: window.onNative(name, json). */
     fun emit(name: String, json: String)
 
+    /** The page has started and is working: the start-up watchdog can stand down. */
+    fun launcherReady()
+
     /** Shows the system's location permission question. */
     fun requestLocationPermission()
 
@@ -178,6 +181,58 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         } catch (_: Exception) {
             launch(pkg)
         }
+    }
+
+    // ---------- For you: what apps recommend on the TV's home channels ----------
+
+    /**
+     * The programmes installed apps publish to the system's home channels (the
+     * same rows Google's home screen shows), as {ok, error, items:[{title,
+     * sub, pkg, uri, art}]}. Only apps' own packages are listed, newest weight
+     * first, one per title. Android may refuse (error "permission") or an app
+     * may publish nothing; both are reported rather than hidden.
+     */
+    @JavascriptInterface
+    fun recommendations(): String {
+        val out = JSONObject()
+        val items = JSONArray()
+        try {
+            val cols = arrayOf(
+                TvContract.PreviewPrograms.COLUMN_TITLE,
+                TvContract.PreviewPrograms.COLUMN_SHORT_DESCRIPTION,
+                TvContract.PreviewPrograms.COLUMN_PACKAGE_NAME,
+                TvContract.PreviewPrograms.COLUMN_INTENT_URI,
+                TvContract.PreviewPrograms.COLUMN_THUMBNAIL_URI,
+                TvContract.PreviewPrograms.COLUMN_POSTER_ART_URI,
+                TvContract.PreviewPrograms.COLUMN_WEIGHT,
+            )
+            val seen = HashSet<String>()
+            activity.contentResolver.query(
+                TvContract.PreviewPrograms.CONTENT_URI, cols, null, null,
+                TvContract.PreviewPrograms.COLUMN_WEIGHT + " DESC",
+            )?.use { c ->
+                while (c.moveToNext() && items.length() < 24) {
+                    val title = c.getString(0).orEmpty()
+                    val pkg = c.getString(2).orEmpty()
+                    val art = c.getString(4).orEmpty().ifEmpty { c.getString(5).orEmpty() }
+                    if (title.isEmpty() || art.isEmpty() || !seen.add("$pkg|$title")) continue
+                    items.put(
+                        JSONObject()
+                            .put("title", title)
+                            .put("sub", c.getString(1).orEmpty())
+                            .put("pkg", pkg)
+                            .put("uri", c.getString(3).orEmpty())
+                            .put("art", art),
+                    )
+                }
+            }
+            out.put("ok", true)
+        } catch (e: SecurityException) {
+            out.put("ok", false).put("error", "permission")
+        } catch (e: Exception) {
+            out.put("ok", false).put("error", e.javaClass.simpleName)
+        }
+        return out.put("items", items).toString()
     }
 
     // ---------- Clean-up over the TV's own debugging port (read only so far) ----------
@@ -316,6 +371,7 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
                 if (!adb.connected) throw AdbClient.AdbException("Connect to the TV first")
                 val allowed = catalog().filter { !it.protectedApp }.map { it.pkg }.toSet()
                 val todo = chosen.filter { it in allowed && pkgName.matches(it) }
+                saveBaselineOnce()
                 val done = mutableListOf<String>()
                 val failed = JSONArray()
                 todo.forEachIndexed { i, pkg ->
@@ -353,12 +409,396 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         }
     }
 
+    // ---------- The deeper clean-up and the home screen ----------
+
+    private fun tierList(tier: String) = when (tier) {
+        "safe" -> DEEP_SAFE
+        "careful" -> DEEP_CAREFUL
+        "google" -> DEEP_GOOGLE
+        else -> emptyList()
+    }
+
+    /** [{pkg, label, reason, tier, installed, enabled}] for all three groups. */
+    @JavascriptInterface
+    fun deepCleanList(): String {
+        val out = JSONArray()
+        listOf("safe" to DEEP_SAFE, "careful" to DEEP_CAREFUL, "google" to DEEP_GOOGLE).forEach { (tier, list) ->
+            list.forEach { (pkg, reason) ->
+                val info = runCatching { pm.getApplicationInfo(pkg, 0) }.getOrNull()
+                out.put(
+                    JSONObject().put("pkg", pkg).put("tier", tier).put("reason", reason)
+                        .put("label", info?.let { pm.getApplicationLabel(it).toString() } ?: pkg)
+                        .put("installed", info != null).put("enabled", info?.enabled == true),
+                )
+            }
+        }
+        return out.toString()
+    }
+
+    /**
+     * Switches off a group of the listed packages (or just [only], if given) with
+     * `pm disable-user --user 0`. Reversible with the same restore as the rest.
+     * Google's home screen is refused unless this launcher is already the home screen.
+     */
+    @JavascriptInterface
+    fun adbDeepClean(tier: String, only: String) {
+        adbIo.execute {
+            try {
+                if (!adb.connected) throw AdbClient.AdbException("Connect to the TV first")
+                if (tier == "google" && !isDefaultHome()) throw AdbClient.AdbException("Make this launcher the home screen first")
+                if (tier == "google" && !safetyReady()) throw AdbClient.AdbException("Test the safety net first")
+                val todo = tierList(tier).map { it.first }.filter { (only.isEmpty() || it == only) && pkgName.matches(it) }
+                    .filter { runCatching { pm.getApplicationInfo(it, 0) }.getOrNull()?.enabled == true }
+                saveBaselineOnce()
+                val done = mutableListOf<String>()
+                val failed = JSONArray()
+                todo.forEachIndexed { i, pkg ->
+                    adbEvent("working", "Switching off ${i + 1} of ${todo.size}")
+                    val out = adb.shell("pm disable-user --user 0 $pkg")
+                    if (out.contains("disabled-user") || out.contains("new state: disabled")) done.add(pkg)
+                    else failed.put(JSONObject().put("pkg", pkg).put("why", out.trim().take(120)))
+                }
+                setSwitchedOff(switchedOffByUs() + done)
+                adbEvent("done", "Switched off ${done.size} of ${todo.size}", JSONObject().put("failed", failed).put("ours", switchedOffByUs().size))
+            } catch (e: Exception) {
+                adbEvent("error", e.message ?: "That didn't work")
+            }
+        }
+    }
+
+    // ---------- The safety net ----------
+
+    private val guardPrefs = activity.getSharedPreferences("guard", Context.MODE_PRIVATE)
+
+    /** Called by the page once it has built its screen. */
+    @JavascriptInterface
+    fun launcherReady() {
+        guardPrefs.edit().putInt("fails", 0).apply()
+        host.launcherReady()
+    }
+
+    @JavascriptInterface
+    fun safetyReady(): Boolean = guardPrefs.getBoolean("safetyOk", false)
+
+    /** True if the launcher had to give Google's home screen back since this was last cleared. */
+    @JavascriptInterface
+    fun wasRescued(): Boolean = guardPrefs.getBoolean("rescued", false)
+
+    @JavascriptInterface
+    fun clearRescued() = guardPrefs.edit().putBoolean("rescued", false).apply()
+
+    /**
+     * Proves the safety net can work on this TV: over the debug connection, Google's
+     * home screen and this launcher are both found. Needed before Google's home
+     * screen can be switched off. Changes nothing.
+     */
+    @JavascriptInterface
+    fun adbSafetyTest() {
+        adbIo.execute {
+            try {
+                if (!adb.connected) throw AdbClient.AdbException("Connect to the TV first")
+                val google = adb.shell("pm path com.google.android.tvlauncher")
+                val mine = adb.shell("pm path ${activity.packageName}")
+                if (!google.contains("package:") || !mine.contains("package:")) throw AdbClient.AdbException("The check didn't pass")
+                guardPrefs.edit().putBoolean("safetyOk", true).apply()
+                adbEvent("done", "Safety net ready: Google's home screen can be switched back on")
+            } catch (e: Exception) {
+                adbEvent("error", e.message ?: "The check didn't pass")
+            }
+        }
+    }
+
+    // ---------- Backup of settings ----------
+
+    private val backupPrefs = activity.getSharedPreferences("backup", Context.MODE_PRIVATE)
+
+    /** The page hands over its saved settings each time they change, so the phone page can offer them. */
+    @JavascriptInterface
+    fun saveBackup(json: String) {
+        if (json.length < 200_000) backupPrefs.edit().putString("settings", json).apply()
+    }
+
+    private fun backupText(): String {
+        val settings = runCatching { JSONObject(backupPrefs.getString("settings", "{}")) }.getOrDefault(JSONObject())
+        return JSONObject().put("app", "Smart TV Launcher").put("version", 1)
+            .put("settings", BackupSchema.clean(settings)).toString(2)
+    }
+
+    /**
+     * Puts a backup back: the page reloads with the saved settings. Only the
+     * known launcher settings, with the right types and sizes, are taken; a
+     * backup can never change the update address, the clean-up list or the
+     * safety net. False if the file isn't one of ours.
+     */
+    private fun restoreFrom(text: String): Boolean {
+        if (text.length > 200_000) return false
+        return try {
+            val o = JSONObject(text)
+            if (o.optString("app") != "Smart TV Launcher") return false
+            val clean = BackupSchema.clean(o.optJSONObject("settings") ?: return false)
+            backupPrefs.edit().putString("settings", clean.toString()).apply()
+            host.emit("restore", clean.toString())
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** The home screen that answers Home now: {pkg, component, isThis}. */
+    private fun currentHome(): ComponentName? =
+        pm.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)
+            ?.activityInfo?.let { ComponentName(it.packageName, it.name) }
+
+    /**
+     * Makes this launcher answer the Home button, with `cmd package set-home-activity`.
+     * The previous home screen is remembered so it can be put back.
+     */
+    @JavascriptInterface
+    fun adbSetHome() {
+        adbIo.execute {
+            try {
+                if (!adb.connected) throw AdbClient.AdbException("Connect to the TV first")
+                val mine = ComponentName(activity.packageName, MainActivity::class.java.name)
+                val before = currentHome()
+                if (before != null && before.packageName != activity.packageName) {
+                    adbLog.edit().putString("prevHome", before.flattenToString()).apply()
+                }
+                adb.shell("cmd package set-home-activity ${mine.flattenToString()}")
+                val now = currentHome()
+                val ok = now?.packageName == activity.packageName
+                adbEvent(if (ok) "done" else "error", if (ok) "This launcher is now the home screen" else "The TV kept its own home screen")
+            } catch (e: Exception) {
+                adbEvent("error", e.message ?: "That didn't work")
+            }
+        }
+    }
+
+    /** Puts back the home screen that was there before [adbSetHome]. */
+    @JavascriptInterface
+    fun adbRestoreHome() {
+        adbIo.execute {
+            try {
+                if (!adb.connected) throw AdbClient.AdbException("Connect to the TV first")
+                val prev = adbLog.getString("prevHome", null)?.takeIf { Regex("^[A-Za-z0-9_.]+/[A-Za-z0-9_.$]+$").matches(it) }
+                    ?: throw AdbClient.AdbException("No earlier home screen was saved")
+                adb.shell("cmd package set-home-activity $prev")
+                adbEvent("done", "The TV's own home screen is back")
+            } catch (e: Exception) {
+                adbEvent("error", e.message ?: "That didn't work")
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun hasPrevHome(): Boolean = adbLog.getString("prevHome", null) != null
+
+    // ---------- Updates ----------
+
+    /** {code, name} of the installed launcher. */
+    @JavascriptInterface
+    fun appVersion(): String {
+        val info = pm.getPackageInfo(activity.packageName, 0)
+        val code = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
+        return JSONObject().put("code", code).put("name", info.versionName ?: "").toString()
+    }
+
+    /**
+     * Downloads and installs the newest launcher. The address is fixed here (the
+     * page can't change it). Before Android's installer is even asked, the
+     * download must match the SHA-256 in the version file, be this app, be a
+     * newer version (no downgrades) and be signed with the same key as the
+     * installed launcher. [channel] is "stable" or "beta".
+     */
+    @JavascriptInterface
+    fun installUpdate(channel: String) {
+        val manifestName = if (channel == "beta") "version-beta.json" else "version.json"
+        adbIo.execute {
+            try {
+                if (Build.VERSION.SDK_INT >= 26 && !activity.packageManager.canRequestPackageInstalls()) {
+                    host.emit("update", JSONObject().put("state", "permission").toString())
+                    activity.runOnUiThread {
+                        runCatching {
+                            activity.startActivity(
+                                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, android.net.Uri.parse("package:${activity.packageName}"))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        }
+                    }
+                    return@execute
+                }
+                host.emit("update", JSONObject().put("state", "downloading").toString())
+                fun get(path: String): java.io.InputStream {
+                    val c = java.net.URL(UPDATE_BASE + path + "?t=" + System.currentTimeMillis()).openConnection() as javax.net.ssl.HttpsURLConnection
+                    c.connectTimeout = 10_000
+                    c.readTimeout = 30_000
+                    return c.inputStream
+                }
+                val manifest = JSONObject(get(manifestName).use { it.readBytes().toString(Charsets.UTF_8) })
+                val apkName = manifest.optString("apk", "tv.apk")
+                val want = manifest.optString("sha256").lowercase()
+                if (!Regex("^[A-Za-z0-9_-]+\\.apk$").matches(apkName)) throw java.io.IOException("The version file is wrong")
+                if (!Regex("^[0-9a-f]{64}$").matches(want)) throw java.io.IOException("The version file has no checksum")
+                val mine = installedVersionCode()
+                if (manifest.optLong("versionCode") <= mine) throw java.io.IOException("Already up to date")
+
+                val dir = File(activity.cacheDir, "updates").apply { mkdirs() }
+                val file = File(dir, "tv.apk")
+                val digest = java.security.MessageDigest.getInstance("SHA-256")
+                get(apkName).use { input ->
+                    file.outputStream().use { out ->
+                        val buf = ByteArray(65536)
+                        var total = 0L
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            total += n
+                            if (total > 80L * 1024 * 1024) throw java.io.IOException("The download is too big")
+                            digest.update(buf, 0, n)
+                            out.write(buf, 0, n)
+                        }
+                    }
+                }
+                val got = digest.digest().joinToString("") { "%02x".format(it) }
+                if (got != want) { file.delete(); throw java.io.IOException("The download didn't match its checksum, so it wasn't installed") }
+                checkApk(file, manifest.optLong("versionCode"))
+
+                val uri = androidx.core.content.FileProvider.getUriForFile(activity, "${activity.packageName}.files", file)
+                host.emit("update", JSONObject().put("state", "installing").toString())
+                activity.runOnUiThread {
+                    activity.startActivity(
+                        Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            } catch (e: Exception) {
+                host.emit("update", JSONObject().put("state", "error").put("message", e.message ?: "Couldn't update").toString())
+            }
+        }
+    }
+
+    private fun installedVersionCode(): Long {
+        val info = pm.getPackageInfo(activity.packageName, 0)
+        return if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
+    }
+
+    /** The downloaded APK must be this app, the promised newer version, and signed with the installed key. */
+    @Suppress("DEPRECATION")
+    private fun checkApk(file: File, promised: Long) {
+        val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
+        val apk = pm.getPackageArchiveInfo(file.path, flags) ?: throw java.io.IOException("The download isn't an app")
+        val code = if (Build.VERSION.SDK_INT >= 28) apk.longVersionCode else apk.versionCode.toLong()
+        if (apk.packageName != activity.packageName) throw java.io.IOException("The download is a different app")
+        if (code != promised || code <= installedVersionCode()) throw java.io.IOException("The download isn't a newer version")
+        fun certs(p: android.content.pm.PackageInfo) = (if (Build.VERSION.SDK_INT >= 28) p.signingInfo?.apkContentsSigners else p.signatures)
+            ?.map { it.toCharsString() }?.toSet().orEmpty()
+        val installed = pm.getPackageInfo(activity.packageName, flags)
+        if (certs(apk).isEmpty() || certs(apk) != certs(installed)) throw java.io.IOException("The download isn't signed with this launcher's key")
+    }
+
     // ---------- Show search: the TMDB key saved from the phone page ----------
 
     private val lookup = activity.getSharedPreferences("lookup", Context.MODE_PRIVATE)
 
+    private fun tmdbSecret() = SecretStore.migrate(activity, "tmdb", "lookup", "tmdb")
+    private fun pricesSecret() = SecretStore.migrate(activity, "prices", "lookup", "prices")
+
+    /** Whether a TMDB key has been saved. The key itself never reaches the page. */
     @JavascriptInterface
-    fun tmdbKey(): String = lookup.getString("tmdb", "").orEmpty()
+    fun tmdbReady(): Boolean = tmdbSecret().isNotEmpty()
+
+    /** Whether the optional Watchmode key (prices) has been saved. */
+    @JavascriptInterface
+    fun pricesReady(): Boolean = pricesSecret().isNotEmpty()
+
+    private val net = java.util.concurrent.Executors.newFixedThreadPool(3)
+    private val tmdbPath = Regex("^(search/multi|discover/(movie|tv)|(movie|tv)/[0-9]{1,9}(/watch/providers)?)$")
+    private val pricesPath = Regex("^(search/|title/[0-9]{1,12}/sources/)$")
+    private val queryKey = Regex("^[a-z_]{1,40}$")
+
+    /**
+     * Fetches from TMDB on the page's behalf, adding the saved key here so it
+     * never reaches page scripts. Only the few paths the launcher uses are
+     * allowed. The answer arrives as a "net" event {id, ok, status, body}.
+     */
+    @JavascriptInterface
+    fun tmdbFetch(id: Int, path: String, query: String) {
+        val key = tmdbSecret()
+        if (key.isEmpty() || !tmdbPath.matches(path)) return netEvent(id, false, 0, "")
+        // A long key is TMDB's read access token, sent as a header; a short one is the v3 key, which TMDB only takes in the address.
+        val params = queryParams(query) + if (key.length > 40) emptyList() else listOf("api_key" to key)
+        fetch(id, "https://api.themoviedb.org/3/$path", params, if (key.length > 40) "Bearer $key" else null)
+    }
+
+    /** The same for Watchmode (rent and buy prices). */
+    @JavascriptInterface
+    fun pricesFetch(id: Int, path: String, query: String) {
+        val key = pricesSecret()
+        if (key.isEmpty() || !pricesPath.matches(path)) return netEvent(id, false, 0, "")
+        fetch(id, "https://api.watchmode.com/v1/$path", queryParams(query) + listOf("apiKey" to key), null)
+    }
+
+    /**
+     * The NBA from ESPN's public feed (no key): scoreboard, standings, news,
+     * teams and one game's summary. Only these paths; the answer arrives as a
+     * "net" event like TMDB's.
+     */
+    @JavascriptInterface
+    fun sportsFetch(id: Int, path: String, query: String) {
+        val base = when (path) {
+            "scoreboard", "news", "teams", "summary" -> "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/$path"
+            "standings" -> "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings"
+            else -> return netEvent(id, false, 0, "")
+        }
+        fetch(id, base, queryParams(query), null)
+    }
+
+    private fun queryParams(json: String): List<Pair<String, String>> = runCatching {
+        val o = JSONObject(json)
+        o.keys().asSequence().take(20).filter { queryKey.matches(it) }.map { it to o.optString(it).take(200) }.toList()
+    }.getOrDefault(emptyList())
+
+    private fun fetch(id: Int, base: String, params: List<Pair<String, String>>, auth: String?) {
+        net.execute {
+            try {
+                val q = params.joinToString("&") { (k, v) -> "$k=" + java.net.URLEncoder.encode(v, "UTF-8") }
+                val c = java.net.URL(if (q.isEmpty()) base else "$base?$q").openConnection() as javax.net.ssl.HttpsURLConnection
+                c.connectTimeout = 8000
+                c.readTimeout = 10000
+                c.setRequestProperty("Accept", "application/json")
+                auth?.let { c.setRequestProperty("Authorization", it) }
+                val status = c.responseCode
+                val body = (if (status in 200..299) c.inputStream else c.errorStream)?.use { s ->
+                    val out = java.io.ByteArrayOutputStream()
+                    val buf = ByteArray(16384)
+                    while (true) {
+                        val n = s.read(buf)
+                        if (n < 0 || out.size() > 2_000_000) break
+                        out.write(buf, 0, n)
+                    }
+                    out.toString("UTF-8")
+                }.orEmpty()
+                netEvent(id, status in 200..299, status, body)
+            } catch (_: Exception) {
+                netEvent(id, false, 0, "")
+            }
+        }
+    }
+
+    private fun netEvent(id: Int, ok: Boolean, status: Int, body: String) =
+        host.emit("net", JSONObject().put("id", id).put("ok", ok).put("status", status).put("body", body).toString())
+
+    /** Opens an app's page in the Play Store so it can be installed. */
+    @JavascriptInterface
+    fun openStore(pkg: String): Boolean {
+        if (!Regex("[A-Za-z0-9_.]+").matches(pkg)) return false
+        val tries = listOf("market://details?id=$pkg", "https://play.google.com/store/apps/details?id=$pkg")
+        activity.runOnUiThread {
+            for (u in tries) {
+                if (runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(u)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) break
+            }
+        }
+        return true
+    }
 
     // ---------- Now playing: whatever is coming out of the speakers ----------
 
@@ -543,6 +983,39 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         return true
     }
 
+    /**
+     * The TV's own inputs (HDMI ports, the aerial, AV) as [{id, label, type}],
+     * so they can be listed and chosen from the launcher. Labels are the ones
+     * the TV shows (including any custom name set in its Settings).
+     */
+    @JavascriptInterface
+    fun inputs(): String {
+        val out = JSONArray()
+        try {
+            val tim = activity.getSystemService(TvInputManager::class.java) ?: return out.toString()
+            tim.tvInputList
+                .filter { it.parentId == null && (it.type == TvInputInfo.TYPE_HDMI || it.type == TvInputInfo.TYPE_TUNER || it.type == TvInputInfo.TYPE_COMPOSITE || it.type == TvInputInfo.TYPE_COMPONENT || it.type == TvInputInfo.TYPE_VGA) }
+                .sortedWith(compareBy({ it.type != TvInputInfo.TYPE_HDMI }, { it.id }))
+                .forEach {
+                    val label = runCatching { it.loadLabel(activity)?.toString() }.getOrNull()
+                    val custom = runCatching { it.loadCustomLabel(activity)?.toString() }.getOrNull()
+                    out.put(JSONObject().put("id", it.id).put("label", (custom ?: label).orEmpty()).put("type", it.type))
+                }
+        } catch (_: Exception) { /* none */ }
+        return out.toString()
+    }
+
+    /** Switches to one of the ids from [inputs]. */
+    @JavascriptInterface
+    fun switchInput(id: String): Boolean {
+        val tim = activity.getSystemService(TvInputManager::class.java) ?: return false
+        if (tim.tvInputList.none { it.id == id }) return false
+        val intent = Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(id))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        activity.runOnUiThread { runCatching { activity.startActivity(intent) } }
+        return true
+    }
+
     // ---------- Weather: where the TV is ----------
 
     /** {lat, lon}, or {error: "permission" | "none"}. Uses the TV's own Location setting. */
@@ -600,10 +1073,10 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
     fun startSetup(): String {
         stopSetup()
         val ip = lanAddress() ?: return JSONObject().put("error", "The TV isn't on Wi-Fi").toString()
-        val pin = (1000 + java.security.SecureRandom().nextInt(9000)).toString()
+        val pin = (100_000 + java.security.SecureRandom().nextInt(900_000)).toString()
         for (port in 8080..8090) {
             try {
-                val s = SetupServer(activity, port, pin, setupEvents)
+                val s = SetupServer(activity, ip, port, pin, setupEvents)
                 s.start(5000, false)
                 server = s
                 main.postDelayed(stopServer, 20 * 60_000L)
@@ -636,7 +1109,7 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         if (ssid.isEmpty()) return "{}"
         fun esc(v: String) = v.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace(":", "\\:").replace("\"", "\\\"")
         val security = guest.getString("security", "WPA")
-        val pass = guest.getString("password", "").orEmpty()
+        val pass = SecretStore.migrate(activity, "wifi", "guest", "password")
         val hide = if (guest.getBoolean("hidden", false)) "H:true;" else ""
         val payload = if (security == "nopass" || pass.isEmpty()) "WIFI:T:nopass;S:${esc(ssid)};${hide};"
         else "WIFI:T:${if (security == "WEP") "WEP" else "WPA"};S:${esc(ssid)};P:${esc(pass)};${hide};"
@@ -656,18 +1129,28 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             if (key.isEmpty()) govee.forgetKey() else govee.connect(key)
         }
 
+        override fun onPrices(key: String) {
+            SecretStore.put(activity, "prices", key)
+            host.emit("setup", "{}")
+        }
+
         override fun onTmdb(key: String) {
-            lookup.edit().putString("tmdb", key).apply()
+            SecretStore.put(activity, "tmdb", key)
             host.emit("setup", "{}")
         }
 
         override fun onWifi(ssid: String, password: String, security: String, hidden: Boolean) {
-            guest.edit().putString("ssid", ssid).putString("password", password)
+            SecretStore.put(activity, "wifi", password)
+            guest.edit().putString("ssid", ssid).remove("password")
                 .putString("security", security).putBoolean("hidden", hidden).apply()
             host.emit("setup", "{}")
         }
 
         override fun appsJson(): String = appCatalog().toString()
+
+        override fun backupJson(): String = backupText()
+
+        override fun onRestore(text: String): Boolean = restoreFrom(text)
 
         override fun wallpaperBytes(name: String): ByteArray? = this@LauncherBridge.wallpaperBytes(name)
 
@@ -687,16 +1170,123 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             .put("govee", JSONObject(govee.status()))
             .put("town", "")
             .put("wifi", guest.getString("ssid", "").orEmpty())
-            .put("tmdb", lookup.getString("tmdb", "").orEmpty().isNotEmpty())
+            .put("tmdb", tmdbSecret().isNotEmpty())
+            .put("prices", pricesSecret().isNotEmpty())
             .put("wallpapers", JSONArray(wallpapers()))
 
         override fun packagesText(): String = packageList()
+
+        override fun packagesBefore(): String = adbLog.getString("before", null) ?: "Nothing has been switched off yet, so there is no earlier list.\n"
+
+        override fun diagnosticsText(): String = this@LauncherBridge.diagnosticsText()
     }
 
     private fun lanAddress(): String? = NetworkInterface.getNetworkInterfaces().toList()
         .flatMap { it.inetAddresses.toList() }
         .firstOrNull { it is Inet4Address && !it.isLoopbackAddress && it.isSiteLocalAddress }
         ?.hostAddress
+
+    // ---------- Diagnostics ----------
+
+    /** Facts for the Diagnostics page and the phone page's report. Never keys, passwords or searches. */
+    @JavascriptInterface
+    fun diagnostics(): String {
+        val am = activity.getSystemService(android.app.ActivityManager::class.java)
+        val mem = android.app.ActivityManager.MemoryInfo().also { am?.getMemoryInfo(it) }
+        fun mb(b: Long) = "${b / 1_048_576} MB"
+        val stat = android.os.StatFs(activity.filesDir.path)
+        val up = android.os.SystemClock.elapsedRealtime() / 60_000
+        val wv = runCatching { android.webkit.WebView.getCurrentWebViewPackage()?.versionName }.getOrNull()
+        val exits = JSONArray()
+        if (Build.VERSION.SDK_INT >= 30) runCatching {
+            am?.getHistoricalProcessExitReasons(activity.packageName, 0, 6)?.forEach { e ->
+                val why = when (e.reason) {
+                    android.app.ApplicationExitInfo.REASON_LOW_MEMORY -> "closed by the TV for memory"
+                    android.app.ApplicationExitInfo.REASON_CRASH, android.app.ApplicationExitInfo.REASON_CRASH_NATIVE -> "crashed"
+                    android.app.ApplicationExitInfo.REASON_ANR -> "stopped responding"
+                    android.app.ApplicationExitInfo.REASON_USER_REQUESTED -> "stopped by the user or an update"
+                    android.app.ApplicationExitInfo.REASON_SIGNALED -> "closed by the system"
+                    android.app.ApplicationExitInfo.REASON_PERMISSION_CHANGE -> "closed after a permission change"
+                    android.app.ApplicationExitInfo.REASON_DEPENDENCY_DIED -> "WebView was updated or closed"
+                    else -> "closed (${e.reason})"
+                }
+                val at = java.text.SimpleDateFormat("d MMM HH:mm", java.util.Locale.UK).format(java.util.Date(e.timestamp))
+                exits.put("$at  $why, using ${e.pss / 1024} MB")
+            }
+        }
+        val events = JSONArray(guardPrefs.getString("events", "").orEmpty().split('\n').filter { it.isNotBlank() })
+        return JSONObject()
+            .put("app", runCatching { JSONObject(appVersion()).optString("name") }.getOrDefault("?"))
+            .put("firmware", Build.DISPLAY.take(60))
+            .put("android", "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+            .put("webview", wv ?: "?")
+            .put("memory", "${mb(mem.availMem)} of ${mb(mem.totalMem)}" + if (mem.lowMemory) ", low" else "")
+            .put("storage", "${mb(stat.availableBytes)} of ${mb(stat.totalBytes)}")
+            .put("uptime", if (up >= 1440) "${up / 1440} days" else "${up / 60} h ${up % 60} min")
+            .put("adb", if (adb.connected) "Connected" else if (safetyReady()) "Trusted (safety net tested)" else "Not connected")
+            .put("listener", MediaListener.instance != null)
+            .put("switchedOff", switchedOffByUs().size)
+            .put("exits", exits)
+            .put("events", events)
+            .toString()
+    }
+
+    private fun diagnosticsText(): String {
+        val o = JSONObject(diagnostics())
+        val sb = StringBuilder("Smart TV Launcher diagnostics\n\n")
+        listOf("app", "firmware", "android", "webview", "memory", "storage", "uptime", "adb", "listener", "switchedOff").forEach {
+            sb.append(it).append(": ").append(o.opt(it)).append('\n')
+        }
+        sb.append("\nLast exits:\n")
+        o.optJSONArray("exits")?.let { a -> for (i in 0 until a.length()) sb.append("  ").append(a.getString(i)).append('\n') }
+        sb.append("\nSafety net:\n")
+        o.optJSONArray("events")?.let { a -> for (i in 0 until a.length()) sb.append("  ").append(a.getString(i)).append('\n') }
+        sb.append("\nSwitched off by the launcher:\n")
+        switchedOffByUs().forEach { sb.append("  ").append(it).append('\n') }
+        return sb.toString()
+    }
+
+    // ---------- Clean-up baseline and firmware updates ----------
+
+    /** Saves the full package list once, before the first thing is switched off. */
+    private fun saveBaselineOnce() {
+        if (adbLog.getString("before", null) == null) adbLog.edit().putString("before", packageList()).apply()
+        adbLog.edit().putString("fingerprint", Build.FINGERPRINT).apply()
+    }
+
+    /**
+     * After a firmware update, apps the launcher switched off may be on again.
+     * {changed, reenabled:[{pkg,label}]}; empty when nothing needs doing.
+     */
+    @JavascriptInterface
+    fun firmwareCheck(): String {
+        val saved = adbLog.getString("fingerprint", null)
+        val back = switchedOffByUs().filter { runCatching { pm.getApplicationInfo(it, 0).enabled }.getOrDefault(false) }
+        val out = JSONArray()
+        back.forEach { p -> out.put(JSONObject().put("pkg", p).put("label", runCatching { pm.getApplicationLabel(pm.getApplicationInfo(p, 0)).toString() }.getOrDefault(p))) }
+        return JSONObject().put("changed", saved != null && saved != Build.FINGERPRINT).put("reenabled", out).toString()
+    }
+
+    /** Switches off again what a firmware update switched back on (only apps the launcher had switched off). */
+    @JavascriptInterface
+    fun adbReapply() {
+        adbIo.execute {
+            try {
+                if (!adb.connected) throw AdbClient.AdbException("Connect to the TV first")
+                val todo = switchedOffByUs().filter { pkgName.matches(it) && runCatching { pm.getApplicationInfo(it, 0).enabled }.getOrDefault(false) }
+                    .filter { protectionFor(it, it, emptySet(), emptySet()) == null || it in DEEP_GOOGLE.map { g -> g.first } }
+                var n = 0
+                todo.forEach { pkg ->
+                    val out = adb.shell("pm disable-user --user 0 $pkg")
+                    if (out.contains("disabled-user") || out.contains("new state: disabled")) n++
+                }
+                adbLog.edit().putString("fingerprint", Build.FINGERPRINT).apply()
+                adbEvent("done", "Switched off again: $n of ${todo.size}", JSONObject().put("ours", switchedOffByUs().size))
+            } catch (e: Exception) {
+                adbEvent("error", e.message ?: "That didn't work")
+            }
+        }
+    }
 
     /** Every app on the TV, one per line: package, name, system or user, on or off. */
     private fun packageList(): String = pm.getInstalledApplications(0)
@@ -874,6 +1464,8 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
     private fun hex(color: Int) = String.format("#%06x", color and 0xFFFFFF)
 
     companion object {
+        const val UPDATE_BASE = "https://raw.githubusercontent.com/Oxygn-02/Smart-tv/main/"
+
         val PROTECTED_PKGS = setOf(
             "android", "com.android.settings", "com.android.systemui", "com.google.android.gms", "com.google.android.gsf",
             "com.android.vending", "com.google.android.tvlauncher", "com.google.android.apps.tv.launcherx",
@@ -882,7 +1474,34 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         )
         // Maker apps that are only for factory testing, retail demos or playing files from USB.
         val MAKER_OK = setOf("com.mediatek.wwtv.mediaplayer", "com.mediatek.testpq", "mediatek.factorymenu.ui", "com.mediatek.mtc.factory")
+        /** Every package the launcher may switch off without being ticked on the phone, with the reason. */
+        val DEEP_SAFE = listOf(
+            "com.google.android.feedback" to "Sends feedback and crash data to Google",
+            "com.google.android.partnersetup" to "Only used during first-time setup",
+            "com.google.android.onetimeinitializer" to "Runs once at setup",
+            "android.autoinstalls.config.JVC" to "The maker's retail auto-install settings",
+            "com.google.android.leanbacklauncher.partnercustomizer" to "Lets the maker add promoted rows to Google's home",
+            "fusion.android.tv.demo" to "Shop demo mode",
+            "mediatek.factorymenu.ui" to "Technician menu",
+            "com.mediatek.testpq" to "Factory picture test",
+            "com.mediatek.mtc.factory" to "Factory test service",
+            "com.mstar.android.tv.disclaimercustomization" to "First-run legal screens",
+            "com.google.android.sss.authbridge" to "Phone-to-TV setup helper",
+            "com.google.android.backdrop" to "Google's screensaver, which the ambient screen replaces",
+            "com.google.android.syncadapters.calendar" to "Calendar sync, which a TV does not use",
+            "com.android.dynsystem" to "A developer feature",
+        )
+        val DEEP_CAREFUL = listOf(
+            "com.mediatek.network" to "Wi-Fi monitor. Test the Wi-Fi after switching it off",
+            "com.google.android.katniss" to "The Google app, with voice search and Assistant. Keep it if you use the remote's voice button",
+        )
+        /** Only after this launcher is the home screen. */
+        val DEEP_GOOGLE = listOf(
+            "com.google.android.tvlauncher" to "Google's home screen, where the ads come from",
+            "com.google.android.tvrecommendations" to "Google's recommendations for its home screen",
+        )
         val KEEP_LABELS = setOf(
+            "downloader",
             "youtube", "youtubemusic", "bbciplayer", "itvx", "channel4", "my5", "primevideo", "disney", "crunchyroll",
             "googleplaystore", "playstore", "googletv", "netflix",
         )

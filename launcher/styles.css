@@ -3899,10 +3899,10 @@ button.w-empty {
 .edge {
   box-shadow: none;
   background:
-    linear-gradient(to right, var(--glow-a), transparent 80px),
-    linear-gradient(to left, var(--glow-a), transparent 80px),
-    linear-gradient(to bottom, var(--glow-a), transparent 80px),
-    linear-gradient(to top, var(--glow-a), transparent 80px);
+    linear-gradient(to right, var(--edge-a, var(--glow-a)), transparent 80px),
+    linear-gradient(to left, var(--edge-a, var(--glow-a)), transparent 80px),
+    linear-gradient(to bottom, var(--edge-a, var(--glow-a)), transparent 80px),
+    linear-gradient(to top, var(--edge-a, var(--glow-a)), transparent 80px);
 }
 
 /* The search bar's ring, without :has() (which makes every focus change re-check the page) */
@@ -4056,4 +4056,1579 @@ button.w-empty {
 
 #stage.light {
   --sub: rgba(16, 17, 26, 0.7);
+}
+
+
+/* ---------- The light bar and page changes ---------- */
+
+/* One bar that slides and stretches between tabs (see moveTabGlow), instead of
+   a separate bar that appears on each tab. */
+.tab.on::after {
+  content: none;
+}
+
+.tabbar {
+  overflow: visible;
+}
+
+.tab-glow {
+  position: absolute;
+  left: 0;
+  bottom: 6px;
+  width: 18px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--glowc);
+  transform-origin: left center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+  will-change: transform;
+}
+
+/* Pages slide in from the side they sit on, and fade */
+.view:not([hidden]) {
+  animation: view-in-r 0.5s var(--ease-out);
+}
+
+#stage[data-dir="l"] .view:not([hidden]) {
+  animation-name: view-in-l;
+}
+
+@keyframes view-in-r {
+  from { opacity: 0; transform: translateX(36px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes view-in-l {
+  from { opacity: 0; transform: translateX(-36px); }
+  to { opacity: 1; transform: none; }
+}
+
+
+/* Saved scenes and the update note */
+.my-scenes {
+  display: contents;
+}
+
+.scene-input {
+  width: 100%;
+  height: 56px;
+  font-size: 20px;
+}
+
+.tool.update-badge {
+  color: var(--glowc);
+}
+
+.tool.update-badge::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--glowc);
+}
+
+.shows[hidden] { display: none; }
+
+.input-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.input-row[hidden] { display: none; }
+
+.slider[data-slider="edgehue"] .slider-track {
+  background: linear-gradient(90deg, hsl(0 85% 58%), hsl(60 85% 58%), hsl(120 85% 58%), hsl(180 85% 58%), hsl(240 85% 58%), hsl(300 85% 58%), hsl(360 85% 58%));
+}
+
+.slider[data-slider="edgeint"] .slider-track {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), var(--edge-a, #888));
+}
+
+/* ---------- A title's page ---------- */
+.xpanel.xwide {
+  position: relative;
+  width: 1120px;
+  height: 640px;
+  max-height: none;
+  padding: 0;
+}
+
+.t-bg {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 430px;
+  overflow: hidden;
+  /* Fades into the panel on the left, the bottom and the edges, so the picture blends in */
+  -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent 100%), linear-gradient(to right, transparent 0%, #000 55%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, #000 45%, transparent 100%), linear-gradient(to right, transparent 0%, #000 55%);
+  mask-composite: intersect;
+}
+
+.t-still {
+  position: absolute;
+  inset: 0;
+  background: center 20% / cover no-repeat;
+}
+
+.t-bg iframe {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 760px;
+  height: 428px;
+  border: 0;
+  transform: translate(-50%, -50%) scale(1.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.6s ease;
+}
+
+.t-bg.playing iframe {
+  opacity: 0.9;
+}
+
+.t-body {
+  position: relative;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 28px 36px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.t-close {
+  position: absolute;
+  top: 22px;
+  right: 28px;
+  z-index: 2;
+}
+
+.t-top {
+  display: flex;
+  gap: 26px;
+  align-items: flex-end;
+  min-height: 250px;
+  padding-top: 24px;
+}
+
+.t-poster {
+  width: 168px;
+  height: 252px;
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.65);
+  flex: none;
+}
+
+.t-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  max-width: 600px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 0 18px rgba(0, 0, 0, 0.5);
+}
+
+.t-title {
+  font-size: 40px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.t-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  color: var(--sub);
+}
+
+.t-rating {
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.t-over {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.t-where {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  flex: 1;
+}
+
+.t-rows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-content: start;
+  overflow: hidden;
+}
+
+.t-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.t-row:disabled {
+  opacity: 0.5;
+}
+
+.t-row:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 24px 2px var(--focus-glow);
+}
+
+.t-row-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  font-size: 19px;
+}
+
+.t-row-act {
+  font-size: 16px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.14);
+  white-space: nowrap;
+}
+
+.t-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex: none;
+}
+
+.t-letter {
+  display: grid;
+  place-items: center;
+  background: #8e8e9a;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* A film's page is always dark, like a cinema, so the trailer blends into it */
+.xpanel.xwide {
+  --ink: #f2f2f6;
+  --sub: rgba(242, 242, 246, 0.68);
+  background: #101117;
+  color: var(--ink);
+}
+
+.xpanel.xwide .eyebrow,
+.xpanel.xwide .small {
+  color: var(--sub);
+}
+
+.xpanel.xwide .t-info {
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+}
+
+.xpanel.xwide .t-row-act,
+.xpanel.xwide .t-row:disabled .t-row-act {
+  color: var(--ink);
+}
+
+.xpanel.xwide .t-close { color: #15151d; }
+
+/* Diagnostics: section labels as small captions, rows compact */
+.view-diag .set-head {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--sub);
+  margin: 12px 0 2px;
+}
+
+.view-diag .diag-row {
+  min-height: 0;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+/* ---------- Edges of scrolling content ----------
+   Search scrolls like Apps (the page itself never does). Anything that carries
+   on past an edge fades out instead of being cut off. */
+.view-search {
+  inset: -10px;
+  padding: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.view-search::-webkit-scrollbar {
+  display: none;
+}
+
+.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 96px), rgba(0, 0, 0, 0.4) calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 96px), rgba(0, 0, 0, 0.4) calc(100% - 36px), transparent);
+}
+
+.more-above {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 48px);
+  mask-image: linear-gradient(to bottom, transparent, #000 48px);
+}
+
+.more-above.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 96px), rgba(0, 0, 0, 0.4) calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 96px), rgba(0, 0, 0, 0.4) calc(100% - 36px), transparent);
+}
+
+/* The bottom of the screen: the pre-blurred wallpaper, rising out of the edge,
+   so the faded content reads as carrying on under frosted glass. Placed with
+   plain stage coordinates (the stage is always 1280x720). */
+.bottom-blur {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 132px;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.75) 60%, #000);
+  mask-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.75) 60%, #000);
+}
+
+#stage.photo .bottom-blur {
+  background:
+    var(--photo-scrim),
+    var(--frost) 0 -588px / 1280px 720px no-repeat;
+}
+
+#stage.photo.more-below .bottom-blur {
+  opacity: 1;
+}
+
+/* For you titles stay on one line so every card's text lines up */
+[data-shows="foryou"] .show-title,
+[data-shows="titles"] .show-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Moving focus scrolls far enough that the focused item sits clear of the fades */
+.view-search,
+.view-apps,
+.cleanup,
+.wp-grid {
+  scroll-padding-top: 56px;
+  scroll-padding-bottom: 72px;
+}
+
+/* =====================================================================
+   Polish pass 2: focus lifts instead of ringing, a welcome instead of a
+   settings screen on first run, labels for the icon buttons, quiet
+   loading placeholders, and a gentle start.
+   ===================================================================== */
+
+/* ---------- Focus: the focused thing comes forward ----------
+   No outline anywhere. Cards and tiles grow and cast a deeper shadow, and a
+   soft sheen crosses them once. Buttons, pills and list rows turn solid white
+   with dark text, as on Apple TV. */
+#stage [data-focus]:focus-visible,
+#stage :is(.dock-app, .opt, .swatch):focus-visible .app-ic,
+#stage .swatch:focus-visible .swatch-dot,
+#stage .show:focus-visible .show-art,
+#stage .mix:focus-visible .mix-art,
+#stage .search-bar:focus-within,
+#stage .search-bar.typing,
+#stage .slider:focus-visible,
+#stage .wp-tile:focus-visible,
+#stage .t-row:focus-visible {
+  outline: none;
+}
+
+#stage :is(.app-card, .widget, .w-mini, .jump, .wp-tile, .light-row) {
+  position: relative;
+  transition: transform 0.45s var(--gentle), box-shadow 0.35s;
+}
+
+#stage :is(.app-card, .widget, .w-mini, .jump, .wp-tile):focus-visible,
+#stage .show:focus-visible .show-art,
+#stage .mix:focus-visible .mix-art {
+  transform: scale(1.06);
+  box-shadow: 0 30px 50px -20px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.28);
+  z-index: 1;
+}
+
+#stage .dock-app:focus-visible .app-ic,
+#stage .opt:focus-visible .app-ic,
+#stage .swatch:focus-visible .swatch-dot {
+  transform: scale(1.14) translateY(-4px);
+  box-shadow: 0 22px 34px -14px rgba(0, 0, 0, 0.65);
+}
+
+/* The sheen: a soft band of light that crosses a focused card once */
+#stage :is(.app-card, .w-mini, .wp-tile) {
+  overflow: hidden;
+}
+
+#stage :is(.app-card, .w-mini, .wp-tile)::after,
+#stage .show-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.26) 48%, transparent 66%);
+  transform: translateX(-120%);
+  opacity: 0;
+}
+
+#stage :is(.app-card, .w-mini, .wp-tile):focus-visible::after,
+#stage .show:focus-visible .show-art::after {
+  opacity: 1;
+  animation: sheen 1.1s var(--gentle) 1 forwards;
+}
+
+@keyframes sheen {
+  to { transform: translateX(120%); }
+}
+
+/* Buttons, pills, choices and list rows: solid white when focused */
+#stage :is(.btn, .pillbtn, .seg, .resume, .x-close, .wel-fit, .jump-btn):focus-visible,
+#stage :is(.set-row, .t-row, .light-row, .queue-row):focus-visible {
+  background: #fff !important;
+  color: #15151b !important;
+  box-shadow: 0 16px 30px -14px rgba(0, 0, 0, 0.55);
+}
+
+#stage :is(.btn, .pillbtn, .seg, .resume, .x-close):focus-visible {
+  transform: scale(1.05);
+}
+
+#stage :is(.set-row, .t-row, .light-row):focus-visible :is(.small, .set-val, .t-row-act, .light-name) {
+  color: rgba(21, 21, 27, 0.66) !important;
+}
+
+#stage :is(.set-row, .t-row):focus-visible .set-label,
+#stage .t-row:focus-visible .t-row-name {
+  color: #15151b;
+}
+
+#stage .t-row:focus-visible .t-row-act {
+  background: rgba(21, 21, 27, 0.08);
+}
+
+/* Top bar: the focused tab or icon sits on a white disc */
+#stage :is(.tab, .tool):focus-visible {
+  background: #fff;
+  color: #15151b;
+  box-shadow: 0 10px 22px -10px rgba(0, 0, 0, 0.55);
+}
+
+#stage :is(.tab, .tool):focus-visible svg {
+  color: #15151b;
+  stroke: currentColor;
+}
+
+/* The search bar brightens and lifts while you type */
+#stage .search-bar:focus-within,
+#stage .search-bar.typing {
+  box-shadow: 0 24px 40px -20px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+
+/* ---------- What the icon buttons do ---------- */
+#stage .tool {
+  position: relative;
+}
+
+#stage .tool::after {
+  content: attr(aria-label);
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  white-space: nowrap;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 450;
+  background: rgba(16, 17, 23, 0.88);
+  color: #f2f2f6;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+#stage .tool:focus-visible::after {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- First-run welcome ---------- */
+.xpanel.xwelcome {
+  width: 640px;
+  padding: 36px 40px 30px;
+  gap: 18px;
+  background: rgba(16, 17, 23, 0.94);
+  --ink: #f2f2f6;
+  --sub: rgba(242, 242, 246, 0.66);
+  color: var(--ink);
+}
+
+.wel-title {
+  font-size: 34px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.wel-lead {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.45;
+  color: var(--sub);
+}
+
+.wel-list {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wel-list li {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 18px;
+}
+
+.wel-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+}
+
+.wel-list li.ok .wel-dot {
+  background: #6fe0a2;
+  border-color: #6fe0a2;
+}
+
+.wel-state {
+  color: var(--sub);
+  font-size: 16px;
+}
+
+.wel-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.wel-fit {
+  align-self: flex-start;
+  padding: 8px 14px;
+  margin-left: -14px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--sub);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* ---------- Quiet placeholders while loading ---------- */
+.skeleton {
+  pointer-events: none;
+}
+
+.skeleton .show-art,
+.skeleton .sk-line,
+.t-row.skeleton {
+  background: rgba(255, 255, 255, 0.1);
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+.t-row.skeleton {
+  height: 62px;
+}
+
+.skeleton .sk-line {
+  height: 14px;
+  width: 80%;
+  margin: 2px 4px 0;
+  border-radius: 7px;
+}
+
+.skeleton .sk-line.short {
+  width: 50%;
+}
+
+@keyframes breathe {
+  50% { opacity: 0.5; }
+}
+
+.fy-why {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 6px 4px 14px;
+  min-height: 0;
+}
+
+.shows.shows-note {
+  min-height: 0;
+}
+
+/* ---------- A gentle start ---------- */
+#stage {
+  animation: stage-in 0.6s ease-out;
+}
+
+@keyframes stage-in {
+  from { opacity: 0; }
+}
+
+/* Animations: Fast keeps all of this still */
+#stage.fast :is(.app-card, .widget, .w-mini, .jump, .wp-tile, .btn, .pillbtn, .seg, .resume, .x-close):focus-visible,
+#stage.fast .show:focus-visible .show-art,
+#stage.fast :is(.dock-app, .opt):focus-visible .app-ic {
+  transform: none;
+}
+
+/* The icon chip inside a focused white row stays visible */
+#stage :is(.set-row, .t-row):focus-visible .chip {
+  background: rgba(21, 21, 27, 0.07) !important;
+  box-shadow: none !important;
+  color: #15151b;
+}
+
+#stage .set-row:focus-visible .chip svg {
+  color: #15151b;
+  stroke: currentColor;
+}
+
+/* ---------- Bottom edge: a thin strip of white liquid glass ----------
+   Replaces the tall dark band. Content fades out over a short distance and
+   passes under a slim frosted strip with a lit top edge, like the bottom of
+   a glass panel. Shows only while there is more below. */
+.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), rgba(0, 0, 0, 0.3) calc(100% - 14px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), rgba(0, 0, 0, 0.3) calc(100% - 14px), transparent);
+}
+
+.more-above.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 56px), rgba(0, 0, 0, 0.3) calc(100% - 14px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 56px), rgba(0, 0, 0, 0.3) calc(100% - 14px), transparent);
+}
+
+.bottom-blur,
+#stage.photo .bottom-blur {
+  height: 34px;
+  -webkit-mask-image: none;
+  mask-image: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 -10px 24px -14px rgba(255, 255, 255, 0.35);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1)),
+    var(--frost, none) 0 -686px / 1280px 720px no-repeat;
+}
+
+#stage.more-below .bottom-blur {
+  opacity: 1;
+}
+
+.bottom-blur,
+#stage.photo .bottom-blur {
+  height: 30px;
+  border-top: 0;
+  box-shadow: none;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.55)) top / 100% 1px no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.2)),
+    var(--frost, none) 0 -690px / 1280px 720px no-repeat;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
+}
+
+/* =====================================================================
+   Sports centre (NBA), Starred, and your own Home layout
+   ===================================================================== */
+
+/* ---------- Home: cards placed by your layout ---------- */
+.off-layout {
+  display: none !important;
+}
+
+.w-game,
+.w-starred {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 22px;
+  text-align: left;
+  color: var(--ink);
+  font: inherit;
+  border: 0;
+  cursor: pointer;
+}
+
+.w-game .w-label,
+.w-starred .w-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wg-line {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+}
+
+.wg-line b,
+.wg-item b {
+  font-weight: 500;
+}
+
+.wg-wide {
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 18px;
+}
+
+.wg-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.wg-score {
+  font-size: 34px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.wg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.wg-item {
+  display: grid;
+  grid-template-columns: 28px 52px 70px 52px 28px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 18px;
+}
+
+.wg-item.mine {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.wg-sc {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.wg-when {
+  text-align: right;
+}
+
+.ws-count {
+  font-size: 54px;
+  font-weight: 200;
+  line-height: 1;
+}
+
+.ws-first {
+  margin-top: auto;
+}
+
+.ws-grid {
+  display: grid;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.ws-wide {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ws-big {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.ws-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.ws-art {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.ws-title {
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sr-badge {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  max-width: calc(100% - 16px);
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #15151b;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Edit Home ---------- */
+#stage.home-edit .view-home .widgets .widget[data-slot] {
+  outline: 2px dashed rgba(255, 255, 255, 0.45);
+  outline-offset: -2px;
+}
+
+#stage.home-edit .view-home .widgets .widget[data-slot]::before {
+  content: attr(data-kind-label) "  ›";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  padding: 5px 12px;
+  border-radius: 12px;
+  background: rgba(16, 17, 23, 0.85);
+  color: #f2f2f6;
+  font-size: 14px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+#stage.home-edit .view-home .widgets .widget[data-slot]:focus-visible {
+  outline: 3px solid #fff;
+}
+
+#stage.home-edit .view-home .widgets .widget * {
+  pointer-events: none;
+}
+
+/* ---------- The Sports page ---------- */
+.view-sports {
+  inset: -10px;
+  padding: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.view-sports::-webkit-scrollbar {
+  display: none;
+}
+
+.sp-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.sp-title {
+  font-size: 34px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+
+.sp-updated {
+  margin-left: auto;
+}
+
+.sp-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sp-body .eyebrow {
+  margin-top: 4px;
+}
+
+.sp-logo {
+  flex: none;
+  border-radius: 50%;
+  object-fit: contain;
+}
+
+.sp-mono {
+  display: inline-grid;
+  place-items: center;
+  background: var(--tc);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sp-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #ff4d4d;
+  box-shadow: 0 0 0 4px rgba(255, 77, 77, 0.25);
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+.sp-feature {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  align-items: center;
+  gap: 20px;
+  min-height: 230px;
+  padding: 26px 30px;
+  border-radius: var(--radius-widget, 28px);
+  background:
+    radial-gradient(120% 140% at 0% 50%, color-mix(in srgb, var(--ta) 45%, transparent), transparent 60%),
+    radial-gradient(120% 140% at 100% 50%, color-mix(in srgb, var(--th) 45%, transparent), transparent 60%),
+    rgba(16, 17, 23, 0.55);
+  color: #f2f2f6;
+}
+
+.sp-feature.skeleton,
+.sp-game.skeleton,
+.sp-table.skeleton {
+  min-height: 120px;
+}
+
+.sp-f-team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.sp-f-name {
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.sp-f-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.sp-f-label {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  color: rgba(242, 242, 246, 0.75);
+}
+
+.sp-f-score {
+  font-size: 56px;
+  font-weight: 200;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-f-dash {
+  margin: 0 12px;
+  opacity: 0.5;
+}
+
+.sp-f-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.sp-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sp-game {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 20px;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sp-game.mine {
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.45);
+}
+
+.sp-row {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+}
+
+.sp-row.win .sp-abbr,
+.sp-row.win .sp-score {
+  font-weight: 600;
+}
+
+.sp-score {
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-status {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  color: var(--sub);
+}
+
+.sp-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 30px;
+  border-radius: 24px;
+}
+
+/* Standings */
+.sp-tables {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.sp-table {
+  padding: 16px 18px;
+  border-radius: 22px;
+}
+
+.sp-t-title {
+  font-size: 19px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.sp-t-row {
+  display: grid;
+  grid-template-columns: 24px 1fr 30px 30px 50px 36px 44px;
+  align-items: center;
+  gap: 6px;
+  height: 27px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-t-row > span:nth-child(n + 3) {
+  text-align: right;
+}
+
+.sp-t-head {
+  color: var(--sub);
+  font-size: 13px;
+}
+
+.sp-t-row.cut {
+  border-top: 1px dashed rgba(255, 255, 255, 0.22);
+}
+
+.sp-t-row.mine {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+}
+
+.sp-t-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sp-seed {
+  color: var(--sub);
+}
+
+.sp-note {
+  margin: 0;
+}
+
+/* News and highlights */
+.sp-vids {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.sp-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #15151b;
+}
+
+.sp-news {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.sp-story {
+  display: flex;
+  gap: 14px;
+  padding: 12px;
+  border: 0;
+  border-radius: 20px;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sp-story-img {
+  flex: none;
+  width: 150px;
+  height: 92px;
+  border-radius: 14px;
+}
+
+.sp-story-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sp-story-head {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.sp-story .small:not(.sp-ago) {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Teams */
+.sp-watch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 20px;
+  border-radius: 22px;
+}
+
+.sp-teams {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sp-team {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 8px;
+  border: 0;
+  border-radius: 18px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.sp-team.on {
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.55);
+}
+
+.sp-star {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  color: #ffd25e;
+}
+
+/* Game and story panels */
+.xpanel.xgame {
+  background:
+    radial-gradient(90% 70% at 0% 0%, color-mix(in srgb, var(--ta) 40%, transparent), transparent 70%),
+    radial-gradient(90% 70% at 100% 0%, color-mix(in srgb, var(--th) 40%, transparent), transparent 70%),
+    #101117;
+}
+
+.g-head {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  align-items: center;
+  padding: 30px 20px 10px;
+}
+
+.g-cols {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 24px;
+  min-height: 0;
+}
+
+.g-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.g-report {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.g-r-head {
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.g-leaders {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.g-leader {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 17px;
+}
+
+.g-l-team {
+  color: var(--sub);
+}
+
+.g-l-val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.st-text {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 760px;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+}
+
+.st-over {
+  -webkit-line-clamp: 6;
+}
+
+/* ---------- Star on a title page ---------- */
+.t-actions {
+  position: absolute;
+  top: 22px;
+  right: 28px;
+  z-index: 2;
+  display: flex;
+  gap: 10px;
+}
+
+.xpanel.xwide .t-actions .btn {
+  color: #15151d;
+}
+
+.t-star {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.t-star.on svg {
+  color: #e0a800;
+}
+
+.sp-f-actions .btn {
+  white-space: nowrap;
+}
+
+/* Close and other buttons on the dark game and story pages read as light glass */
+.xpanel.xwide .t-close,
+.xpanel.xwide .t-actions .btn {
+  background: rgba(255, 255, 255, 0.82);
+  color: #15151d;
+}
+
+[data-shows] .show-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wg-item {
+  grid-template-columns: 28px 44px 62px 44px 28px 1fr;
+}
+
+.wg-when {
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+/* Team logos sit in a light glass circle; the team's colour and initials
+   show only when there is no logo. */
+.sp-logo {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--tc);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 4px 10px -4px rgba(0, 0, 0, 0.45);
+}
+
+.sp-logo.has-img {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(232, 234, 240, 0.9));
+}
+
+.sp-initials {
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sp-logo.has-img .sp-initials {
+  visibility: hidden;
+}
+
+.sp-img {
+  position: absolute;
+  inset: 14%;
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+}
+
+/* ---------- Highlight previews and the clip player ---------- */
+.clip-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+
+.clip-preview.on {
+  opacity: 1;
+}
+
+.sp-vid .show-art .sp-play {
+  z-index: 1;
+  transition: opacity 0.4s;
+}
+
+.show-art.previewing .sp-play,
+.g-thumb.previewing .sp-play {
+  opacity: 0;
+}
+
+.g-vid {
+  gap: 14px;
+}
+
+.g-thumb {
+  position: relative;
+  flex: none;
+  width: 112px;
+  height: 63px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.g-thumb .sp-play {
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+}
+
+.xpanel.xvideo {
+  position: relative;
+  width: 1184px;
+  height: 666px;
+  max-height: none;
+  padding: 0;
+  background: #000;
+}
+
+.clip-full {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.clip-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding: 40px 32px 22px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  color: #f2f2f6;
+}
+
+.clip-title {
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.clip-focus {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+#stage .clip-focus:focus-visible {
+  outline: none;
+  box-shadow: none;
+  background: transparent !important;
+}
+
+/* The game page's report column scrolls when it holds more than fits */
+.xgame .t-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.xgame .g-cols {
+  flex: 1;
+  min-height: 0;
+}
+
+.xgame .g-col:first-child {
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 4px;
+  margin: -4px;
+  scroll-padding: 12px;
+}
+
+.sp-top {
+  font-size: 14px;
+  color: var(--sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sp-top b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.sp-f-top {
+  font-size: 16px;
+  color: rgba(242, 242, 246, 0.85);
+}
+
+.sp-feature .btn-primary {
+  background: rgba(255, 255, 255, 0.92);
+  color: #15151b;
 }
