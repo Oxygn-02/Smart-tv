@@ -1,0 +1,5463 @@
+/* Inter (SIL Open Font License, see fonts/OFL.txt), bundled so the launcher
+   never waits on the network for its type. Named "Inter Local" so the hosted
+   copy on the preview page can still take precedence. */
+@font-face {
+  font-family: "Inter Local";
+  src: url("fonts/inter-latin.woff2") format("woff2");
+  font-weight: 300 900;
+  font-display: swap;
+}
+
+/* Tokens from HANDOFF.md "Design spec" and mockup/index.html */
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: background 0.5s;
+}
+
+/* Letterbox around the 16:9 stage follows the theme */
+body:has(#stage.light) {
+  background: #dcdde3;
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* Dark (default) */
+#stage {
+  --ink: #ececf1;
+  --sub: rgba(236, 236, 241, 0.62);
+  --glass: rgba(255, 255, 255, 0.04);
+  --border: rgba(255, 255, 255, 0.08);
+  --track: rgba(255, 255, 255, 0.12);
+  --shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  --onbtn: rgba(255, 255, 255, 0.12);
+  --playink: #050508;
+  --scrim: rgba(3, 3, 6, 0.74);
+
+  /* Liquid glass behind icons */
+  --lg-top: rgba(255, 255, 255, 0.11);
+  --lg-bottom: rgba(255, 255, 255, 0.02);
+  --lg-hi: rgba(255, 255, 255, 0.38);
+  --lg-lo: rgba(255, 255, 255, 0.07);
+  --lg-rim: rgba(255, 255, 255, 0.12);
+  --lg-drop: rgba(0, 0, 0, 0.35);
+  --lg-sheen: rgba(255, 255, 255, 0.16);
+  --lg-on-top: rgba(255, 255, 255, 0.24);
+  --lg-on-bottom: rgba(255, 255, 255, 0.08);
+
+  --bg:
+    radial-gradient(ellipse at 10% 0%, rgba(84, 58, 150, 0.32) 0%, rgba(84, 58, 150, 0) 50%),
+    radial-gradient(ellipse at 95% 5%, rgba(28, 64, 140, 0.28) 0%, rgba(28, 64, 140, 0) 50%),
+    radial-gradient(ellipse at 75% 105%, rgba(150, 62, 38, 0.2) 0%, rgba(150, 62, 38, 0) 50%),
+    #050508;
+}
+
+/* Light */
+#stage.light {
+  --ink: #15151d;
+  --sub: rgba(21, 21, 29, 0.62);
+  --glass: rgba(255, 255, 255, 0.5);
+  --border: rgba(255, 255, 255, 0.85);
+  --track: rgba(21, 21, 29, 0.12);
+  --shadow: 0 14px 40px rgba(40, 40, 80, 0.08);
+  --onbtn: rgba(21, 21, 29, 0.08);
+  --playink: #fff;
+  --scrim: rgba(225, 226, 235, 0.72);
+
+  --lg-top: rgba(255, 255, 255, 0.9);
+  --lg-bottom: rgba(255, 255, 255, 0.4);
+  --lg-hi: rgba(255, 255, 255, 1);
+  --lg-lo: rgba(21, 21, 29, 0.06);
+  --lg-rim: rgba(21, 21, 29, 0.07);
+  --lg-drop: rgba(40, 40, 80, 0.12);
+  --lg-sheen: rgba(255, 255, 255, 0.75);
+  --lg-on-top: rgba(255, 255, 255, 1);
+  --lg-on-bottom: rgba(225, 228, 245, 0.85);
+
+  --bg:
+    radial-gradient(ellipse at 10% 0%, #f7d5cc 0%, rgba(247, 213, 204, 0) 50%),
+    radial-gradient(ellipse at 95% 5%, #cdd6fb 0%, rgba(205, 214, 251, 0) 50%),
+    radial-gradient(ellipse at 75% 105%, #fbe3c6 0%, rgba(251, 227, 198, 0) 50%),
+    #eff0f5;
+}
+
+/* Photo wallpaper from wallpapers/, under a light scrim so glass and text stay
+   legible. Falls back to a plain gradient when there is no photo. */
+#stage {
+  --photo: linear-gradient(135deg, #1c1c22, #0b0b0f);
+  --photo-scrim: linear-gradient(rgba(5, 5, 8, 0.18), rgba(5, 5, 8, 0.42));
+}
+
+#stage.light {
+  --photo-scrim: linear-gradient(rgba(239, 240, 245, 0.55), rgba(239, 240, 245, 0.62));
+}
+
+/* Header text sits straight on the photo: a soft halo keeps it readable */
+#stage.photo {
+  --bg: var(--photo-scrim), var(--photo) center / cover no-repeat, #050508;
+}
+
+#stage {
+  position: relative;
+  width: 1280px;
+  height: 720px;
+  flex: none;
+  overflow: hidden;
+  transform-origin: center center;
+  font-family: Inter, "Inter Local", system-ui, sans-serif;
+  font-weight: 300;
+  color: var(--ink);
+  background: var(--bg);
+  transition: background 0.5s;
+}
+
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--border);
+}
+
+/* Liquid glass: a thicker, lit lens for the back of every icon.
+   Top highlight, soft inner rim, specular sheen, and a small drop shadow. */
+.lg {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(165deg, var(--lg-top), var(--lg-bottom));
+  box-shadow:
+    inset 0 1px 0.5px var(--lg-hi),
+    inset 0 -1px 1px var(--lg-lo),
+    inset 0 0 0 0.5px var(--lg-rim),
+    0 6px 16px -6px var(--lg-drop);
+}
+
+.lg::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(120% 70% at 28% 0%, var(--lg-sheen), transparent 62%);
+  pointer-events: none;
+}
+
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+}
+
+.mark {
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.card {
+  box-sizing: border-box;
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+}
+
+.sub {
+  font-size: 16px;
+  color: var(--sub);
+}
+
+.small {
+  font-size: 16px;
+  color: var(--sub);
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--sub);
+}
+
+.track {
+  display: block;
+  height: 3px;
+  border-radius: 12px;
+  background: var(--track);
+}
+
+.fill {
+  display: block;
+  height: 3px;
+  border-radius: 12px;
+  background: var(--ink);
+}
+
+/* Focus: thin ring for D-pad. Cards and tiles also lift slightly. */
+[data-focus] {
+  outline: none;
+}
+
+[data-focus]:focus-visible {
+  outline: 1.5px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.mini,
+.show,
+.mix,
+.channel,
+.app-card,
+.info,
+.queue-row,
+.set-row {
+  transition: transform 0.5s var(--gentle, ease-out), box-shadow 0.25s, background 0.25s;
+}
+
+.mini:focus-visible,
+.show:focus-visible,
+.mix:focus-visible,
+.channel:focus-visible,
+.app-card:focus-visible,
+.info:focus-visible {
+  transform: scale(1.015);
+  outline-offset: 2px;
+}
+
+button {
+  color: inherit;
+}
+
+.btn {
+  height: 44px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 48px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--playink);
+}
+
+/* ---------- Sidebar: vertical glass oval ---------- */
+
+/* Sidebar focus: no ring, the icon brightens, glows softly and grows */
+/* ---------- Header ---------- */
+
+/* ---------- Views ---------- */
+
+.views {
+  position: absolute;
+  left: 128px;
+  right: 48px;
+  top: 112px;
+  bottom: 36px;
+}
+
+.view {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---------- Home ---------- */
+
+/* Album art on the right at full card height; text and controls on the left */
+.now-playing {
+  height: 262px;
+  padding: 22px;
+  display: flex;
+  gap: 20px;
+}
+
+.np-art {
+  width: 184px;
+  height: 184px;
+  flex: none;
+  align-self: center;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  transition: background 0.5s;
+}
+
+.np-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.np-meta > * {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.np-title {
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.np-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.np-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.transport {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.ctrl {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.play {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  background: var(--ink);
+  color: var(--playink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.6), 0 6px 16px -6px var(--lg-drop);
+}
+
+.temp {
+  font-size: 64px;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.hero {
+  height: 280px;
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+}
+
+.hero-art,
+.hero-shade {
+  position: absolute;
+  inset: 0;
+}
+
+.hero-shade {
+  background: linear-gradient(to top, rgba(4, 4, 8, 0.85) 0%, rgba(4, 4, 8, 0.2) 60%, rgba(4, 4, 8, 0) 100%);
+}
+
+.hero-body {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #fff;
+}
+
+.hero-app {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.hero-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.hero-title {
+  font-size: 32px;
+  font-weight: 300;
+}
+
+.hero-sub {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.resume {
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.resume:focus-visible {
+  outline-color: #fff;
+}
+
+.hero-track {
+  height: 3px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.hero-track > div {
+  height: 3px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+/* Focused app: thin ring and soft glow in the app's brand colour */
+.app:focus-visible,
+.app-card:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 0;
+  box-shadow: 0 0 24px var(--glow);
+}
+
+.app-name {
+  font-size: 16px;
+  font-weight: 400;
+}
+
+/* ---------- Search ---------- */
+
+.view-search {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.search-bar {
+  box-sizing: border-box;
+  height: 60px;
+  flex: none;
+  border-radius: 48px;
+  padding: 0 22px 0 9px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: var(--shadow);
+  cursor: text;
+}
+
+.search-bar:focus-within {
+  outline: 1.5px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.search-bar input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 300;
+}
+
+.search-bar input::placeholder {
+  color: var(--sub);
+}
+
+.search-bar input:focus-visible {
+  outline: none;
+}
+
+.search-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shows {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  min-height: 196px;
+}
+
+.show {
+  border-radius: 20px;
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+  min-width: 0;
+}
+
+.show-art {
+  position: relative;
+  height: 122px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.show-app {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+}
+
+/* Glass over artwork: always a dark lens, so logos and prices read on any art */
+.show-art .lg {
+  --lg-top: rgba(14, 14, 20, 0.62);
+  --lg-bottom: rgba(14, 14, 20, 0.42);
+  --lg-hi: rgba(255, 255, 255, 0.3);
+  --lg-lo: rgba(255, 255, 255, 0.05);
+  --lg-rim: rgba(255, 255, 255, 0.14);
+  --lg-sheen: rgba(255, 255, 255, 0.12);
+  --sub: rgba(236, 236, 241, 0.7);
+  color: #ececf1;
+}
+
+/* Paid titles: price in the bottom corner */
+.price {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 48px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.price-kind {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--sub);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.show-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 6px 4px;
+  min-width: 0;
+}
+
+.show-title {
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.show-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty {
+  grid-column: 1 / -1;
+  align-self: center;
+}
+
+/* ---------- Music ---------- */
+
+.view-music {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.music-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 16px;
+  height: 336px;
+  flex: none;
+}
+
+.music-now {
+  padding: 24px;
+  display: flex;
+  gap: 28px;
+  min-width: 0;
+}
+
+.music-art {
+  width: 288px;
+  height: 288px;
+  flex: none;
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  transition: background 0.5s;
+}
+
+.music-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.music-title {
+  font-size: 32px;
+  font-weight: 300;
+  line-height: 1.15;
+  margin-bottom: 6px;
+}
+
+.music-queue {
+  padding: 22px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.music-queue > .eyebrow {
+  padding: 0 8px;
+}
+
+.queue {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.queue-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.queue-row:focus-visible {
+  background: var(--onbtn);
+  outline-offset: 0;
+}
+
+.queue-art {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 12px;
+}
+
+.queue-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.queue-title {
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.music-mixes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mixes {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.mix {
+  border-radius: 20px;
+  padding: 8px 8px 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.mix-art {
+  height: 96px;
+  border-radius: 12px;
+  margin-bottom: 6px;
+}
+
+.mix-title {
+  font-size: 16px;
+  font-weight: 400;
+  padding: 0 4px;
+}
+
+.mix .small {
+  padding: 0 4px;
+}
+
+/* ---------- Live TV ---------- */
+
+/* ---------- All apps ---------- */
+
+.view-apps {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.app-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.app-card {
+  --accent: transparent;
+  --glow: transparent;
+  height: 168px;
+  border-radius: 28px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--ink);
+}
+
+/* ---------- Games ---------- */
+
+.view-games {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.games-hero {
+  flex: 1 1 0;
+  padding: 40px 44px;
+  display: flex;
+  align-items: center;
+  gap: 44px;
+}
+
+.games-chip {
+  width: 168px;
+  height: 168px;
+  border-radius: 48px;
+}
+
+.games-text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.games-title {
+  font-size: 48px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+
+.games-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.info {
+  height: 120px;
+  box-sizing: border-box;
+  border-radius: 28px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-align: left;
+  color: var(--ink);
+}
+
+button.info {
+  cursor: pointer;
+}
+
+.info > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* ---------- Settings ---------- */
+
+.settings {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.set-row {
+  height: 66px;
+  box-sizing: border-box;
+  padding: 0 18px 0 12px;
+  border: 0;
+  border-radius: 20px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.set-row:focus-visible,
+.set-row:focus-within {
+  background: var(--onbtn);
+  outline: none;
+}
+
+.set-chip {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+}
+
+.set-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.set-val {
+  font-size: 16px;
+  color: var(--sub);
+}
+
+.set-input {
+  width: 260px;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--glass);
+  color: var(--ink);
+  font-size: 16px;
+  text-align: right;
+}
+
+.set-input:focus-visible {
+  outline: 1.5px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ---------- Games switch overlay ---------- */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+}
+
+.switch-card {
+  width: 420px;
+  padding: 36px 32px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.ring {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  margin-bottom: 10px;
+}
+
+.ring circle {
+  fill: none;
+  stroke-width: 3;
+}
+
+.ring-track {
+  stroke: var(--track);
+}
+
+.ring-fill {
+  stroke: var(--ink);
+  stroke-linecap: round;
+}
+
+.ring-count {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 300;
+}
+
+.switch-title {
+  font-size: 24px;
+  font-weight: 300;
+}
+
+.switch-card .btn {
+  margin-top: 16px;
+}
+
+/* Stand-in for the TV showing the HDMI input */
+.input-screen {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  color: #ececf1;
+}
+
+.input-label {
+  position: absolute;
+  left: 48px;
+  top: 40px;
+  font-size: 16px;
+  color: rgba(236, 236, 241, 0.62);
+}
+
+.input-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  font-size: 20px;
+}
+
+.input-screen .btn {
+  color: #ececf1;
+  --lg-top: rgba(255, 255, 255, 0.11);
+  --lg-bottom: rgba(255, 255, 255, 0.02);
+}
+
+.input-screen [data-focus]:focus-visible {
+  outline-color: #ececf1;
+}
+
+/* ---------- Toast ---------- */
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 40px;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 12px 22px;
+  border-radius: 48px;
+  font-size: 16px;
+  font-weight: 400;
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+}
+
+
+
+/* ---------- Tinted cards (colours from album art / weather) ---------- */
+
+
+.tinted {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  /* White type and lighter glass over the colour, in both themes */
+  --ink: #fff;
+  --sub: rgba(255, 255, 255, 0.74);
+  --track: rgba(255, 255, 255, 0.24);
+  --playink: #15151d;
+  --lg-top: rgba(255, 255, 255, 0.3);
+  --lg-bottom: rgba(255, 255, 255, 0.08);
+  --lg-hi: rgba(255, 255, 255, 0.65);
+  --lg-lo: rgba(0, 0, 0, 0.08);
+  --lg-rim: rgba(255, 255, 255, 0.2);
+  --lg-drop: rgba(0, 0, 0, 0.25);
+  --lg-sheen: rgba(255, 255, 255, 0.3);
+  transition: transform 0.5s var(--gentle);
+}
+
+.tinted > :not(.tint) {
+  position: relative;
+}
+
+.tint {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(80% 110% at 88% 10%, var(--t0a, var(--t0)), transparent 65%),
+    linear-gradient(135deg, var(--t1), var(--t2));
+  transition: opacity 0.5s, filter 0.5s;
+}
+
+/* Soft darkening at the bottom keeps text and controls legible on light art */
+.tint::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.32));
+}
+
+/* Paused: the colour fades back toward plain glass */
+.tinted.paused .tint {
+  opacity: 0.4;
+  filter: saturate(0.5);
+}
+
+.tinted .np-art,
+.tinted .music-art {
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+}
+
+/* ---------- Room (lights, backlights, soundbar) ---------- */
+
+.view-room {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.room-grid {
+  flex: 1 1 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0;
+}
+
+.room-card,
+.soundbar {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.soundbar {
+  flex: none;
+  gap: 16px;
+}
+
+.room-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.room-chip {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+
+.room-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px 10px;
+}
+
+.swatch {
+  border: 0;
+  padding: 6px 0;
+  border-radius: 20px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.swatch-dot {
+  width: 56px;
+  height: 56px;
+  border-radius: 20px;
+  box-shadow: 0 6px 16px -6px var(--lg-drop);
+  transition: transform 0.5s var(--gentle, ease-out), outline-color 0.25s;
+  outline: 2px solid transparent;
+  outline-offset: 3px;
+}
+
+.swatch.on .swatch-dot {
+  outline-color: var(--ink);
+}
+
+.swatch:is(:focus-visible, :hover) .swatch-dot {
+  transform: scale(1.05);
+}
+
+.swatch:focus-visible {
+  outline-offset: 0;
+}
+
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pillbtn {
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 48px;
+  border: 1px solid var(--border);
+  background: var(--glass);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background 0.25s, color 0.25s;
+}
+
+.pillbtn.on {
+  background: var(--ink);
+  color: var(--playink);
+}
+
+.light-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.light-row {
+  height: 46px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.light-row:focus-visible {
+  background: var(--onbtn);
+  outline-offset: 0;
+}
+
+.light-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--track);
+  transition: background 0.25s, box-shadow 0.25s;
+}
+
+.light-row.on .light-dot {
+  background: #ffcf70;
+  box-shadow: 0 0 10px 2px rgba(255, 207, 112, 0.6);
+}
+
+.light-name {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vol-track {
+  width: 180px;
+}
+
+.soundbar.standby .vol-track,
+.soundbar.standby .vol-num {
+  opacity: 0.35;
+}
+
+.vol-num {
+  min-width: 46px;
+  font-size: 16px;
+  color: var(--sub);
+  text-align: center;
+}
+
+/* Wallpaper that follows the backlights: their colours as soft glows */
+
+#stage.lights {
+  --bg:
+    radial-gradient(ellipse at 10% 0%, var(--lw0) 0%, transparent 58%),
+    radial-gradient(ellipse at 95% 5%, var(--lw1) 0%, transparent 58%),
+    radial-gradient(ellipse at 70% 105%, var(--lw2) 0%, transparent 58%),
+    #050508;
+}
+
+#stage.light.lights {
+  --bg:
+    radial-gradient(ellipse at 10% 0%, var(--lw0) 0%, transparent 58%),
+    radial-gradient(ellipse at 95% 5%, var(--lw1) 0%, transparent 58%),
+    radial-gradient(ellipse at 70% 105%, var(--lw2) 0%, transparent 58%),
+    #eff0f5;
+}
+
+/* ---------- Motion ---------- */
+
+#stage {
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --gentle: cubic-bezier(0.25, 0.8, 0.3, 1);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Icons grow slightly when the D-pad (or mouse) lands on them */
+.ib,
+.ctrl,
+.play,
+.chip {
+  transition: transform 0.5s var(--gentle), color 0.25s, background 0.25s, box-shadow 0.25s, filter 0.25s;
+}
+
+.ib:is(:focus-visible, :hover),
+.ctrl:is(:focus-visible, :hover),
+.play:is(:focus-visible, :hover) {
+  transform: scale(1.06);
+}
+
+/* App icons and setting icons grow inside their tile or row */
+:is(.app, .app-card, .info, .set-row, .channel):is(:focus-visible, :hover, :focus-within) .chip {
+  transform: scale(1.05);
+}
+
+/* Page transitions: a view's cards rise and fade in, one after another */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* `backwards` only holds the first frame during the delay, so focus
+   transforms still apply once the entrance has finished. */
+.view .anim {
+  animation: rise-in 0.55s var(--ease-out) backwards;
+  animation-delay: var(--d, 0ms);
+}
+
+.overlay:not([hidden]) {
+  animation: fade-in 0.3s var(--ease-out);
+}
+
+.switch-card:not([hidden]) {
+  animation: pop-in 0.45s var(--spring);
+}
+
+.input-screen:not([hidden]) {
+  animation: fade-in 0.5s var(--ease-out);
+}
+
+.toast:not([hidden]) {
+  animation: toast-in 0.35s var(--spring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* =====================================================================
+   v2: iPadOS-inspired layout, sized for a TV
+   Top tab bar (as on tvOS and iPadOS apps), a widget grid, a glass dock,
+   heavier Liquid Glass and SF-style type (Inter with optical sizing; Apple's
+   SF Pro is only licensed for Apple platforms).
+   ===================================================================== */
+
+#stage {
+  font-family: Inter, "Inter Local", system-ui, sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  --glass: rgba(255, 255, 255, 0.075);
+  --glass-hi: rgba(255, 255, 255, 0.3);
+  --glass-rim: rgba(255, 255, 255, 0.1);
+  --glass-sheen: linear-gradient(165deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0) 45%);
+  --radius-widget: 34px;
+}
+
+#stage.light {
+  --glass: rgba(255, 255, 255, 0.45);
+  --glass-hi: rgba(255, 255, 255, 0.95);
+  --glass-rim: rgba(255, 255, 255, 0.55);
+  --glass-sheen: linear-gradient(165deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 50%);
+}
+
+/* Liquid Glass panels: lit top edge, soft rim, sheen */
+.glass {
+  background: var(--glass-sheen), var(--glass);
+  border: 0;
+  box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 0 0 1px var(--glass-rim), var(--shadow);
+}
+
+.card {
+  border-radius: 36px;
+}
+
+/* ---------- Top bar ---------- */
+
+.topbar {
+  position: absolute;
+  left: 48px;
+  right: 48px;
+  top: 26px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 3;
+  animation: fade-in 0.6s var(--ease-out) backwards;
+}
+
+.status {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.status-time {
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.status-date {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--sub);
+}
+
+#stage.photo .status {
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.45);
+}
+
+#stage.light.photo .status {
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.85);
+}
+
+.tabbar {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 48px;
+}
+
+.tab {
+  height: 44px;
+  padding: 0 15px;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 48px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--sub);
+  cursor: pointer;
+  transition: color 0.25s, background 0.25s, transform 0.5s var(--gentle);
+}
+
+.tab.on {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* Focus lens: a glass capsule appears only under the focused tab */
+.tab:is(:focus-visible, :hover),
+.tool:is(:focus-visible, :hover) {
+  background: var(--onbtn);
+  color: var(--ink);
+  outline: none;
+  transform: scale(1.04);
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-wifi {
+  display: flex;
+  margin-right: 8px;
+  color: var(--sub);
+}
+
+.tool {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 48px;
+  background: transparent;
+  color: var(--sub);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.25s, background 0.25s, transform 0.5s var(--gentle);
+}
+
+.tool.on {
+  color: var(--ink);
+}
+
+.views {
+  left: 48px;
+  right: 48px;
+  top: 100px;
+  bottom: 28px;
+}
+
+/* ---------- Home widgets ---------- */
+
+.widgets {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 452px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.widget {
+  position: relative;
+  box-sizing: border-box;
+  border-radius: var(--radius-widget);
+  overflow: hidden;
+  min-width: 0;
+  color: var(--ink);
+}
+
+.w-weather {
+  grid-area: 2 / 1;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.w-weather-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.w-label {
+  font-size: 16px;
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.w-weather-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+
+.w-weather .temp {
+  font-size: 64px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.w-weather-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.w-music.now-playing {
+  grid-area: 1 / 2 / 3 / 4;
+  height: auto;
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0;
+}
+
+.w-music .np-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.w-music .np-meta {
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.w-music .np-meta > * {
+  white-space: normal;
+}
+
+.w-music .np-title {
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-top: 6px;
+}
+
+.w-music .np-art {
+  width: 196px;
+  height: 196px;
+  border-radius: 28px;
+  align-self: auto;
+}
+
+.w-music .play {
+  width: 58px;
+  height: 58px;
+}
+
+.w-music .ctrl {
+  width: 48px;
+  height: 48px;
+}
+
+.w-music .np-row .small {
+  font-size: 16px;
+}
+
+.w-hero.hero {
+  grid-area: 1 / 4 / 2 / 6;
+  height: auto;
+  box-shadow: var(--shadow);
+}
+
+.hero-title {
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.resume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.w-mini {
+  padding: 14px 16px 18px;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: transform 0.5s var(--gentle), box-shadow 0.25s;
+}
+
+.w-mini:focus-visible {
+  transform: scale(1.015);
+  outline-offset: 2px;
+}
+
+.w-mini-art {
+  height: 98px;
+  flex: none;
+  border-radius: 20px;
+  margin-bottom: 9px;
+  padding: 8px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+}
+
+.w-mini-title {
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.w-mini .track {
+  margin-top: auto;
+}
+
+/* ---------- Dock ---------- */
+
+.dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: fit-content;
+  margin: 0 auto;
+  height: 116px;
+  box-sizing: border-box;
+  padding: 16px 22px 0;
+  border-radius: 36px;
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.dock-app {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.dock-app:focus-visible {
+  outline: none;
+}
+
+.dock-app:is(:focus-visible, :hover) .app-ic {
+  transform: scale(1.06) translateY(-3px);
+}
+
+.dock-app:focus-visible .app-ic {
+  box-shadow: 0 0 0 2px var(--ink), 0 12px 26px -8px var(--accent);
+}
+
+/* The label shows only for the focused app, as tvOS does */
+.dock-label {
+  font-size: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.25s, transform 0.5s var(--gentle);
+}
+
+.dock-app:is(:focus-visible, :hover) .dock-label {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- App icon styles (Default / Dark / Clear / Tinted) ---------- */
+
+.app-ic {
+  --glyph: var(--brand);
+  transition: transform 0.5s var(--gentle), box-shadow 0.25s, background 0.5s;
+}
+
+.app-ic.s-default {
+  background: linear-gradient(165deg, var(--b1, #8e8e9a), var(--b2, #4a4a55));
+  --glyph: #fff;
+}
+
+.app-ic.s-dark {
+  background: linear-gradient(165deg, #3a3a44, #121218);
+  --glyph: var(--brand);
+}
+
+.app-ic.s-clear {
+  --glyph: var(--ink);
+}
+
+.app-ic.s-tinted {
+  background: linear-gradient(165deg, var(--tint-bg1), var(--tint-bg2));
+  --glyph: var(--tint-glyph);
+}
+
+/* ---------- Customize panel ---------- */
+
+.sheet-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+  animation: fade-in 0.3s var(--ease-out);
+}
+
+.sheet {
+  width: 580px;
+  box-sizing: border-box;
+  padding: 26px 30px 30px;
+  border-radius: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: pop-in 0.45s var(--gentle);
+}
+
+.sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sheet-title {
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.sheet-label {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--sub);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.opts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.opt {
+  border: 0;
+  background: transparent;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.opt:focus-visible {
+  outline: none;
+}
+
+.opt:is(:focus-visible, :hover) .app-ic {
+  transform: scale(1.06);
+}
+
+.opt:focus-visible .app-ic {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+.opt-label {
+  font-size: 16px;
+  font-weight: 400;
+  padding: 4px 12px;
+  border-radius: 48px;
+}
+
+.opt.on .opt-label {
+  background: var(--onbtn);
+  font-weight: 500;
+}
+
+.sheet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 48px;
+  background: var(--onbtn);
+}
+
+.seg {
+  height: 38px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 48px;
+  background: transparent;
+  color: var(--sub);
+  font-size: 16px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background 0.25s, color 0.25s;
+}
+
+.seg.on {
+  background: var(--ink);
+  color: var(--playink);
+  font-weight: 500;
+}
+
+.seg:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ---------- Type: heavier, SF-style weights across the other views ---------- */
+
+.eyebrow {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.music-title,
+.games-title {
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.np-title,
+.show-title,
+.mix-title,
+.queue-title,
+.channel-title,
+.channel-prog,
+.light-name,
+.set-label,
+.room-title,
+.info-val,
+.app-name,
+.switch-title {
+  font-weight: 400;
+}
+
+.btn,
+.pillbtn {
+  font-weight: 500;
+}
+
+/* Up next, in the gap between the song and the controls */
+.np-next {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.np-next > div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.np-next-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.np-next-art {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.4);
+}
+
+.np-next-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.np-next-title {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* =====================================================================
+   v3: council review changes
+   Focus visible from the sofa, 24px-at-1080p minimum text, 5% TV-safe
+   margins, room status on Home, empty states and plain labels.
+   ===================================================================== */
+
+#stage {
+  --focus: rgba(255, 255, 255, 0.96);
+  --focus-glow: rgba(255, 255, 255, 0.3);
+  --lift: 0 18px 36px -14px rgba(0, 0, 0, 0.6);
+}
+
+#stage.light {
+  --focus: #15151d;
+  --focus-glow: rgba(21, 21, 29, 0.18);
+  --lift: 0 18px 36px -14px rgba(40, 40, 80, 0.35);
+}
+
+/* ---------- Focus: a bright ring, a soft glow and a lift ----------
+   Focused = ring + glow. Selected (current tab, chosen option) stays a
+   quieter fill or weight, so the two never look the same. */
+#stage [data-focus]:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  box-shadow: 0 0 26px 2px var(--focus-glow), var(--lift);
+}
+
+/* Focus goes on the icon itself where a label sits under it */
+#stage :is(.dock-app, .opt, .swatch):focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+#stage .dock-app:focus-visible .app-ic,
+#stage .opt:focus-visible .app-ic,
+#stage .swatch:focus-visible .swatch-dot {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
+  box-shadow: 0 0 26px 2px var(--focus-glow), var(--lift);
+}
+
+#stage .search-bar:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  box-shadow: 0 0 26px 2px var(--focus-glow);
+}
+
+#stage #search-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Selected swatch: a small dot under the label, not a ring */
+.swatch.on .swatch-dot {
+  outline-color: transparent;
+}
+
+.swatch.on .small {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.swatch.on .small::after {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  margin: 5px auto 0;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+/* ---------- 5% TV-safe margins (64px x 36px on the 1280x720 canvas) ---------- */
+
+.topbar {
+  left: 64px;
+  right: 64px;
+  top: 36px;
+}
+
+.views {
+  left: 64px;
+  right: 64px;
+  top: 108px;
+  bottom: 36px;
+}
+
+/* ---------- Text: at least 16px here, 24px on a 1080p TV ---------- */
+
+.small,
+.sub {
+  font-size: 16px;
+}
+
+.sub {
+  font-size: 16px;
+}
+
+.eyebrow {
+  font-size: 16px;
+}
+
+.status-date {
+  font-size: 20px;
+}
+
+.tab {
+  font-size: 16px;
+  padding: 0 14px;
+}
+
+.hero-app,
+.hero-sub {
+  font-size: 16px;
+}
+
+.resume,
+.btn,
+.pillbtn,
+.seg,
+.opt-label,
+.vol-num {
+  font-size: 16px;
+}
+
+.w-label,
+.w-weather-foot,
+.np-next-title,
+.queue-title,
+.mix-title,
+.light-name,
+.set-val,
+.show-title,
+.set-label,
+.room-title,
+.price {
+  font-size: 16px;
+}
+
+.price-kind {
+  font-size: 16px;
+}
+
+.toast {
+  font-size: 16px;
+}
+
+.sheet-label {
+  font-size: 16px;
+}
+
+.dock-label {
+  font-size: 16px;
+}
+
+/* Section headings sit on the wallpaper: full-contrast text with a soft halo */
+:is(.search-section, .music-mixes, .view-apps, .live-head, .view-games) > .eyebrow,
+#stage.light :is(.search-section, .music-mixes, .view-apps, .live-head, .view-games) > .eyebrow,
+/* A steadier scrim, so text holds up on any photo you add */
+#stage {
+  --photo-scrim: linear-gradient(rgba(5, 5, 8, 0.3), rgba(5, 5, 8, 0.5));
+}
+
+#stage.light {
+  --photo-scrim: linear-gradient(rgba(239, 240, 245, 0.62), rgba(239, 240, 245, 0.7));
+}
+
+/* ---------- Home: rows fit the new margins, bigger dock ---------- */
+
+.widgets {
+  height: 416px;
+}
+
+.dock {
+  height: 132px;
+  padding-top: 14px;
+  gap: 20px;
+}
+
+/* Room status widget (replaces the clock) */
+.w-room {
+  grid-area: 1 / 1;
+  border: 0;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.w-room-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.w-room-row svg {
+  color: var(--sub);
+  flex: none;
+}
+
+.w-room-swatch {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 12px;
+  box-shadow: 0 0 12px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* Recently used apps stand in for Continue watching when there's no data */
+/* ---------- Empty states ---------- */
+
+.w-empty {
+  display: none;
+}
+
+.widget.is-empty > :not(.w-empty) {
+  display: none !important;
+}
+
+.widget.is-empty > .w-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 22px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: center;
+  font: inherit;
+}
+
+button.w-empty {
+  cursor: pointer;
+  border-radius: inherit;
+}
+
+.w-empty svg {
+  color: var(--sub);
+  margin-bottom: 4px;
+}
+
+.w-empty-title {
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.w-empty .btn {
+  margin-top: 10px;
+}
+
+.w-hero.is-empty {
+  background: var(--glass-sheen), var(--glass);
+  box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 0 0 1px var(--glass-rim), var(--shadow);
+}
+
+/* ---------- Plain controls ---------- */
+
+/* Light rows: an on/off switch you can see is pressable */
+.switch {
+  width: 46px;
+  height: 28px;
+  flex: none;
+  border-radius: 48px;
+  background: var(--track);
+  position: relative;
+  transition: background 0.25s;
+}
+
+.switch > span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.5s var(--gentle);
+}
+
+.light-row.on .switch {
+  background: #34c759;
+}
+
+.light-row.on .switch > span {
+  transform: translateX(18px);
+}
+
+.tool {
+  position: relative;
+}
+
+.opt-desc {
+  font-size: 16px;
+  color: var(--sub);
+  margin-top: -6px;
+}
+
+.sheet-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sheet-help {
+  font-size: 16px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* =====================================================================
+   v4: a point of view (frontend-design pass)
+
+   Subject: a UK living-room TV, used in the evening, in a room lit by a
+   Govee strip behind the screen. Job: get to a show in one or two presses,
+   and set the room.
+
+   The one bold idea: the backlight bleed. The screen edges glow in the
+   room's light colour, like the strip spilling onto the wall, and focus is
+   lit the same way. In "Sync to TV" mode the glow follows whatever you're
+   on. Everything else stays quiet: Inter on one scale (16 / 20 / 25 /
+   31 / 39 / 49), sentence case, no dot-joined strings, posters straight on
+   the wallpaper, radius set by size, one power-on moment instead of
+   entrance effects everywhere.
+   ===================================================================== */
+
+
+#stage {
+  font-family: Inter, "Inter Local", system-ui, sans-serif;
+  letter-spacing: 0;
+
+  /* Focus is lit in the room's light colour (set by applyColors in app.js) */
+  --focus: #ffffff;
+  --focus-glow: rgba(255, 255, 255, 0.3);
+  --glowc: #2bd47d;
+  --glow-a: rgba(43, 212, 125, 0.7);
+  --tint-bg1: rgba(40, 90, 70, 0.6);
+  --tint-bg2: rgba(10, 30, 24, 0.5);
+  --tint-glyph: #b8f0d6;
+}
+
+/* ---------- The backlight bleed ---------- */
+
+.edge {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* A soft, thin glow that hugs the screen edges and corners (a rectangle,
+     not an oval), painted once. */
+  background: none;
+  box-shadow: inset 0 0 28px 2px var(--glow-a), inset 0 0 90px -6px var(--glow-a);
+  transition: opacity 0.9s;
+  animation: lights-on 2.4s var(--ease-out) 0.3s backwards;
+}
+
+.edge.off {
+  opacity: 0;
+}
+
+/* The one orchestrated moment: the room lights come up when the TV turns on */
+@keyframes lights-on {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Views simply cross-fade; no staggered entrances */
+.view .anim {
+  animation: none;
+}
+
+.view:not([hidden]) {
+  animation: fade-in 0.35s var(--ease-out);
+}
+
+/* The current tab carries a short bar of the light colour */
+.tab {
+  position: relative;
+}
+
+.tab.on::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 18px;
+  height: 3px;
+  margin-left: -9px;
+  border-radius: 12px;
+  background: var(--glowc);
+}
+
+/* ---------- Type: Inter on one scale ---------- */
+
+.small { font-size: 16px; }
+.sub { font-size: 20px; }
+
+.status-time { font-size: 24px; font-weight: 500; letter-spacing: -0.01em; }
+.status-date { font-size: 20px; }
+
+.w-music .np-title,
+.hero-title,
+.music-title {
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.games-title { font-size: 48px; font-weight: 300; letter-spacing: -0.02em; }
+.w-weather .temp { font-size: 64px; font-weight: 400; letter-spacing: -0.02em; }
+.w-empty-title { font-size: 20px; }
+.w-mini-title,
+.show-title,
+.np-next-title,
+.mix-title,
+.room-title,
+/* Sentence case everywhere; labels say what they are, quietly */
+.sheet-label,
+.price-kind {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.sheet-label {
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.price-kind {
+  font-size: 16px;
+}
+
+.eyebrow {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.np-next-label,
+.music-queue-title {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--sub);
+}
+
+.music-queue-title {
+  padding: 0 8px;
+}
+
+.music-source {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--sub);
+}
+
+/* ---------- Home details ---------- */
+
+.np-art {
+  position: relative;
+}
+
+.hero-progress {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hero-progress .hero-track {
+  flex: 1;
+}
+
+.hero-left {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.8);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Radius follows size: large widgets 34, small 28, tiles 22, artwork 20 */
+.w-room,
+.w-weather,
+.w-mini {
+  border-radius: 28px;
+}
+
+.w-mini-art {
+  border-radius: 20px;
+}
+
+/* ---------- Posters sit on the wallpaper, not in cards ---------- */
+
+.show.glass,
+.mix.glass {
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  gap: 10px;
+}
+
+.show-art {
+  height: 136px;
+  border-radius: 20px;
+  box-shadow: 0 14px 30px -14px rgba(0, 0, 0, 0.6);
+}
+
+.mix-art {
+  height: 112px;
+  border-radius: 20px;
+  margin: 0;
+  box-shadow: 0 14px 30px -14px rgba(0, 0, 0, 0.6);
+}
+
+.show-body,
+.mix .small,
+.mix-title {
+  padding: 0 4px;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+}
+
+#stage.light :is(.show-body, .mix .small, .mix-title) {
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.85);
+}
+
+/* Focus lights the artwork itself */
+#stage :is(.show, .mix):focus-visible {
+  outline: none;
+  box-shadow: none;
+  transform: none;
+}
+
+#stage .show:focus-visible .show-art,
+#stage .mix:focus-visible .mix-art {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
+  box-shadow: 0 0 30px 4px var(--focus-glow), var(--lift);
+  transform: scale(1.03);
+}
+
+.show-art,
+.mix-art {
+  transition: transform 0.5s var(--gentle), box-shadow 0.25s;
+}
+
+/* Captions on the wallpaper need a firmer shadow over bright photos */
+.show-body,
+.mix .small,
+.mix-title {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7), 0 0 16px rgba(0, 0, 0, 0.65);
+}
+
+/* An empty tinted widget has no colour behind it, so it uses theme text */
+.widget.tinted.is-empty {
+  --ink: inherit;
+  --sub: inherit;
+  --track: inherit;
+  color: var(--ink);
+}
+
+/* Music tab: keep the now-playing card inside its row */
+.music-now {
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.music-art {
+  width: 264px;
+  height: 264px;
+  align-self: center;
+}
+
+.music-grid {
+  grid-template-rows: 336px;
+}
+
+/* ---------- Top bar: icons only ----------
+   No capsule or ring behind the icons. Focus brightens and lifts the icon,
+   lights it in the room colour and shows its name underneath. */
+.tabbar {
+  gap: 4px;
+  padding: 6px 10px;
+}
+
+.tab {
+  width: 52px;
+  height: 46px;
+  padding: 0;
+  justify-content: center;
+}
+
+#stage :is(.tab, .tool):is(:focus-visible, :hover) {
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+  color: var(--ink);
+  transform: scale(1.12);
+}
+
+#stage :is(.tab, .tool):focus-visible svg {
+  filter: drop-shadow(0 0 8px var(--focus-glow)) drop-shadow(0 0 2px var(--focus));
+}
+
+.tab.on::after {
+  bottom: 2px;
+}
+
+/* Search hands anything else to Google TV */
+.google-search {
+  height: 40px;
+  flex: none;
+}
+
+/* The search bar rings only when the text field itself is focused */
+#stage .search-bar:focus-within {
+  outline: none;
+  box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 0 0 1px var(--glass-rim), var(--shadow);
+}
+
+/* Real app icons from the TV. Default shows the app's own icon; the other
+   styles show a one-colour glyph (traced, drawn or a logo) in the style's
+   colour, so every app matches Clear, Dark and Tinted. */
+.app-ic {
+  position: relative;
+  overflow: hidden;
+}
+
+.app-ic .ic-glyph {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.app-ic .ic-glyph .mark {
+  font-size: 1em;
+  color: var(--glyph);
+}
+
+.ic-mask {
+  display: block;
+  width: 1.5em;
+  height: 1.5em;
+  background: var(--glyph);
+  -webkit-mask: var(--mask) center / contain no-repeat;
+  mask: var(--mask) center / contain no-repeat;
+  opacity: 0;
+}
+
+.ic-mask.ready {
+  opacity: 1;
+  transition: opacity 0.25s;
+}
+
+.app-ic .ic-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+}
+
+.app-ic.has-img.s-default .ic-img {
+  display: block;
+}
+
+.app-ic.has-img.s-default .ic-glyph {
+  visibility: hidden;
+}
+
+
+/* =====================================================================
+   v5: smooth on a TV chip
+
+   Live backdrop blur behind a dozen panels is what made the launcher slow
+   (about 29 frames a second on a 6x slower processor, against about 56
+   without it). Panels now use a frost image instead: the wallpaper is blurred
+   once, when it loads (see makeFrost in app.js), and painted as the panel's
+   background. Same frosted look; almost no per-frame cost.
+   ===================================================================== */
+
+#stage {
+  --frost: none;
+}
+
+/* Photo wallpaper: tint and scrim over the pre-blurred photo, which is pinned
+   to the screen so every panel shows the part of the photo behind it. */
+#stage.photo .glass {
+  background:
+    var(--glass-sheen),
+    linear-gradient(var(--glass), var(--glass)),
+    var(--photo-scrim),
+    var(--frost) 0 0 / 1280px 720px fixed;
+}
+
+/* Cheaper glass chips behind icons: no blur, same lit edge */
+.lg {
+  background: linear-gradient(165deg, var(--lg-top), var(--lg-bottom));
+}
+
+/* The Home hero's Resume button is over artwork, so a plain translucent fill */
+.resume {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ---------- Fit the screen ---------- */
+
+.fit {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+
+/* The launcher's edge: should sit just inside the TV's edges */
+.fit-frame {
+  position: absolute;
+  inset: 0;
+  border: 6px solid #fff;
+  pointer-events: none;
+}
+
+/* The 5% safe margin all content stays inside */
+.fit-safe {
+  position: absolute;
+  inset: 36px 64px;
+  border: 2px dashed rgba(255, 255, 255, 0.45);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.fit-card {
+  width: 560px;
+  box-sizing: border-box;
+  padding: 32px 36px;
+  border-radius: 36px;
+  background: rgba(20, 22, 28, 0.94);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.fit-title {
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.fit-text {
+  font-size: 20px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.fit-size {
+  font-size: 48px;
+  font-weight: 300;
+  margin-top: 4px;
+}
+
+.fit-diag {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.fit .btn {
+  margin-top: 10px;
+}
+
+#stage .fit [data-focus]:focus-visible {
+  outline-color: #fff;
+}
+
+/* =====================================================================
+   v6: one type voice, a dock that fits its icons, sliders, tidy-up
+   ===================================================================== */
+
+/* The date ("Fri 30 Oct") sets the type for the whole page: Inter at medium
+   weight, normal spacing, no thin or light cuts anywhere. */
+#stage,
+.eyebrow,
+.btn,
+.small,
+.sub,
+.np-title,
+.hero-title,
+.music-title,
+.app-name,
+.search-bar input,
+.show-title,
+.queue-title,
+.mix-title,
+.info-val,
+.set-label,
+.switch-title,
+.toast,
+.room-title,
+.pillbtn,
+.light-name,
+.status-date {
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.temp,
+.games-title,
+.ring-count,
+.fit-size {
+  font-weight: 400;
+}
+
+/* ---------- Dock: hugs its icons ----------
+   No room is kept for a label. The name appears in a small pill just under
+   the dock on the icon you're on, and the other icons step back a little. */
+.dock {
+  height: auto;
+  bottom: 34px;
+  padding: 12px 20px;
+  gap: 18px;
+  align-items: center;
+  border-radius: 36px;
+}
+
+.dock-app {
+  position: relative;
+}
+
+.dock {
+  transition: padding 0.5s var(--gentle), bottom 0.5s var(--gentle);
+}
+
+/* On the dock: it deepens a little and the name sits inside its border,
+   under the icon, while the icons shrink to make room. */
+.dock.active {
+  padding-bottom: 40px;
+  bottom: 6px;
+}
+
+.dock-label {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  padding: 0;
+  background: none;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, -4px);
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.5s var(--gentle);
+}
+
+.dock-app:is(:focus-visible, :hover) .dock-label {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.dock.active .dock-app .app-ic {
+  transform: scale(0.82);
+}
+
+.dock.active .dock-app:focus-visible .app-ic,
+.dock.active .dock-app:hover .app-ic {
+  transform: scale(0.96);
+}
+
+/* ---------- Sliders (Customize > Tinted) ---------- */
+
+.slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.seg-pill {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  background: var(--glass);
+  font-size: 16px;
+}
+
+.slider {
+  position: relative;
+  width: 280px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.slider-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 10px;
+  border-radius: 12px;
+  background: var(--track);
+}
+
+.slider[data-slider="hue"] .slider-track {
+  background: linear-gradient(90deg, #ff4d4d, #ffb84d, #e6e64d, #4de68c, #4dc3ff, #6f6bff, #d84dff, #ff4d4d);
+}
+
+.slider[data-slider="warmth"] .slider-track {
+  background: linear-gradient(90deg, #6fa8ff, #e8eef8 50%, #ffb35c);
+}
+
+.slider[data-slider="opacity"] .slider-track {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12), var(--tint-base, #888));
+}
+
+.slider.muted .slider-track {
+  opacity: 0.4;
+}
+
+.slider-thumb {
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+#stage .slider:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+#stage .slider:focus-visible .slider-thumb {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  box-shadow: 0 0 22px 2px var(--focus-glow);
+}
+
+.tint-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tint-block[hidden] {
+  display: none;
+}
+
+.sheet {
+  max-height: 640px;
+}
+
+/* Customize panel: tighter, and nothing squashes when the tint rows appear */
+.sheet {
+  gap: 10px;
+  padding: 22px 30px 24px;
+}
+
+.sheet > *,
+.tint-block > * {
+  flex: none;
+}
+
+.sheet-row {
+  min-height: 44px;
+}
+
+.tint-block {
+  gap: 4px;
+}
+
+.opts {
+  margin-bottom: 0;
+}
+
+.opt {
+  padding: 4px 0;
+  gap: 8px;
+}
+
+/* Panels that float over other content need a solid backing now that nothing
+   is blurred behind them. */
+#stage {
+  --solid-panel: rgba(26, 28, 34, 0.97);
+}
+
+#stage.light {
+  --solid-panel: rgba(247, 248, 251, 0.97);
+}
+
+#stage .sheet.glass,
+#stage .switch-card.glass,
+#stage .toast.glass {
+  background: var(--solid-panel);
+}
+
+/* ---------- Settings: two columns ---------- */
+
+.settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 14px;
+  align-content: start;
+  padding: 12px;
+}
+
+.set-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.set-row {
+  height: 62px;
+  min-width: 0;
+}
+
+.set-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.set-val {
+  max-width: 190px;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.set-input {
+  width: 190px;
+}
+
+/* ---------- Wallpaper chooser ---------- */
+
+.wp-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  padding: 4px 4px 0;
+}
+
+.wp-tile {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--track);
+  color: #fff;
+  cursor: pointer;
+}
+
+.wp-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wp-name {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), 0 0 14px rgba(0, 0, 0, 0.6);
+}
+
+.wp-check {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: none;
+  color: var(--ink);
+}
+
+.wp-tile.on .wp-check {
+  display: flex;
+  background: var(--solid-panel);
+}
+
+.wp-tile.on {
+  outline: 3px solid var(--ink);
+  outline-offset: -3px;
+}
+
+#stage .wp-tile:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  transform: scale(1.015);
+}
+
+.wp-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--glass);
+  box-shadow: inset 0 0 0 1px var(--glass-rim);
+  color: var(--ink);
+}
+
+.wp-add .wp-name {
+  position: static;
+  color: var(--ink);
+  text-shadow: none;
+}
+
+.wp-add-chip {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+}
+
+/* ---------- Set up from your phone ---------- */
+
+.setup {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+}
+
+.setup-card {
+  width: 640px;
+  box-sizing: border-box;
+  padding: 34px 40px;
+  border-radius: 36px;
+  background: var(--solid-panel);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.setup-title {
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.setup-steps {
+  margin: 0;
+  padding-left: 28px;
+  font-size: 20px;
+  line-height: 1.7;
+}
+
+.setup-steps strong {
+  font-weight: 500;
+}
+
+.setup-pin {
+  font-size: 48px;
+  letter-spacing: 0.06em;
+}
+
+.setup-status {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--sub);
+}
+
+.setup-card .btn {
+  align-self: flex-start;
+  margin-top: 6px;
+}
+
+.w-weather-icon {
+  display: flex;
+}
+
+/* ---------- Now playing: no controls, empty Music tab, Govee prompt ---------- */
+
+.no-controls .np-controls {
+  display: none;
+}
+
+.music-empty-card {
+  position: relative;
+  height: 336px;
+  overflow: hidden;
+}
+
+.music-empty-card .w-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 24px;
+}
+
+.w-empty .btn[hidden] {
+  display: none;
+}
+
+.light-cta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.light-cta > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ---------- Clean up apps ---------- */
+
+.cleanup {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 560px;
+  overflow-y: auto;
+}
+
+.cleanup-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 28px 24px;
+  max-width: 680px;
+}
+
+.search-hint {
+  margin-top: 18px;
+  color: var(--sub);
+}
+
+/* Keeps text readable on bright photos: a soft darkening at the top and bottom
+   only, so the picture stays clear in the middle. */
+.shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.16), transparent 22%, transparent 70%, rgba(0, 0, 0, 0.2));
+}
+
+#stage.light .shade {
+  background: none;
+}
+
+.cleanup-note {
+  padding: 4px 6px 12px;
+  color: var(--sub);
+}
+
+/* ---------- Room: backlight strip on top, lights in two columns ---------- */
+.room-grid {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+}
+
+.room-card {
+  padding: 18px 22px;
+  gap: 12px;
+}
+
+.swatches {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.swatch {
+  padding: 2px 0;
+  gap: 6px;
+}
+
+.swatch-dot {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.room-head .btn {
+  flex: none;
+  height: 38px;
+  font-size: 16px;
+}
+
+.light-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(var(--rows, 5), 40px);
+  grid-auto-flow: column;
+  column-gap: 18px;
+  row-gap: 0;
+}
+
+.light-row {
+  height: 40px;
+  min-width: 0;
+}
+
+.light-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.light-cta {
+  grid-column: 1 / -1;
+}
+
+/* Soundbar volume lives on the Music tab */
+.view-music .soundbar {
+  padding: 14px 24px;
+  gap: 0;
+}
+
+/* A slow drift of colour behind everything, in the room's light colour.
+   Two soft gradients moving by transform only, so it costs next to nothing. */
+.aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.5;
+  transition: opacity 1.2s;
+}
+
+#stage.lights .aurora {
+  opacity: 0.9;
+}
+
+.aurora i {
+  position: absolute;
+  width: 70%;
+  height: 90%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--lw0, var(--glow-a)), transparent);
+  will-change: transform;
+}
+
+.aurora i:first-child {
+  left: -15%;
+  top: -25%;
+  animation: drift-a 38s ease-in-out infinite alternate;
+}
+
+.aurora i:last-child {
+  right: -15%;
+  bottom: -35%;
+  background: radial-gradient(closest-side, var(--lw1, var(--glow-a)), transparent);
+  animation: drift-b 46s ease-in-out infinite alternate;
+}
+
+@keyframes drift-a {
+  to { transform: translate(55%, 30%) scale(1.15); }
+}
+
+@keyframes drift-b {
+  to { transform: translate(-60%, -25%) scale(1.2); }
+}
+
+#stage.light .aurora { opacity: 0.25; }
+
+
+/* ---------- Apps scroll inside their own panel ----------
+   The page itself never scrolls, so the glow and wallpaper layers stay put. */
+.view-apps {
+  inset: -10px;
+  padding: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.view-apps::-webkit-scrollbar {
+  display: none;
+}
+
+.view-apps {
+  -webkit-mask-image: linear-gradient(transparent, #000 22px, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(transparent, #000 22px, #000 calc(100% - 22px), transparent);
+}
+
+/* ---------- Ambient screen ---------- */
+.ambient {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: #000;
+  overflow: hidden;
+  animation: fade-in 1.2s var(--ease-out);
+}
+
+.ambient .amb-a,
+.ambient .amb-b {
+  position: absolute;
+  inset: -4%;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 3s ease;
+  animation: amb-pan 50s ease-in-out infinite alternate;
+}
+
+.ambient .on {
+  opacity: 0.85;
+}
+
+@keyframes amb-pan {
+  to { transform: scale(1.08) translate(-1.5%, -1%); }
+}
+
+.amb-info {
+  position: absolute;
+  left: 64px;
+  bottom: 56px;
+  text-align: left;
+  color: #fff;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.6);
+}
+
+.amb-clock {
+  font-size: 96px;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.amb-sub {
+  margin-top: 8px;
+  font-size: 20px;
+  opacity: 0.85;
+}
+
+/* ---------- Guest Wi-Fi ---------- */
+.guest {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+  height: 100%;
+  padding: 32px;
+}
+
+.guest .qr {
+  width: 360px;
+  height: 360px;
+  flex: none;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.guest .qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.guest-text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 340px;
+  text-align: left;
+}
+
+.view-roles .cleanup,
+.view-guest .guest {
+  max-height: 100%;
+  overflow: auto;
+}
+
+.pillbtn[data-action="sleep"] {
+  margin-left: auto;
+}
+
+/* Settings now holds nine rows a side: a little tighter so all fit */
+.settings .set-row {
+  height: 56px;
+}
+
+.settings .set-col {
+  gap: 0;
+}
+
+/* =====================================================================
+   v0.6: Home cards you can select, and the window they open into
+   ===================================================================== */
+
+/* Lighter edge glow, easier on the eyes */
+.edge {
+  opacity: 0.7;
+}
+
+/* Hover and focus on a card: a slow lift and a soft glow in the room colour */
+.widget {
+  transition: transform 0.5s var(--gentle), box-shadow 0.5s;
+}
+
+.widget:is(:focus-visible, :hover) {
+  transform: translateY(-4px) scale(1.025);
+  box-shadow: 0 26px 60px -16px var(--focus-glow), 0 0 0 1px var(--glass-hi), inset 0 1px 0 var(--glass-hi);
+}
+
+.widget[data-expand] {
+  cursor: pointer;
+}
+
+/* The window */
+.xscrim {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+  animation: fade-in 0.35s var(--ease-out);
+}
+
+.xscrim.closing {
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.xpanel {
+  width: 780px;
+  max-height: 600px;
+  box-sizing: border-box;
+  padding: 26px 30px 28px;
+  border-radius: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: left;
+  color: var(--ink);
+  background: var(--solid-panel, rgba(26, 28, 34, 0.97));
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 40px 90px rgba(0, 0, 0, 0.5), 0 0 60px -10px var(--focus-glow);
+  transition: transform 0.5s var(--gentle), opacity 0.5s;
+  overflow: hidden;
+}
+
+.xscrim.closing .xpanel {
+  transform: scale(0.97);
+  transition: transform 0.25s;
+}
+
+.x-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.x-title {
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.x-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.x-swatches {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.x-swatches .swatch-dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.x-lights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(var(--rows, 3), 40px);
+  grid-auto-flow: column;
+  column-gap: 18px;
+}
+
+.x-weather {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.x-temp {
+  font-size: 96px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.x-cond {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 24px;
+}
+
+.x-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.x-stat,
+.x-hour {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--glass);
+}
+
+.x-val {
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.x-hours {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+.x-hour {
+  align-items: center;
+}
+
+.x-music {
+  display: flex;
+  gap: 28px;
+  align-items: center;
+}
+
+.x-art {
+  width: 240px;
+  height: 240px;
+  flex: none;
+  border-radius: 28px;
+  box-shadow: 0 20px 50px -14px rgba(0, 0, 0, 0.5);
+}
+
+.x-music-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.x-song {
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.x-cw {
+  display: flex;
+  gap: 26px;
+}
+
+.x-cw-art {
+  width: 300px;
+  height: 180px;
+  flex: none;
+  border-radius: 20px;
+}
+
+.x-cw-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Ten rows a side on the TV: one notch tighter */
+.settings .set-row {
+  height: 52px;
+}
+
+
+/* =====================================================================
+   v0.9: frost that lines up, clearer empty cards, fewer costly effects
+   ===================================================================== */
+
+/* The blurred wallpaper behind each panel is placed with --fx/--fy (set in
+   app.js, alignFrost) so a panel shows the part of the photo that is really
+   behind it. */
+#stage.photo .glass {
+  background:
+    var(--glass-sheen),
+    linear-gradient(var(--glass), var(--glass)),
+    var(--photo-scrim),
+    var(--frost) var(--fx, 0px) var(--fy, 0px) / 1280px 720px no-repeat;
+}
+
+/* Cards with nothing to show are clearer: the wallpaper itself shows through */
+#stage.photo .glass.is-empty,
+#stage.photo .music-empty-card {
+  background: var(--glass-sheen), linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+}
+
+#stage.photo.light .glass.is-empty,
+#stage.photo.light .music-empty-card {
+  background: var(--glass-sheen), linear-gradient(rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.18));
+}
+
+/* Costly effects removed, for a TV chip:
+   - the colour drift behind everything only runs when Animate is on
+   - the card glow no longer animates (only the lift does)
+   - the dock keeps one size instead of resizing as focus enters it
+   - the apps list has no scroll mask */
+.aurora {
+  display: none;
+}
+
+#stage.animate .aurora {
+  display: block;
+}
+
+.aurora i {
+  animation: none;
+  will-change: auto;
+}
+
+#stage.animate .aurora i:first-child {
+  animation: drift-a 38s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+#stage.animate .aurora i:last-child {
+  animation: drift-b 46s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.widget {
+  transition: transform 0.5s var(--gentle);
+}
+
+.widget:is(:focus-visible, :hover) {
+  box-shadow: 0 18px 40px -14px var(--focus-glow), 0 0 0 1px var(--glass-hi), inset 0 1px 0 var(--glass-hi);
+}
+
+.dock,
+.dock.active {
+  transition: none;
+  padding-bottom: 36px;
+  bottom: 8px;
+}
+
+.view-apps {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+
+/* ---------- Settings: a short menu, each group opens its own rows ---------- */
+.settings {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.settings .set-row {
+  height: 66px;
+}
+
+.set-head {
+  padding: 8px 12px 10px;
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  text-align: left;
+}
+
+.set-more {
+  font-size: 32px;
+  opacity: 0.6;
+}
+
+
+/* Search: no gap where results would go */
+.shows:empty,
+[data-titles-note]:empty,
+.search-hint:empty {
+  display: none;
+}
+
+.view-search [data-shows="titles"],
+.view-search [data-shows="apps"] {
+  min-height: 0;
+}
+
+/* =====================================================================
+   v0.9.4: cheaper to draw while you move around
+   Only transform and opacity animate; the screen-edge glow is four plain
+   gradients (cheap to paint) instead of a large blurred shadow.
+   ===================================================================== */
+
+.app-ic,
+.dock-app,
+.widget,
+.tab,
+.tool,
+.chip,
+.set-row,
+.swatch,
+.light-row,
+.pillbtn,
+.btn,
+.show,
+.mix,
+.app-card,
+.info,
+.ib,
+.ctrl,
+.play,
+.lg,
+.resume,
+.dock-label {
+  transition: transform 0.5s var(--gentle), opacity 0.25s;
+}
+
+#stage :is(.tab, .tool):focus-visible svg {
+  filter: none;
+}
+
+.widget:is(:focus-visible, :hover) {
+  box-shadow: 0 14px 28px -12px var(--focus-glow), 0 0 0 1px var(--glass-hi);
+}
+
+.widget,
+.app-card,
+.show,
+.dock-app .app-ic {
+  will-change: transform;
+}
+
+.edge {
+  box-shadow: none;
+  background:
+    linear-gradient(to right, var(--edge-a, var(--glow-a)), transparent 80px),
+    linear-gradient(to left, var(--edge-a, var(--glow-a)), transparent 80px),
+    linear-gradient(to bottom, var(--edge-a, var(--glow-a)), transparent 80px),
+    linear-gradient(to top, var(--edge-a, var(--glow-a)), transparent 80px);
+}
+
+/* The search bar's ring, without :has() (which makes every focus change re-check the page) */
+.search-bar.typing {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  box-shadow: 0 0 26px 2px var(--focus-glow);
+}
+
+
+
+/* Animations: Fast. Nothing moves between states, for a TV that is struggling. */
+#stage.fast *,
+#stage.fast *::before,
+#stage.fast *::after {
+  transition: none !important;
+  animation: none !important;
+  will-change: auto !important;
+}
+
+#stage.fast .widget:is(:focus-visible, :hover) {
+  transform: none;
+}
+
+
+/* Home: what shows when nothing is being watched */
+.w-jump .jump-row {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+}
+
+.jump {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 84px;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 20px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 0.5s var(--gentle);
+}
+
+.jump:is(:focus-visible, :hover) {
+  transform: scale(1.08);
+}
+
+.w-scenes {
+  grid-area: 2 / 4 / 3 / 6;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+.scene-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.scene-grid .pillbtn {
+  height: 52px;
+  font-size: 16px;
+}
+
+.games-hero {
+  flex: 1;
+}
+
+
+/* =====================================================================
+   One scale for the whole launcher
+   Type:    16 / 20 / 24 / 32 / 48 / 64 / 96 px (nothing smaller than 16: 24 px on a 1080p TV)
+   Corners: 12 / 20 / 28 / 36 / 48 px, and a pill only for the tab bar, search bar, switches and chips
+   Motion:  0.25 s for small changes, 0.5 s for movement
+   Letter-spacing: 0, -0.01em, -0.02em, and 0.06em for small capitals
+   ===================================================================== */
+
+.btn,
+.pillbtn,
+.resume,
+.price {
+  border-radius: 20px;
+}
+
+/* A label and a switch, instead of "Name: On" */
+.tog {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tog .switch {
+  width: 46px;
+  height: 28px;
+}
+
+.tog.on .switch {
+  background: #34c759;
+}
+
+.tog.on .switch > span {
+  transform: translateX(18px);
+}
+
+.jump .small {
+  white-space: nowrap;
+}
+
+.w-jump .jump-row {
+  gap: 8px;
+}
+
+
+/* The clock and date, set like the system clock on a phone: firm, tight, in one weight */
+.status-time,
+.status-date,
+.amb-clock {
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.status-time {
+  margin-right: 2px;
+}
+
+
+/* Lighter type: regular for text, a step up for headings and the clock, a light cut for big numbers */
+#stage {
+  font-weight: 400;
+}
+
+.temp,
+.amb-clock,
+.fit-size,
+.x-temp {
+  font-weight: 300;
+  letter-spacing: -0.03em;
+}
+
+/* Thinner type needs a little more contrast to stay readable from the sofa */
+#stage {
+  --sub: rgba(236, 236, 241, 0.74);
+}
+
+#stage.light {
+  --sub: rgba(16, 17, 26, 0.7);
+}
+
+
+/* ---------- The light bar and page changes ---------- */
+
+/* One bar that slides and stretches between tabs (see moveTabGlow), instead of
+   a separate bar that appears on each tab. */
+.tab.on::after {
+  content: none;
+}
+
+.tabbar {
+  overflow: visible;
+}
+
+.tab-glow {
+  position: absolute;
+  left: 0;
+  bottom: 6px;
+  width: 18px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--glowc);
+  transform-origin: left center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+  will-change: transform;
+}
+
+/* Pages slide in from the side they sit on, and fade */
+.view:not([hidden]) {
+  animation: view-in-r 0.5s var(--ease-out);
+}
+
+#stage[data-dir="l"] .view:not([hidden]) {
+  animation-name: view-in-l;
+}
+
+@keyframes view-in-r {
+  from { opacity: 0; transform: translateX(36px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes view-in-l {
+  from { opacity: 0; transform: translateX(-36px); }
+  to { opacity: 1; transform: none; }
+}
+
+
+/* Saved scenes and the update note */
+.my-scenes {
+  display: contents;
+}
+
+.scene-input {
+  width: 100%;
+  height: 56px;
+  font-size: 20px;
+}
+
+.tool.update-badge {
+  color: var(--glowc);
+}
+
+.tool.update-badge::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--glowc);
+}
+
+.shows[hidden] { display: none; }
+
+.input-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.input-row[hidden] { display: none; }
+
+.slider[data-slider="edgehue"] .slider-track {
+  background: linear-gradient(90deg, hsl(0 85% 58%), hsl(60 85% 58%), hsl(120 85% 58%), hsl(180 85% 58%), hsl(240 85% 58%), hsl(300 85% 58%), hsl(360 85% 58%));
+}
+
+.slider[data-slider="edgeint"] .slider-track {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), var(--edge-a, #888));
+}
+
+/* ---------- A title's page ---------- */
+.xpanel.xwide {
+  position: relative;
+  width: 1120px;
+  height: 640px;
+  max-height: none;
+  padding: 0;
+}
+
+.t-bg {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 430px;
+  overflow: hidden;
+  /* Fades into the panel on the left, the bottom and the edges, so the picture blends in */
+  -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent 100%), linear-gradient(to right, transparent 0%, #000 55%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, #000 45%, transparent 100%), linear-gradient(to right, transparent 0%, #000 55%);
+  mask-composite: intersect;
+}
+
+.t-still {
+  position: absolute;
+  inset: 0;
+  background: center 20% / cover no-repeat;
+}
+
+.t-bg iframe {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 760px;
+  height: 428px;
+  border: 0;
+  transform: translate(-50%, -50%) scale(1.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.6s ease;
+}
+
+.t-bg.playing iframe {
+  opacity: 0.9;
+}
+
+.t-body {
+  position: relative;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 28px 36px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.t-close {
+  position: absolute;
+  top: 22px;
+  right: 28px;
+  z-index: 2;
+}
+
+.t-top {
+  display: flex;
+  gap: 26px;
+  align-items: flex-end;
+  min-height: 250px;
+  padding-top: 24px;
+}
+
+.t-poster {
+  width: 168px;
+  height: 252px;
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.65);
+  flex: none;
+}
+
+.t-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  max-width: 600px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 0 18px rgba(0, 0, 0, 0.5);
+}
+
+.t-title {
+  font-size: 40px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.t-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  color: var(--sub);
+}
+
+.t-rating {
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.t-over {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.t-where {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  flex: 1;
+}
+
+.t-rows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-content: start;
+  overflow: hidden;
+}
+
+.t-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.t-row:disabled {
+  opacity: 0.5;
+}
+
+.t-row:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 24px 2px var(--focus-glow);
+}
+
+.t-row-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  font-size: 19px;
+}
+
+.t-row-act {
+  font-size: 16px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.14);
+  white-space: nowrap;
+}
+
+.t-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex: none;
+}
+
+.t-letter {
+  display: grid;
+  place-items: center;
+  background: #8e8e9a;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* A film's page is always dark, like a cinema, so the trailer blends into it */
+.xpanel.xwide {
+  --ink: #f2f2f6;
+  --sub: rgba(242, 242, 246, 0.68);
+  background: #101117;
+  color: var(--ink);
+}
+
+.xpanel.xwide .eyebrow,
+.xpanel.xwide .small {
+  color: var(--sub);
+}
+
+.xpanel.xwide .t-info {
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+}
+
+.xpanel.xwide .t-row-act,
+.xpanel.xwide .t-row:disabled .t-row-act {
+  color: var(--ink);
+}
+
+.xpanel.xwide .t-close { color: #15151d; }
+
+/* Diagnostics: section labels as small captions, rows compact */
+.view-diag .set-head {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--sub);
+  margin: 12px 0 2px;
+}
+
+.view-diag .diag-row {
+  min-height: 0;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+/* ---------- Edges of scrolling content ----------
+   Search scrolls like Apps (the page itself never does). Anything that carries
+   on past an edge fades out instead of being cut off. */
+.view-search {
+  inset: -10px;
+  padding: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.view-search::-webkit-scrollbar {
+  display: none;
+}
+
+.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 96px), rgba(0, 0, 0, 0.4) calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 96px), rgba(0, 0, 0, 0.4) calc(100% - 36px), transparent);
+}
+
+.more-above {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 48px);
+  mask-image: linear-gradient(to bottom, transparent, #000 48px);
+}
+
+.more-above.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 96px), rgba(0, 0, 0, 0.4) calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 96px), rgba(0, 0, 0, 0.4) calc(100% - 36px), transparent);
+}
+
+/* The bottom of the screen: the pre-blurred wallpaper, rising out of the edge,
+   so the faded content reads as carrying on under frosted glass. Placed with
+   plain stage coordinates (the stage is always 1280x720). */
+.bottom-blur {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 132px;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.75) 60%, #000);
+  mask-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.75) 60%, #000);
+}
+
+#stage.photo .bottom-blur {
+  background:
+    var(--photo-scrim),
+    var(--frost) 0 -588px / 1280px 720px no-repeat;
+}
+
+#stage.photo.more-below .bottom-blur {
+  opacity: 1;
+}
+
+/* For you titles stay on one line so every card's text lines up */
+[data-shows="foryou"] .show-title,
+[data-shows="titles"] .show-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Moving focus scrolls far enough that the focused item sits clear of the fades */
+.view-search,
+.view-apps,
+.cleanup,
+.wp-grid {
+  scroll-padding-top: 56px;
+  scroll-padding-bottom: 72px;
+}
+
+/* =====================================================================
+   Polish pass 2: focus lifts instead of ringing, a welcome instead of a
+   settings screen on first run, labels for the icon buttons, quiet
+   loading placeholders, and a gentle start.
+   ===================================================================== */
+
+/* ---------- Focus: the focused thing comes forward ----------
+   No outline anywhere. Cards and tiles grow and cast a deeper shadow, and a
+   soft sheen crosses them once. Buttons, pills and list rows turn solid white
+   with dark text, as on Apple TV. */
+#stage [data-focus]:focus-visible,
+#stage :is(.dock-app, .opt, .swatch):focus-visible .app-ic,
+#stage .swatch:focus-visible .swatch-dot,
+#stage .show:focus-visible .show-art,
+#stage .mix:focus-visible .mix-art,
+#stage .search-bar:focus-within,
+#stage .search-bar.typing,
+#stage .slider:focus-visible,
+#stage .wp-tile:focus-visible,
+#stage .t-row:focus-visible {
+  outline: none;
+}
+
+#stage :is(.app-card, .widget, .w-mini, .jump, .wp-tile, .light-row) {
+  position: relative;
+  transition: transform 0.45s var(--gentle), box-shadow 0.35s;
+}
+
+#stage :is(.app-card, .widget, .w-mini, .jump, .wp-tile):focus-visible,
+#stage .show:focus-visible .show-art,
+#stage .mix:focus-visible .mix-art {
+  transform: scale(1.06);
+  box-shadow: 0 30px 50px -20px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.28);
+  z-index: 1;
+}
+
+#stage .dock-app:focus-visible .app-ic,
+#stage .opt:focus-visible .app-ic,
+#stage .swatch:focus-visible .swatch-dot {
+  transform: scale(1.14) translateY(-4px);
+  box-shadow: 0 22px 34px -14px rgba(0, 0, 0, 0.65);
+}
+
+/* The sheen: a soft band of light that crosses a focused card once */
+#stage :is(.app-card, .w-mini, .wp-tile) {
+  overflow: hidden;
+}
+
+#stage :is(.app-card, .w-mini, .wp-tile)::after,
+#stage .show-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.26) 48%, transparent 66%);
+  transform: translateX(-120%);
+  opacity: 0;
+}
+
+#stage :is(.app-card, .w-mini, .wp-tile):focus-visible::after,
+#stage .show:focus-visible .show-art::after {
+  opacity: 1;
+  animation: sheen 1.1s var(--gentle) 1 forwards;
+}
+
+@keyframes sheen {
+  to { transform: translateX(120%); }
+}
+
+/* Buttons, pills, choices and list rows: solid white when focused */
+#stage :is(.btn, .pillbtn, .seg, .resume, .x-close, .wel-fit, .jump-btn):focus-visible,
+#stage :is(.set-row, .t-row, .light-row, .queue-row):focus-visible {
+  background: #fff !important;
+  color: #15151b !important;
+  box-shadow: 0 16px 30px -14px rgba(0, 0, 0, 0.55);
+}
+
+#stage :is(.btn, .pillbtn, .seg, .resume, .x-close):focus-visible {
+  transform: scale(1.05);
+}
+
+#stage :is(.set-row, .t-row, .light-row):focus-visible :is(.small, .set-val, .t-row-act, .light-name) {
+  color: rgba(21, 21, 27, 0.66) !important;
+}
+
+#stage :is(.set-row, .t-row):focus-visible .set-label,
+#stage .t-row:focus-visible .t-row-name {
+  color: #15151b;
+}
+
+#stage .t-row:focus-visible .t-row-act {
+  background: rgba(21, 21, 27, 0.08);
+}
+
+/* Top bar: the focused tab or icon sits on a white disc */
+#stage :is(.tab, .tool):focus-visible {
+  background: #fff;
+  color: #15151b;
+  box-shadow: 0 10px 22px -10px rgba(0, 0, 0, 0.55);
+}
+
+#stage :is(.tab, .tool):focus-visible svg {
+  color: #15151b;
+  stroke: currentColor;
+}
+
+/* The search bar brightens and lifts while you type */
+#stage .search-bar:focus-within,
+#stage .search-bar.typing {
+  box-shadow: 0 24px 40px -20px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+
+/* ---------- What the icon buttons do ---------- */
+#stage .tool {
+  position: relative;
+}
+
+#stage .tool::after {
+  content: attr(aria-label);
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  white-space: nowrap;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 450;
+  background: rgba(16, 17, 23, 0.88);
+  color: #f2f2f6;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+#stage .tool:focus-visible::after {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- First-run welcome ---------- */
+.xpanel.xwelcome {
+  width: 640px;
+  padding: 36px 40px 30px;
+  gap: 18px;
+  background: rgba(16, 17, 23, 0.94);
+  --ink: #f2f2f6;
+  --sub: rgba(242, 242, 246, 0.66);
+  color: var(--ink);
+}
+
+.wel-title {
+  font-size: 34px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.wel-lead {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.45;
+  color: var(--sub);
+}
+
+.wel-list {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wel-list li {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 18px;
+}
+
+.wel-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+}
+
+.wel-list li.ok .wel-dot {
+  background: #6fe0a2;
+  border-color: #6fe0a2;
+}
+
+.wel-state {
+  color: var(--sub);
+  font-size: 16px;
+}
+
+.wel-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.wel-fit {
+  align-self: flex-start;
+  padding: 8px 14px;
+  margin-left: -14px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--sub);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* ---------- Quiet placeholders while loading ---------- */
+.skeleton {
+  pointer-events: none;
+}
+
+.skeleton .show-art,
+.skeleton .sk-line,
+.t-row.skeleton {
+  background: rgba(255, 255, 255, 0.1);
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+.t-row.skeleton {
+  height: 62px;
+}
+
+.skeleton .sk-line {
+  height: 14px;
+  width: 80%;
+  margin: 2px 4px 0;
+  border-radius: 7px;
+}
+
+.skeleton .sk-line.short {
+  width: 50%;
+}
+
+@keyframes breathe {
+  50% { opacity: 0.5; }
+}
+
+.fy-why {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 6px 4px 14px;
+  min-height: 0;
+}
+
+.shows.shows-note {
+  min-height: 0;
+}
+
+/* ---------- A gentle start ---------- */
+#stage {
+  animation: stage-in 0.6s ease-out;
+}
+
+@keyframes stage-in {
+  from { opacity: 0; }
+}
+
+/* Animations: Fast keeps all of this still */
+#stage.fast :is(.app-card, .widget, .w-mini, .jump, .wp-tile, .btn, .pillbtn, .seg, .resume, .x-close):focus-visible,
+#stage.fast .show:focus-visible .show-art,
+#stage.fast :is(.dock-app, .opt):focus-visible .app-ic {
+  transform: none;
+}
+
+/* The icon chip inside a focused white row stays visible */
+#stage :is(.set-row, .t-row):focus-visible .chip {
+  background: rgba(21, 21, 27, 0.07) !important;
+  box-shadow: none !important;
+  color: #15151b;
+}
+
+#stage .set-row:focus-visible .chip svg {
+  color: #15151b;
+  stroke: currentColor;
+}
+
+/* ---------- Bottom edge: a thin strip of white liquid glass ----------
+   Replaces the tall dark band. Content fades out over a short distance and
+   passes under a slim frosted strip with a lit top edge, like the bottom of
+   a glass panel. Shows only while there is more below. */
+.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), rgba(0, 0, 0, 0.3) calc(100% - 14px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), rgba(0, 0, 0, 0.3) calc(100% - 14px), transparent);
+}
+
+.more-above.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 56px), rgba(0, 0, 0, 0.3) calc(100% - 14px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 56px), rgba(0, 0, 0, 0.3) calc(100% - 14px), transparent);
+}
+
+.bottom-blur,
+#stage.photo .bottom-blur {
+  height: 34px;
+  -webkit-mask-image: none;
+  mask-image: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 -10px 24px -14px rgba(255, 255, 255, 0.35);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1)),
+    var(--frost, none) 0 -686px / 1280px 720px no-repeat;
+}
+
+#stage.more-below .bottom-blur {
+  opacity: 1;
+}
+
+.bottom-blur,
+#stage.photo .bottom-blur {
+  height: 30px;
+  border-top: 0;
+  box-shadow: none;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.55)) top / 100% 1px no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.2)),
+    var(--frost, none) 0 -690px / 1280px 720px no-repeat;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
+}
+
+/* =====================================================================
+   Sports centre (NBA), Starred, and your own Home layout
+   ===================================================================== */
+
+/* ---------- Home: cards placed by your layout ---------- */
+.off-layout {
+  display: none !important;
+}
+
+.w-game,
+.w-starred {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 22px;
+  text-align: left;
+  color: var(--ink);
+  font: inherit;
+  border: 0;
+  cursor: pointer;
+}
+
+.w-game .w-label,
+.w-starred .w-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wg-line {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+}
+
+.wg-line b,
+.wg-item b {
+  font-weight: 500;
+}
+
+.wg-wide {
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 18px;
+}
+
+.wg-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.wg-score {
+  font-size: 34px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.wg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.wg-item {
+  display: grid;
+  grid-template-columns: 28px 52px 70px 52px 28px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 18px;
+}
+
+.wg-item.mine {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.wg-sc {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.wg-when {
+  text-align: right;
+}
+
+.ws-count {
+  font-size: 54px;
+  font-weight: 200;
+  line-height: 1;
+}
+
+.ws-first {
+  margin-top: auto;
+}
+
+.ws-grid {
+  display: grid;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.ws-wide {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ws-big {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.ws-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.ws-art {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.ws-title {
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sr-badge {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  max-width: calc(100% - 16px);
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #15151b;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Edit Home ---------- */
+#stage.home-edit .view-home .widgets .widget[data-slot] {
+  outline: 2px dashed rgba(255, 255, 255, 0.45);
+  outline-offset: -2px;
+}
+
+#stage.home-edit .view-home .widgets .widget[data-slot]::before {
+  content: attr(data-kind-label) "  ›";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  padding: 5px 12px;
+  border-radius: 12px;
+  background: rgba(16, 17, 23, 0.85);
+  color: #f2f2f6;
+  font-size: 14px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+#stage.home-edit .view-home .widgets .widget[data-slot]:focus-visible {
+  outline: 3px solid #fff;
+}
+
+#stage.home-edit .view-home .widgets .widget * {
+  pointer-events: none;
+}
+
+/* ---------- The Sports page ---------- */
+.view-sports {
+  inset: -10px;
+  padding: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.view-sports::-webkit-scrollbar {
+  display: none;
+}
+
+.sp-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.sp-title {
+  font-size: 34px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+
+.sp-updated {
+  margin-left: auto;
+}
+
+.sp-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sp-body .eyebrow {
+  margin-top: 4px;
+}
+
+.sp-logo {
+  flex: none;
+  border-radius: 50%;
+  object-fit: contain;
+}
+
+.sp-mono {
+  display: inline-grid;
+  place-items: center;
+  background: var(--tc);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sp-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #ff4d4d;
+  box-shadow: 0 0 0 4px rgba(255, 77, 77, 0.25);
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+.sp-feature {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  align-items: center;
+  gap: 20px;
+  min-height: 230px;
+  padding: 26px 30px;
+  border-radius: var(--radius-widget, 28px);
+  background:
+    radial-gradient(120% 140% at 0% 50%, color-mix(in srgb, var(--ta) 45%, transparent), transparent 60%),
+    radial-gradient(120% 140% at 100% 50%, color-mix(in srgb, var(--th) 45%, transparent), transparent 60%),
+    rgba(16, 17, 23, 0.55);
+  color: #f2f2f6;
+}
+
+.sp-feature.skeleton,
+.sp-game.skeleton,
+.sp-table.skeleton {
+  min-height: 120px;
+}
+
+.sp-f-team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.sp-f-name {
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.sp-f-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.sp-f-label {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  color: rgba(242, 242, 246, 0.75);
+}
+
+.sp-f-score {
+  font-size: 56px;
+  font-weight: 200;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-f-dash {
+  margin: 0 12px;
+  opacity: 0.5;
+}
+
+.sp-f-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.sp-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sp-game {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 20px;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sp-game.mine {
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.45);
+}
+
+.sp-row {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+}
+
+.sp-row.win .sp-abbr,
+.sp-row.win .sp-score {
+  font-weight: 600;
+}
+
+.sp-score {
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-status {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  color: var(--sub);
+}
+
+.sp-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 30px;
+  border-radius: 24px;
+}
+
+/* Standings */
+.sp-tables {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.sp-table {
+  padding: 16px 18px;
+  border-radius: 22px;
+}
+
+.sp-t-title {
+  font-size: 19px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.sp-t-row {
+  display: grid;
+  grid-template-columns: 24px 1fr 30px 30px 50px 36px 44px;
+  align-items: center;
+  gap: 6px;
+  height: 27px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-t-row > span:nth-child(n + 3) {
+  text-align: right;
+}
+
+.sp-t-head {
+  color: var(--sub);
+  font-size: 13px;
+}
+
+.sp-t-row.cut {
+  border-top: 1px dashed rgba(255, 255, 255, 0.22);
+}
+
+.sp-t-row.mine {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+}
+
+.sp-t-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sp-seed {
+  color: var(--sub);
+}
+
+.sp-note {
+  margin: 0;
+}
+
+/* News and highlights */
+.sp-vids {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.sp-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #15151b;
+}
+
+.sp-news {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.sp-story {
+  display: flex;
+  gap: 14px;
+  padding: 12px;
+  border: 0;
+  border-radius: 20px;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sp-story-img {
+  flex: none;
+  width: 150px;
+  height: 92px;
+  border-radius: 14px;
+}
+
+.sp-story-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sp-story-head {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.sp-story .small:not(.sp-ago) {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Teams */
+.sp-watch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 20px;
+  border-radius: 22px;
+}
+
+.sp-teams {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sp-team {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 8px;
+  border: 0;
+  border-radius: 18px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.sp-team.on {
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.55);
+}
+
+.sp-star {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  color: #ffd25e;
+}
+
+/* Game and story panels */
+.xpanel.xgame {
+  background:
+    radial-gradient(90% 70% at 0% 0%, color-mix(in srgb, var(--ta) 40%, transparent), transparent 70%),
+    radial-gradient(90% 70% at 100% 0%, color-mix(in srgb, var(--th) 40%, transparent), transparent 70%),
+    #101117;
+}
+
+.g-head {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  align-items: center;
+  padding: 30px 20px 10px;
+}
+
+.g-cols {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 24px;
+  min-height: 0;
+}
+
+.g-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.g-report {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.g-r-head {
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.g-leaders {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.g-leader {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 17px;
+}
+
+.g-l-team {
+  color: var(--sub);
+}
+
+.g-l-val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.st-text {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 760px;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+}
+
+.st-over {
+  -webkit-line-clamp: 6;
+}
+
+/* ---------- Star on a title page ---------- */
+.t-actions {
+  position: absolute;
+  top: 22px;
+  right: 28px;
+  z-index: 2;
+  display: flex;
+  gap: 10px;
+}
+
+.xpanel.xwide .t-actions .btn {
+  color: #15151d;
+}
+
+.t-star {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.t-star.on svg {
+  color: #e0a800;
+}
+
+.sp-f-actions .btn {
+  white-space: nowrap;
+}
+
+/* Close and other buttons on the dark game and story pages read as light glass */
+.xpanel.xwide .t-close,
+.xpanel.xwide .t-actions .btn {
+  background: rgba(255, 255, 255, 0.82);
+  color: #15151d;
+}
+
+[data-shows] .show-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wg-item {
+  grid-template-columns: 28px 44px 62px 44px 28px 1fr;
+}
+
+.wg-when {
+  white-space: nowrap;
+  font-size: 14px;
+}

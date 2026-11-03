@@ -737,6 +737,21 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         fetch(id, "https://api.watchmode.com/v1/$path", queryParams(query) + listOf("apiKey" to key), null)
     }
 
+    /**
+     * The NBA from ESPN's public feed (no key): scoreboard, standings, news,
+     * teams and one game's summary. Only these paths; the answer arrives as a
+     * "net" event like TMDB's.
+     */
+    @JavascriptInterface
+    fun sportsFetch(id: Int, path: String, query: String) {
+        val base = when (path) {
+            "scoreboard", "news", "teams", "summary" -> "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/$path"
+            "standings" -> "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings"
+            else -> return netEvent(id, false, 0, "")
+        }
+        fetch(id, base, queryParams(query), null)
+    }
+
     private fun queryParams(json: String): List<Pair<String, String>> = runCatching {
         val o = JSONObject(json)
         o.keys().asSequence().take(20).filter { queryKey.matches(it) }.map { it to o.optString(it).take(200) }.toList()
