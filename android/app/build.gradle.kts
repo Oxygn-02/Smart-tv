@@ -67,6 +67,7 @@ android {
 val copyWebUi by tasks.registering(Sync::class) {
     from(rootProject.file("../launcher")) {
         include("index.html", "styles.css", "*.js", "fonts/*")
+        exclude("demo-bridge.js") // the browser preview's pretend TV, never in the app
         into("web")
     }
     from(rootProject.file("../wallpapers")) {

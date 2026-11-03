@@ -515,8 +515,11 @@
   const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   // Addresses from outside (TMDB, other apps) go into the page only if they are plain https
   // addresses with nothing that could end an attribute or a CSS url().
-  const safeUrl = (u) => (typeof u === 'string' && /^https:\/\/[^\s"'()<>\\]+$/.test(u) ? u : '');
-  const tmdbImg = (size, path) => (typeof path === 'string' && /^\/[A-Za-z0-9_.-]+$/.test(path) ? `https://image.tmdb.org/t/p/${size}${path}` : '');
+  // The browser preview's pretend TV (demo-bridge.js) draws its own pictures as SVG data.
+  const DEMO = !!(NATIVE && NATIVE.__demo);
+  const demoPic = (u) => DEMO && typeof u === 'string' && /^data:image\/svg\+xml,[^\s"'()<>\\]+$/.test(u);
+  const safeUrl = (u) => (demoPic(u) || (typeof u === 'string' && /^https:\/\/[^\s"'()<>\\]+$/.test(u)) ? u : '');
+  const tmdbImg = (size, path) => (demoPic(path) ? path : typeof path === 'string' && /^\/[A-Za-z0-9_.-]+$/.test(path) ? `https://image.tmdb.org/t/p/${size}${path}` : '');
   const appByPkg = (pkg) => D.apps.find((a) => a.pkg === pkg);
 
   function leftText(pos, dur) {
@@ -1492,7 +1495,7 @@
       const head = tier === 'safe'
         ? `<button class="set-row" data-focus data-action="adb-deep" data-tier="safe" ${on.length && ready ? '' : 'disabled'}>
             <span class="lg chip set-chip">${icon('power')}</span>
-            <span class="set-label">${confirm === 'safe' ? 'Press OK again to switch off' : `Switch off all ${on.length} recommended`}<span class="small">${ready ? (on.length ? 'Reversible. Switch them back on from Clean up apps' : 'All switched off') : 'Connect to the TV first'}</span></span>
+            <span class="set-label">${confirm === 'safe' ? 'Press OK again to switch off' : on.length ? `Switch off all ${on.length} recommended` : 'All recommended switched off'}<span class="small">${ready ? (on.length ? 'Reversible. Switch them back on from Clean up apps' : 'All switched off') : 'Connect to the TV first'}</span></span>
             <span class="set-val">${confirm === 'safe' ? 'Confirm' : on.length ? 'Press OK' : 'Done'}</span>
           </button>` : '';
       const locked = tier === 'google' && !(isHome && safe);
