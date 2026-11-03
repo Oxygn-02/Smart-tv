@@ -109,7 +109,9 @@
       Object.entries(t.prov).forEach(([k, names]) => { gb[k] = names.map(P); });
       return { results: { GB: gb } };
     }
-    return { ...asTmdb(t), runtime: t.type === 'movie' ? t.runtime : undefined, episode_run_time: t.type === 'tv' ? [t.runtime] : undefined, number_of_seasons: t.type === 'tv' ? 3 : undefined, genres: t.genres.map((name) => ({ name })), videos: { results: [] } };
+    const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+    const eps = t.type === 'tv' ? { last_episode_to_air: { air_date: day(t.id % 3 ? -9 : 0), season_number: 3, episode_number: 4 + (t.id % 4), name: 'Episode' }, next_episode_to_air: t.id % 2 ? { air_date: day(5), season_number: 3, episode_number: 6 + (t.id % 4) } : null } : {};
+    return { ...asTmdb(t), ...eps, runtime: t.type === 'movie' ? t.runtime : undefined, episode_run_time: t.type === 'tv' ? [t.runtime] : undefined, number_of_seasons: t.type === 'tv' ? 3 : undefined, genres: t.genres.map((name) => ({ name })), videos: { results: [] } };
   }
   function pricesAnswer(path, q) {
     if (path === 'search/') return { title_results: [{ id: 1000 + Number(q.search_value) }] };
@@ -119,6 +121,100 @@
     const out = [];
     ['rent', 'buy'].forEach((type) => (t.prov[type] || []).forEach((name) => { if (PRICES[name]) out.push({ name: name === 'Amazon Video' ? 'Prime Video' : name, type, price: PRICES[name][type] }); }));
     return out;
+  }
+
+
+  // ---------- NBA (sample data shaped like ESPN's public feed) ----------
+  const TEAMS = [
+    ['ATL', 'Atlanta Hawks', 'Hawks', 'e03a3e', 'E'], ['BOS', 'Boston Celtics', 'Celtics', '008348', 'E'], ['BKN', 'Brooklyn Nets', 'Nets', '000000', 'E'],
+    ['CHA', 'Charlotte Hornets', 'Hornets', '1d1160', 'E'], ['CHI', 'Chicago Bulls', 'Bulls', 'ce1141', 'E'], ['CLE', 'Cleveland Cavaliers', 'Cavaliers', '860038', 'E'],
+    ['DET', 'Detroit Pistons', 'Pistons', 'c8102e', 'E'], ['IND', 'Indiana Pacers', 'Pacers', '002d62', 'E'], ['MIA', 'Miami Heat', 'Heat', '98002e', 'E'],
+    ['MIL', 'Milwaukee Bucks', 'Bucks', '00471b', 'E'], ['NY', 'New York Knicks', 'Knicks', 'f58426', 'E'], ['ORL', 'Orlando Magic', 'Magic', '0077c0', 'E'],
+    ['PHI', 'Philadelphia 76ers', '76ers', '006bb6', 'E'], ['TOR', 'Toronto Raptors', 'Raptors', 'ce1141', 'E'], ['WSH', 'Washington Wizards', 'Wizards', '002b5c', 'E'],
+    ['DAL', 'Dallas Mavericks', 'Mavericks', '00538c', 'W'], ['DEN', 'Denver Nuggets', 'Nuggets', '0e2240', 'W'], ['GS', 'Golden State Warriors', 'Warriors', '1d428a', 'W'],
+    ['HOU', 'Houston Rockets', 'Rockets', 'ce1141', 'W'], ['LAC', 'LA Clippers', 'Clippers', 'c8102e', 'W'], ['LAL', 'Los Angeles Lakers', 'Lakers', '552583', 'W'],
+    ['MEM', 'Memphis Grizzlies', 'Grizzlies', '5d76a9', 'W'], ['MIN', 'Minnesota Timberwolves', 'Timberwolves', '0c2340', 'W'], ['NO', 'New Orleans Pelicans', 'Pelicans', '0c2340', 'W'],
+    ['OKC', 'Oklahoma City Thunder', 'Thunder', '007ac1', 'W'], ['PHX', 'Phoenix Suns', 'Suns', '1d1160', 'W'], ['POR', 'Portland Trail Blazers', 'Trail Blazers', 'e03a3e', 'W'],
+    ['SAC', 'Sacramento Kings', 'Kings', '5a2d81', 'W'], ['SA', 'San Antonio Spurs', 'Spurs', 'c4ced4', 'W'], ['UTAH', 'Utah Jazz', 'Jazz', '002b5c', 'W'],
+  ].map(([abbr, name, short, color, conf], i) => ({ id: String(i + 1), abbr, name, short, color, conf }));
+  const teamBy = (abbr) => TEAMS.find((t) => t.abbr === abbr);
+  const logo = (t) => enc(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><circle cx="48" cy="48" r="46" fill="#${t.color}"/><circle cx="48" cy="48" r="46" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="3"/><text x="48" y="57" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="${t.abbr.length > 3 ? 22 : 28}" font-weight="800" fill="#fff">${t.abbr}</text></svg>`);
+  const espnTeam = (t) => ({ id: t.id, abbreviation: t.abbr, displayName: t.name, shortDisplayName: t.short, color: t.color, logo: logo(t) });
+  const record = (t) => { const w = 3 + (hash(t.abbr) % 9); return `${w}-${10 - w}`; };
+
+  const FIXTURES = [
+    ['LAL', 'BOS', -1, 'post', 118, 112], ['NY', 'MIA', -1, 'post', 104, 99], ['GS', 'DEN', 0, 'in', 87, 91, 3, '4:12'], ['OKC', 'DAL', 0, 'in', 52, 49, 2, '1:05'],
+    ['PHX', 'MIL', 0, 'pre'], ['CLE', 'ORL', 0, 'pre'], ['BOS', 'PHI', 1, 'pre'], ['LAL', 'SAC', 1, 'pre'], ['MIN', 'HOU', 1, 'pre'],
+    ['DEN', 'LAL', 2, 'pre'], ['TOR', 'CHI', 2, 'pre'], ['BOS', 'NY', 3, 'pre'], ['GS', 'LAC', 3, 'pre'], ['MEM', 'SA', 4, 'pre'],
+    ['LAL', 'GS', 5, 'pre'], ['ATL', 'BOS', 5, 'pre'], ['IND', 'DET', 6, 'pre'], ['POR', 'UTAH', 6, 'pre'],
+  ];
+  function scoreboard() {
+    const start = new Date(); start.setUTCHours(0, 30, 0, 0);
+    return { events: FIXTURES.map(([a, h, day, st, as, hs, period, clock], i) => {
+      const at = new Date(start.getTime() + day * 86400000 + (i % 3) * 3600000 + (day === 0 && st === 'pre' ? 20 * 3600000 : 0));
+      const away = teamBy(a); const home = teamBy(h);
+      const detail = st === 'post' ? 'Final' : st === 'in' ? `${clock} - ${period === 2 ? '2nd' : '3rd'} Qtr` : at.toUTCString();
+      return {
+        id: String(4000 + i), date: at.toISOString(), name: `${away.name} at ${home.name}`, shortName: `${a} @ ${h}`,
+        status: { displayClock: clock || '0:00', period: period || 0, type: { state: st, completed: st === 'post', shortDetail: detail, detail } },
+        competitions: [{
+          venue: { fullName: `${home.short} Arena` }, broadcasts: [{ names: [i % 2 ? 'NBA TV' : 'ESPN'] }],
+          competitors: [
+            { homeAway: 'home', score: hs != null ? String(hs) : '', team: espnTeam(home), records: [{ summary: record(home) }] },
+            { homeAway: 'away', score: as != null ? String(as) : '', team: espnTeam(away), records: [{ summary: record(away) }] },
+          ],
+        }],
+      };
+    }) };
+  }
+  function standings() {
+    const conf = (c, name) => ({ name, abbreviation: c === 'E' ? 'East' : 'West', standings: { entries: TEAMS.filter((t) => t.conf === c)
+      .map((t) => { const w = 3 + (hash(t.abbr + 'w') % 10); return { t, w, l: 13 - w }; })
+      .sort((x, y) => y.w - x.w)
+      .map(({ t, w, l }, i, all) => ({ team: { abbreviation: t.abbr, displayName: t.name, shortDisplayName: t.short, logos: [{ href: logo(t) }] },
+        stats: [{ name: 'wins', value: w }, { name: 'losses', value: l }, { name: 'winPercent', value: w / 13 }, { name: 'gamesBehind', displayValue: i ? String((all[0].w - w)) : '-' },
+          { name: 'streak', displayValue: (hash(t.abbr) % 2 ? 'W' : 'L') + (1 + (hash(t.abbr) % 4)) }, { name: 'playoffSeed', value: i + 1 }] })) } });
+    return { children: [conf('E', 'Eastern Conference'), conf('W', 'Western Conference')] };
+  }
+  const NEWS = [
+    ['Media', 'Highlights: Lakers hold off Celtics in Boston', 'LeBron James scored 31 and the Lakers survived a late Boston run to win 118-112.', 'LAL'],
+    ['Recap', 'Knicks grind past Heat behind Brunson\'s 34', 'Jalen Brunson scored 12 in the fourth quarter as New York pulled away from Miami.', 'NY'],
+    ['Media', 'Top 10 plays of the night', 'Dunks, blocks and a buzzer-beater from Denver headline the night\'s best plays.', 'DEN'],
+    ['HeadlineNews', 'Thunder extend winning streak to five', 'Oklahoma City\'s defence continues to lead the league as the Thunder roll on.', 'OKC'],
+    ['Media', 'Curry hits 9 threes against the Nuggets', 'Stephen Curry put on a shooting show in San Francisco.', 'GS'],
+    ['HeadlineNews', 'Injury report: who is out this week', 'The latest on the players missing games across the league.', 'BOS'],
+    ['Recap', 'Cavaliers stay perfect at home', 'Cleveland improved to 6-0 at home with a comfortable win over Orlando.', 'CLE'],
+  ];
+  function news() {
+    return { articles: NEWS.map(([type, headline, description, abbr], i) => ({
+      id: 9000 + i, type, headline, description, published: new Date(Date.now() - (i + 1) * 3 * 3600000).toISOString(),
+      images: [{ url: picture(headline, true, hash(abbr) % 360) }], links: { web: { href: 'https://www.espn.com/nba/' } },
+    })) };
+  }
+  function summary(eventId) {
+    const ev = scoreboard().events.find((e) => e.id === eventId);
+    if (!ev) return {};
+    const [home, away] = ev.competitions[0].competitors;
+    const leader = (c, who, pts) => ({ team: { abbreviation: c.team.abbreviation }, leaders: [
+      { name: 'points', displayName: 'Points', leaders: [{ displayValue: `${pts} PTS`, athlete: { displayName: who } }] },
+      { name: 'rebounds', displayName: 'Rebounds', leaders: [{ displayValue: `${7 + (pts % 6)} REB`, athlete: { displayName: `${c.team.shortDisplayName} forward` } }] },
+      { name: 'assists', displayName: 'Assists', leaders: [{ displayValue: `${5 + (pts % 5)} AST`, athlete: { displayName: `${c.team.shortDisplayName} guard` } }] },
+    ] });
+    const done = ev.status.type.state !== 'pre';
+    return {
+      header: { competitions: [{ competitors: [home, away], status: ev.status }] },
+      leaders: done ? [leader(away, `${away.team.shortDisplayName} star`, 31), leader(home, `${home.team.shortDisplayName} star`, 27)] : [],
+      article: ev.status.type.state === 'post' ? { headline: `${away.team.shortDisplayName} beat ${home.team.shortDisplayName} ${away.score}-${home.score}`, description: `A strong fourth quarter decided it as the ${away.team.shortDisplayName} closed out the win on the road.` } : null,
+      videos: done ? [{ headline: `${away.team.shortDisplayName} vs ${home.team.shortDisplayName}: full highlights`, thumbnail: picture(`${away.team.abbreviation} ${home.team.abbreviation}`, true, hash(ev.id) % 360) }] : [],
+    };
+  }
+  function sportsAnswer(path, q) {
+    if (path === 'scoreboard') return scoreboard();
+    if (path === 'standings') return standings();
+    if (path === 'news') return news();
+    if (path === 'teams') return { sports: [{ leagues: [{ teams: TEAMS.map((t) => ({ team: espnTeam(t) })) }] }] };
+    if (path === 'summary') return summary(String(q.event || ''));
+    return null;
   }
 
   // ---------- Clean-up ----------
@@ -191,6 +287,10 @@
     tmdbFetch: (id, path, query) => {
       const body = tmdbAnswer(path, JSON.parse(query || '{}'));
       emit('net', { id, ok: !!body, status: body ? 200 : 404, body: JSON.stringify(body || {}) }, 250);
+    },
+    sportsFetch: (id, path, query) => {
+      const body = sportsAnswer(path, JSON.parse(query || '{}'));
+      emit('net', { id, ok: !!body, status: body ? 200 : 404, body: JSON.stringify(body || {}) }, 300);
     },
     pricesFetch: (id, path, query) => emit('net', { id, ok: true, status: 200, body: JSON.stringify(pricesAnswer(path, JSON.parse(query || '{}'))) }, 400),
 

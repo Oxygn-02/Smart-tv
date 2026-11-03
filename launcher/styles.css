@@ -4784,3 +4784,680 @@ button.w-empty {
   -webkit-mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
   mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
 }
+
+/* =====================================================================
+   Sports centre (NBA), Starred, and your own Home layout
+   ===================================================================== */
+
+/* ---------- Home: cards placed by your layout ---------- */
+.off-layout {
+  display: none !important;
+}
+
+.w-game,
+.w-starred {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 22px;
+  text-align: left;
+  color: var(--ink);
+  font: inherit;
+  border: 0;
+  cursor: pointer;
+}
+
+.w-game .w-label,
+.w-starred .w-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wg-line {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+}
+
+.wg-line b,
+.wg-item b {
+  font-weight: 500;
+}
+
+.wg-wide {
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 18px;
+}
+
+.wg-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.wg-score {
+  font-size: 34px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.wg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.wg-item {
+  display: grid;
+  grid-template-columns: 28px 52px 70px 52px 28px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 18px;
+}
+
+.wg-item.mine {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.wg-sc {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.wg-when {
+  text-align: right;
+}
+
+.ws-count {
+  font-size: 54px;
+  font-weight: 200;
+  line-height: 1;
+}
+
+.ws-first {
+  margin-top: auto;
+}
+
+.ws-grid {
+  display: grid;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.ws-wide {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ws-big {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.ws-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.ws-art {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.ws-title {
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sr-badge {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  max-width: calc(100% - 16px);
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #15151b;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Edit Home ---------- */
+#stage.home-edit .view-home .widgets .widget[data-slot] {
+  outline: 2px dashed rgba(255, 255, 255, 0.45);
+  outline-offset: -2px;
+}
+
+#stage.home-edit .view-home .widgets .widget[data-slot]::before {
+  content: attr(data-kind-label) "  ›";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  padding: 5px 12px;
+  border-radius: 12px;
+  background: rgba(16, 17, 23, 0.85);
+  color: #f2f2f6;
+  font-size: 14px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+#stage.home-edit .view-home .widgets .widget[data-slot]:focus-visible {
+  outline: 3px solid #fff;
+}
+
+#stage.home-edit .view-home .widgets .widget * {
+  pointer-events: none;
+}
+
+/* ---------- The Sports page ---------- */
+.view-sports {
+  inset: -10px;
+  padding: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.view-sports::-webkit-scrollbar {
+  display: none;
+}
+
+.sp-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.sp-title {
+  font-size: 34px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+
+.sp-updated {
+  margin-left: auto;
+}
+
+.sp-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sp-body .eyebrow {
+  margin-top: 4px;
+}
+
+.sp-logo {
+  flex: none;
+  border-radius: 50%;
+  object-fit: contain;
+}
+
+.sp-mono {
+  display: inline-grid;
+  place-items: center;
+  background: var(--tc);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sp-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #ff4d4d;
+  box-shadow: 0 0 0 4px rgba(255, 77, 77, 0.25);
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+.sp-feature {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  align-items: center;
+  gap: 20px;
+  min-height: 230px;
+  padding: 26px 30px;
+  border-radius: var(--radius-widget, 28px);
+  background:
+    radial-gradient(120% 140% at 0% 50%, color-mix(in srgb, var(--ta) 45%, transparent), transparent 60%),
+    radial-gradient(120% 140% at 100% 50%, color-mix(in srgb, var(--th) 45%, transparent), transparent 60%),
+    rgba(16, 17, 23, 0.55);
+  color: #f2f2f6;
+}
+
+.sp-feature.skeleton,
+.sp-game.skeleton,
+.sp-table.skeleton {
+  min-height: 120px;
+}
+
+.sp-f-team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.sp-f-name {
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.sp-f-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.sp-f-label {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  color: rgba(242, 242, 246, 0.75);
+}
+
+.sp-f-score {
+  font-size: 56px;
+  font-weight: 200;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-f-dash {
+  margin: 0 12px;
+  opacity: 0.5;
+}
+
+.sp-f-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.sp-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sp-game {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 20px;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sp-game.mine {
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.45);
+}
+
+.sp-row {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+}
+
+.sp-row.win .sp-abbr,
+.sp-row.win .sp-score {
+  font-weight: 600;
+}
+
+.sp-score {
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-status {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  color: var(--sub);
+}
+
+.sp-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 30px;
+  border-radius: 24px;
+}
+
+/* Standings */
+.sp-tables {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.sp-table {
+  padding: 16px 18px;
+  border-radius: 22px;
+}
+
+.sp-t-title {
+  font-size: 19px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.sp-t-row {
+  display: grid;
+  grid-template-columns: 24px 1fr 30px 30px 50px 36px 44px;
+  align-items: center;
+  gap: 6px;
+  height: 27px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-t-row > span:nth-child(n + 3) {
+  text-align: right;
+}
+
+.sp-t-head {
+  color: var(--sub);
+  font-size: 13px;
+}
+
+.sp-t-row.cut {
+  border-top: 1px dashed rgba(255, 255, 255, 0.22);
+}
+
+.sp-t-row.mine {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+}
+
+.sp-t-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sp-seed {
+  color: var(--sub);
+}
+
+.sp-note {
+  margin: 0;
+}
+
+/* News and highlights */
+.sp-vids {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.sp-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #15151b;
+}
+
+.sp-news {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.sp-story {
+  display: flex;
+  gap: 14px;
+  padding: 12px;
+  border: 0;
+  border-radius: 20px;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sp-story-img {
+  flex: none;
+  width: 150px;
+  height: 92px;
+  border-radius: 14px;
+}
+
+.sp-story-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sp-story-head {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.sp-story .small:not(.sp-ago) {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Teams */
+.sp-watch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 20px;
+  border-radius: 22px;
+}
+
+.sp-teams {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sp-team {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 8px;
+  border: 0;
+  border-radius: 18px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.sp-team.on {
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.55);
+}
+
+.sp-star {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  color: #ffd25e;
+}
+
+/* Game and story panels */
+.xpanel.xgame {
+  background:
+    radial-gradient(90% 70% at 0% 0%, color-mix(in srgb, var(--ta) 40%, transparent), transparent 70%),
+    radial-gradient(90% 70% at 100% 0%, color-mix(in srgb, var(--th) 40%, transparent), transparent 70%),
+    #101117;
+}
+
+.g-head {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  align-items: center;
+  padding: 30px 20px 10px;
+}
+
+.g-cols {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 24px;
+  min-height: 0;
+}
+
+.g-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.g-report {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.g-r-head {
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.g-leaders {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.g-leader {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 17px;
+}
+
+.g-l-team {
+  color: var(--sub);
+}
+
+.g-l-val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.st-text {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 760px;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+}
+
+.st-over {
+  -webkit-line-clamp: 6;
+}
+
+/* ---------- Star on a title page ---------- */
+.t-actions {
+  position: absolute;
+  top: 22px;
+  right: 28px;
+  z-index: 2;
+  display: flex;
+  gap: 10px;
+}
+
+.xpanel.xwide .t-actions .btn {
+  color: #15151d;
+}
+
+.t-star {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.t-star.on svg {
+  color: #e0a800;
+}
+
+.sp-f-actions .btn {
+  white-space: nowrap;
+}
+
+/* Close and other buttons on the dark game and story pages read as light glass */
+.xpanel.xwide .t-close,
+.xpanel.xwide .t-actions .btn {
+  background: rgba(255, 255, 255, 0.82);
+  color: #15151d;
+}
+
+[data-shows] .show-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wg-item {
+  grid-template-columns: 28px 44px 62px 44px 28px 1fr;
+}
+
+.wg-when {
+  white-space: nowrap;
+  font-size: 14px;
+}

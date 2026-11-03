@@ -10,6 +10,7 @@ const LAUNCHER_DATA = {
   nav: [
     { id: 'home', label: 'Home' },
     { id: 'search', label: 'Search' },
+    { id: 'sports', label: 'Sports' },
     { id: 'music', label: 'Music' },
     { id: 'apps', label: 'Apps' },
     { id: 'games', label: 'Games' },

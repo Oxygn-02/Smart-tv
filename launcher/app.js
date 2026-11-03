@@ -32,6 +32,13 @@
     updateNotes: '',
     dev: false, // developer options shown in Settings (press the Settings icon 3 times)
     welcomed: false, // the first-run welcome has been seen
+    homeLayout: null, // what each place on Home shows (see applyHomeLayout)
+    homeEdit: false,
+    starred: [], // films and series you starred: {id, type, title, poster, backdrop, seen, badge, line}
+    nbaTeams: [], // NBA teams you follow (abbreviations)
+    nbaWatch: 'leaguepass', // where you watch the NBA
+    nbaTab: 'games',
+    nbaNews: [],
     trailers: false, // play a muted trailer (off until the speed test shows room for it) behind a title's page
     titleRows: [], // the search results, so a card can open its page
     edgeHue: 330,
@@ -79,7 +86,7 @@
 
   // ---------- Saved settings ----------
   // Remembered on the TV between launches (browser storage inside the app).
-  const SAVED = ['myScenes', 'edge', 'edgeHue', 'edgeInt', 'trailers', 'updateChannel', 'dev', 'welcomed', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
+  const SAVED = ['myScenes', 'edge', 'edgeHue', 'edgeInt', 'trailers', 'updateChannel', 'dev', 'welcomed', 'nbaTeams', 'nbaWatch', 'starred', 'homeLayout', 'clock24', 'motion', 'roles', 'spread', 'ambient', 'appearance', 'iconStyle', 'wallpaper', 'wallpaperName', 'matchLights', 'town', 'tint'];
 
   function loadSaved() {
     try {
@@ -246,6 +253,9 @@
             </div>
           </section>
 
+          <button class="widget glass w-game off-layout" data-focus data-nav-to="sports" aria-label="NBA"></button>
+          <button class="widget glass w-starred off-layout" data-focus data-nav-to="search" aria-label="Starred"></button>
+
           <section class="widget glass w-scenes" data-scenes hidden aria-label="Scenes">
             <span class="w-label">Scenes</span>
             <div class="scene-grid">
@@ -303,6 +313,8 @@
         </label>
         ${NATIVE ? `
         <div class="search-section">
+          <div class="eyebrow" data-sr-head hidden>Starred</div>
+          <div class="shows" data-shows="starred" hidden></div>
           <div class="eyebrow" data-fy-head hidden>For you</div>
           <div class="shows" data-shows="foryou"></div>
           <div class="eyebrow" data-titles-head hidden>Shows and films</div>
@@ -756,9 +768,11 @@
     box.__off = () => window.removeEventListener('message', onMsg);
   }
 
+  let titleNow = null;
   async function openTitle(h) {
     if (!h) return;
     const seq = ++titleSeq;
+    titleNow = h;
     xFrom = document.activeElement;
     const type = h.media_type === 'tv' ? 'tv' : 'movie';
     const art = tmdbImg('w1280', h.backdrop_path);
@@ -766,7 +780,7 @@
     refs.xpanel.innerHTML = `
       <div class="t-bg" data-t-trailer><div class="t-still" style="${art ? `background-image:url('${art}')` : ''}"></div></div>
       <div class="t-body">
-        <button class="btn lg x-close t-close" data-focus data-action="x-close">Close</button>
+        <div class="t-actions">${starButton(h)}<button class="btn lg x-close" data-focus data-action="x-close">Close</button></div>
         <div class="t-top">
           ${tmdbImg('w342', h.poster_path) ? `<img class="t-poster" src="${tmdbImg('w342', h.poster_path)}" alt="">` : ''}
           <div class="t-info"><div data-t-head>${titleHead(h, null)}</div>
@@ -815,6 +829,598 @@
   function goTitleRow(r) {
     if (!r) return;
     if (r.app) { closeExpand(); launchApp(r.app.id); } else if (r.pkg) nativeCall('openStore', r.pkg);
+  }
+
+  // ---------- Sports: the NBA centre ----------
+  // Games, live scores, standings, news and highlights from ESPN's public NBA
+  // feed, fetched by the Android side (sportsFetch) and kept for a while, so
+  // nothing polls in the background. Where to watch is your choice: UK rights
+  // change by season, and no free source lists UK channels per game.
+  const NBA_WATCH = [
+    { id: 'leaguepass', name: 'NBA League Pass', app: /^nba/i },
+    { id: 'sky', name: 'Sky Sports', app: /(^now\b|sky)/i },
+    { id: 'prime', name: 'Prime Video', app: /prime video/i },
+  ];
+  const sportsCache = new Map();
+  const sportsWaiting = new Map();
+
+  function sportsGet(kind, params = {}, maxAgeMs = 600000) {
+    const key = kind + JSON.stringify(params);
+    const hit = sportsCache.get(key);
+    if (hit && Date.now() - hit.at < maxAgeMs) return Promise.resolve(hit.data);
+    if (sportsWaiting.has(key)) return sportsWaiting.get(key);
+    const p = nativeFetch('sportsFetch', kind, params).then((data) => {
+      sportsCache.set(key, { at: Date.now(), data });
+      sportsWaiting.delete(key);
+      return data;
+    }, (e) => { sportsWaiting.delete(key); if (hit) return hit.data; throw e; });
+    sportsWaiting.set(key, p);
+    return p;
+  }
+
+  const ymd = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+  const sportsImg = (u) => safeUrl(u);
+
+  function parseTeam(c) {
+    const t = (c && c.team) || {};
+    return {
+      abbr: String(t.abbreviation || '?').slice(0, 5), name: String(t.displayName || ''), short: String(t.shortDisplayName || t.name || t.abbreviation || ''),
+      logo: sportsImg(t.logo || (t.logos && t.logos[0] && t.logos[0].href)), color: /^[0-9a-f]{6}$/i.test(t.color || '') ? `#${t.color}` : '#555a66',
+      score: c && c.score !== undefined && c.score !== '' ? String(c.score) : '', record: (c && c.records && c.records[0] && c.records[0].summary) || '',
+    };
+  }
+
+  function parseGames(sb) {
+    return ((sb && sb.events) || []).map((e) => {
+      const comp = (e.competitions && e.competitions[0]) || {};
+      const cs = comp.competitors || [];
+      const st = (e.status && e.status.type) || {};
+      return {
+        id: String(e.id), date: new Date(e.date), state: st.state || 'pre', detail: st.shortDetail || '',
+        home: parseTeam(cs.find((c) => c.homeAway === 'home')), away: parseTeam(cs.find((c) => c.homeAway === 'away')),
+        venue: (comp.venue && comp.venue.fullName) || '',
+      };
+    }).filter((g) => !isNaN(g.date));
+  }
+
+  function parseStandings(s) {
+    return ((s && s.children) || []).map((c) => ({
+      name: String(c.name || c.abbreviation || ''),
+      rows: (((c.standings && c.standings.entries) || []).map((en) => {
+        const stat = (n) => (en.stats || []).find((x) => x.name === n) || {};
+        const t = en.team || {};
+        return {
+          abbr: String(t.abbreviation || '?'), name: String(t.shortDisplayName || t.displayName || ''), logo: sportsImg(t.logos && t.logos[0] && t.logos[0].href),
+          w: Number(stat('wins').value) || 0, l: Number(stat('losses').value) || 0, pct: Number(stat('winPercent').value) || 0,
+          gb: stat('gamesBehind').displayValue || '-', streak: stat('streak').displayValue || '', seed: Number(stat('playoffSeed').value) || 99,
+        };
+      })).sort((a, b) => a.seed - b.seed || b.pct - a.pct),
+    }));
+  }
+
+  function parseNews(n) {
+    return ((n && n.articles) || []).slice(0, 14).map((a) => ({
+      id: String(a.id || a.headline), headline: String(a.headline || ''), description: String(a.description || ''),
+      published: new Date(a.published || Date.now()), image: sportsImg(a.images && a.images[0] && a.images[0].url),
+      video: a.type === 'Media' || !!(a.video || (a.videos && a.videos.length)),
+    })).filter((a) => a.headline);
+  }
+
+  function ago(d) {
+    const m = Math.max(1, Math.round((Date.now() - d) / 60000));
+    return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
+  }
+
+  // "Tonight 12:30 am", "Tomorrow 1:00 am", "Sat 2:30 am" in your own time
+  function whenText(d) {
+    const day = new Date(d); day.setHours(0, 0, 0, 0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const diff = Math.round((day - today) / 86400000);
+    const label = diff === 0 ? (d.getHours() >= 17 ? 'Tonight' : 'Today') : diff === 1 ? 'Tomorrow' : d.toLocaleDateString('en-GB', { weekday: 'short' });
+    return `${label} ${clockText(d)}`;
+  }
+
+  const followed = (g) => state.nbaTeams.includes(g.home.abbr) || state.nbaTeams.includes(g.away.abbr);
+  const watchInfo = () => NBA_WATCH.find((w) => w.id === state.nbaWatch) || NBA_WATCH[0];
+  const watchApp = () => D.apps.find((a) => watchInfo().app.test(a.name));
+
+  function teamBadge(t, size = 44) {
+    return t.logo
+      ? `<img class="sp-logo" src="${t.logo}" alt="" width="${size}" height="${size}">`
+      : `<span class="sp-logo sp-mono" style="--tc:${t.color};width:${size}px;height:${size}px">${esc(t.abbr)}</span>`;
+  }
+
+  function statusText(g) {
+    if (g.state === 'pre') return whenText(g.date);
+    if (g.state === 'post') return 'Final';
+    return g.detail.replace(' - ', ' · ');
+  }
+
+  // The game to put first: your team live, then your team next, then anything live, then the next game.
+  function featuredGame(games) {
+    const soon = games.filter((g) => g.state !== 'post').sort((a, b) => a.date - b.date);
+    return soon.find((g) => g.state === 'in' && followed(g)) || soon.find(followed) || soon.find((g) => g.state === 'in') || soon[0] || games[games.length - 1] || null;
+  }
+
+  let nbaGames = [];
+  let nbaLoadedAt = 0;
+  async function loadNba(force = false) {
+    if (!NATIVE) return [];
+    const from = new Date(Date.now() - 86400000);
+    const to = new Date(Date.now() + 6 * 86400000);
+    const live = nbaGames.some((g) => g.state === 'in');
+    try {
+      const sb = await sportsGet('scoreboard', { dates: `${ymd(from)}-${ymd(to)}`, limit: '200' }, force ? 0 : live ? 60000 : 600000);
+      nbaGames = parseGames(sb).sort((a, b) => a.date - b.date);
+      nbaLoadedAt = Date.now();
+      remindGames();
+    } catch { /* keep what we had */ }
+    renderGameWidget();
+    if (state.view === 'sports') renderSports();
+    return nbaGames;
+  }
+
+  const reminded = new Set();
+  function remindGames() {
+    nbaGames.filter(followed).forEach((g) => {
+      const mins = (g.date - Date.now()) / 60000;
+      if (g.state === 'pre' && mins > 0 && mins <= 30 && !reminded.has(g.id)) {
+        reminded.add(g.id);
+        toast(`${g.away.short} at ${g.home.short} starts in ${Math.round(mins)} min. ${watchInfo().name}`);
+      }
+    });
+  }
+
+  function sportsView() {
+    return `
+      <section class="view view-sports" data-view="sports" hidden>
+        <div class="sp-head">
+          <span class="sp-title">NBA</span>
+          <div class="segmented sp-tabs">${[['games', 'Games'], ['standings', 'Standings'], ['news', 'News and highlights'], ['teams', 'Your teams']].map(([id, label]) => `<button class="seg" data-focus data-action="sp-tab" data-id="${id}">${label}</button>`).join('')}</div>
+          <span class="small sp-updated" data-sp-updated></span>
+        </div>
+        <div class="sp-body" data-sp-body></div>
+      </section>`;
+  }
+
+  function gameCard(g) {
+    const live = g.state === 'in';
+    const scores = g.state !== 'pre';
+    const win = (a, b) => (g.state === 'post' && Number(a) > Number(b) ? ' win' : '');
+    return `
+      <button class="sp-game glass${live ? ' live' : ''}${followed(g) ? ' mine' : ''}" data-focus data-action="sp-game" data-id="${g.id}" aria-label="${esc(g.away.name)} at ${esc(g.home.name)}, ${esc(statusText(g))}">
+        <span class="sp-row${win(g.away.score, g.home.score)}">${teamBadge(g.away, 30)}<span class="sp-abbr">${esc(g.away.abbr)}</span><span class="sp-score">${scores ? esc(g.away.score) : ''}</span></span>
+        <span class="sp-row${win(g.home.score, g.away.score)}">${teamBadge(g.home, 30)}<span class="sp-abbr">${esc(g.home.abbr)}</span><span class="sp-score">${scores ? esc(g.home.score) : ''}</span></span>
+        <span class="sp-status">${live ? '<span class="sp-dot"></span>' : ''}${esc(statusText(g))}</span>
+      </button>`;
+  }
+
+  function featureCard(g) {
+    if (!g) return '<div class="sp-empty glass"><span class="w-empty-title">No games this week</span><span class="small">The NBA season runs from October to June.</span></div>';
+    const scores = g.state !== 'pre';
+    const app = watchApp();
+    return `
+      <section class="sp-feature glass${g.state === 'in' ? ' live' : ''}" style="--ta:${g.away.color};--th:${g.home.color}">
+        <div class="sp-f-team">${teamBadge(g.away, 84)}<span class="sp-f-name">${esc(g.away.short)}</span><span class="small">${esc(g.away.record)}</span></div>
+        <div class="sp-f-mid">
+          <span class="sp-f-label">${g.state === 'in' ? '<span class="sp-dot"></span>Live' : g.state === 'post' ? 'Final' : followed(g) ? 'Your team next' : 'Next game'}</span>
+          <span class="sp-f-score">${scores ? `${esc(g.away.score)}<span class="sp-f-dash">–</span>${esc(g.home.score)}` : esc(clockText(g.date))}</span>
+          <span class="small">${esc(g.state === 'pre' ? whenText(g.date).replace(/ \d.*$/, '') : g.detail)}${g.venue ? ` · ${esc(g.venue)}` : ''}</span>
+          <div class="sp-f-actions">
+            <button class="btn lg btn-primary" data-focus data-action="sp-watch">${app ? `Watch on ${esc(app.short || app.name)}` : `Watch: ${esc(watchInfo().name)}`}</button>
+            <button class="btn lg" data-focus data-action="sp-game" data-id="${g.id}">Game details</button>
+          </div>
+        </div>
+        <div class="sp-f-team">${teamBadge(g.home, 84)}<span class="sp-f-name">${esc(g.home.short)}</span><span class="small">${esc(g.home.record)}</span></div>
+      </section>`;
+  }
+
+  async function renderSports() {
+    const body = stage.querySelector('[data-sp-body]');
+    if (!body) return;
+    all('[data-action="sp-tab"]').forEach((b) => { const on = b.dataset.id === state.nbaTab; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+    const upd = stage.querySelector('[data-sp-updated]');
+    const tab = state.nbaTab;
+    if (tab === 'games') {
+      if (!nbaGames.length && NATIVE) body.innerHTML = `<div class="sp-feature glass skeleton"></div><div class="sp-grid">${'<div class="sp-game glass skeleton"></div>'.repeat(4)}</div>`;
+      const games = nbaGames;
+      const today = games.filter((g) => new Date(g.date).toDateString() === new Date().toDateString() || g.state === 'in');
+      const yesterday = games.filter((g) => g.state === 'post' && !today.includes(g));
+      const coming = games.filter((g) => g.state === 'pre' && !today.includes(g) && (!state.nbaTeams.length || followed(g))).slice(0, 8);
+      if (games.length || !NATIVE) {
+        body.innerHTML = featureCard(featuredGame(games))
+          + (today.length ? `<div class="eyebrow">Today</div><div class="sp-grid">${today.map(gameCard).join('')}</div>` : '')
+          + (coming.length ? `<div class="eyebrow">${state.nbaTeams.length ? 'Your teams, coming up' : 'Coming up'}</div><div class="sp-grid">${coming.map(gameCard).join('')}</div>` : '')
+          + (yesterday.length ? `<div class="eyebrow">Last night</div><div class="sp-grid">${yesterday.map(gameCard).join('')}</div>` : '');
+      }
+      upd.textContent = nbaLoadedAt ? `Updated ${clockText(new Date(nbaLoadedAt))}` : '';
+      if (!nbaLoadedAt || Date.now() - nbaLoadedAt > 60000) loadNba();
+    } else if (tab === 'standings') {
+      body.innerHTML = '<div class="sp-tables"><div class="sp-table glass skeleton"></div><div class="sp-table glass skeleton"></div></div>';
+      try {
+        const confs = parseStandings(await sportsGet('standings', {}, 3 * 3600000));
+        if (state.nbaTab !== 'standings') return;
+        body.innerHTML = `<div class="sp-tables">${confs.map((c) => `
+          <section class="sp-table glass" data-focus tabindex="0" aria-label="${esc(c.name)} standings">
+            <div class="sp-t-title">${esc(c.name)}</div>
+            <div class="sp-t-row sp-t-head"><span></span><span>Team</span><span>W</span><span>L</span><span>PCT</span><span>GB</span><span>Strk</span></div>
+            ${c.rows.map((r, i) => `<div class="sp-t-row${state.nbaTeams.includes(r.abbr) ? ' mine' : ''}${i === 5 || i === 9 ? ' cut' : ''}"><span class="sp-seed">${i + 1}</span><span class="sp-t-team">${teamBadge(r, 22)}${esc(r.name)}</span><span>${r.w}</span><span>${r.l}</span><span>${r.pct.toFixed(3).replace(/^0/, '')}</span><span>${esc(r.gb)}</span><span>${esc(r.streak)}</span></div>`).join('')}
+          </section>`).join('')}</div>
+          <p class="small sp-note">Top 6 go straight to the play-offs; 7 to 10 play in.</p>`;
+      } catch { body.innerHTML = '<p class="small sp-note">Couldn\'t load the standings. Is the TV online?</p>'; }
+    } else if (tab === 'news') {
+      body.innerHTML = `<div class="sp-grid">${'<div class="sp-game glass skeleton"></div>'.repeat(4)}</div>`;
+      try {
+        const items = parseNews(await sportsGet('news', { limit: '20' }, 1800000));
+        if (state.nbaTab !== 'news') return;
+        state.nbaNews = items;
+        const vids = items.filter((a) => a.video);
+        const reads = items.filter((a) => !a.video);
+        body.innerHTML = (vids.length ? `<div class="eyebrow">Highlights</div><div class="sp-vids">${vids.slice(0, 4).map((a) => `
+            <button class="show glass sp-vid" data-focus data-action="sp-video" data-id="${esc(a.id)}" aria-label="Watch: ${esc(a.headline)}">
+              <div class="show-art" style="${a.image ? `background:url('${a.image}') center / cover` : ''}"><span class="sp-play">${filledIcon('play', 18)}</span></div>
+              <div class="show-body"><div class="show-title">${esc(a.headline)}</div><div class="small show-meta">${esc(ago(a.published))}</div></div>
+            </button>`).join('')}</div>` : '')
+          + (reads.length ? `<div class="eyebrow">Reports</div><div class="sp-news">${reads.map((a) => `
+            <button class="sp-story glass" data-focus data-action="sp-story" data-id="${esc(a.id)}">
+              ${a.image ? `<span class="sp-story-img" style="background:url('${a.image}') center / cover"></span>` : ''}
+              <span class="sp-story-text"><span class="sp-story-head">${esc(a.headline)}</span><span class="small">${esc(a.description)}</span><span class="small sp-ago">${esc(ago(a.published))}</span></span>
+            </button>`).join('')}</div>` : '');
+      } catch { body.innerHTML = '<p class="small sp-note">Couldn\'t load the news. Is the TV online?</p>'; }
+    } else if (tab === 'teams') {
+      let teams = [];
+      try {
+        const t = await sportsGet('teams', {}, 24 * 3600000);
+        teams = ((((t.sports || [])[0] || {}).leagues || [])[0] || {}).teams || [];
+      } catch { /* none */ }
+      if (state.nbaTab !== 'teams') return;
+      body.innerHTML = `
+        <div class="sp-watch glass">
+          <span class="set-label">Where you watch the NBA<span class="small">The Watch button opens this. UK rights change each season, so pick yours.</span></span>
+          <div class="segmented">${NBA_WATCH.map((w) => `<button class="seg${w.id === state.nbaWatch ? ' on' : ''}" data-focus data-action="sp-watch-pick" data-id="${w.id}">${w.name}</button>`).join('')}</div>
+        </div>
+        <div class="eyebrow">Follow teams for reminders and your own fixtures</div>
+        <div class="sp-teams">${teams.map((x) => parseTeam(x)).sort((a, b) => a.name.localeCompare(b.name)).map((t) => `
+          <button class="sp-team glass${state.nbaTeams.includes(t.abbr) ? ' on' : ''}" data-focus data-action="sp-follow" data-id="${esc(t.abbr)}" aria-pressed="${state.nbaTeams.includes(t.abbr)}">
+            ${teamBadge(t, 40)}<span>${esc(t.short)}</span>${state.nbaTeams.includes(t.abbr) ? `<span class="sp-star">${filledIcon('star', 16)}</span>` : ''}
+          </button>`).join('') || '<p class="small sp-note">Couldn\'t load the teams. Is the TV online?</p>'}</div>`;
+    }
+    refreshEdges();
+  }
+
+  function openStory(id) {
+    const a = state.nbaNews.find((x) => x.id === id);
+    if (!a) return;
+    xFrom = document.activeElement;
+    refs.xpanel.className = 'xpanel xwide xstory';
+    refs.xpanel.innerHTML = `
+      ${a.image ? `<div class="t-bg"><div class="t-still" style="background-image:url('${a.image}')"></div></div>` : ''}
+      <div class="t-body">
+        <button class="btn lg x-close t-close" data-focus data-action="x-close">Close</button>
+        <div class="st-text"><span class="small">${esc(ago(a.published))}</span><div class="t-title">${esc(a.headline)}</div><p class="t-over st-over">${esc(a.description)}</p>
+          <div class="sp-f-actions"><button class="btn lg btn-primary" data-focus data-action="sp-highlights" data-q="${esc(a.headline)}">Find the video on YouTube</button></div></div>
+      </div>`;
+    refs.x.hidden = false;
+    refs.x.classList.remove('closing');
+    refs.xpanel.querySelector('[data-action="sp-highlights"]').focus();
+  }
+
+  async function openGame(id) {
+    const g = nbaGames.find((x) => x.id === id);
+    if (!g) return;
+    xFrom = document.activeElement;
+    const app = watchApp();
+    refs.xpanel.className = 'xpanel xwide xgame';
+    refs.xpanel.style.setProperty('--ta', g.away.color);
+    refs.xpanel.style.setProperty('--th', g.home.color);
+    refs.xpanel.innerHTML = `
+      <div class="t-body">
+        <button class="btn lg x-close t-close" data-focus data-action="x-close">Close</button>
+        <div class="g-head">
+          <div class="sp-f-team">${teamBadge(g.away, 96)}<span class="sp-f-name">${esc(g.away.name)}</span><span class="small">${esc(g.away.record)}</span></div>
+          <div class="sp-f-mid"><span class="sp-f-label">${g.state === 'in' ? '<span class="sp-dot"></span>Live' : g.state === 'post' ? 'Final' : esc(whenText(g.date))}</span>
+            <span class="sp-f-score">${g.state !== 'pre' ? `${esc(g.away.score)}<span class="sp-f-dash">–</span>${esc(g.home.score)}` : 'vs'}</span>
+            <span class="small">${esc(g.venue)}</span></div>
+          <div class="sp-f-team">${teamBadge(g.home, 96)}<span class="sp-f-name">${esc(g.home.name)}</span><span class="small">${esc(g.home.record)}</span></div>
+        </div>
+        <div class="g-cols">
+          <div class="g-col" data-g-main><div class="t-row skeleton"></div><div class="t-row skeleton"></div></div>
+          <div class="g-col g-side">
+            <div class="eyebrow">Where to watch</div>
+            <button class="t-row" data-focus data-action="sp-watch">${app ? appIcon(app, 40) : `<span class="t-logo t-letter">${esc(watchInfo().name.slice(0, 1))}</span>`}<span class="t-row-name">${esc(watchInfo().name)}<span class="small">${app ? 'On this TV' : 'Not on this TV. Change in Sports, Your teams'}</span></span><span class="t-row-act">${app ? 'Watch' : 'Change'}</span></button>
+            <button class="t-row" data-focus data-action="sp-highlights" data-q="${esc(`${g.away.name} vs ${g.home.name} highlights`)}"><span class="t-logo t-letter">▶</span><span class="t-row-name">Highlights<span class="small">On YouTube</span></span><span class="t-row-act">Open</span></button>
+          </div>
+        </div>
+      </div>`;
+    refs.x.hidden = false;
+    refs.x.classList.remove('closing');
+    refs.xpanel.querySelector('[data-action="sp-watch"]')?.focus();
+    try {
+      const s = await sportsGet('summary', { event: g.id }, g.state === 'in' ? 30000 : 600000);
+      const main = refs.xpanel.querySelector('[data-g-main]');
+      if (!main) return;
+      const art = s.article && (s.article.headline || s.article.description) ? `<div class="eyebrow">Report</div><div class="g-report"><div class="g-r-head">${esc(s.article.headline || '')}</div><p class="small">${esc(String(s.article.description || '').slice(0, 320))}</p></div>` : '';
+      const leaders = (s.leaders || []).map((tm) => {
+        const pts = ((tm.leaders || []).find((x) => x.name === 'points') || (tm.leaders || [])[0] || {});
+        const top = (pts.leaders || [])[0];
+        return top ? `<div class="g-leader"><span class="g-l-team">${esc((tm.team && tm.team.abbreviation) || '')}</span><span>${esc((top.athlete && top.athlete.displayName) || '')}</span><span class="g-l-val">${esc(top.displayValue || '')}</span></div>` : '';
+      }).join('');
+      const vids = (s.videos || []).slice(0, 2).map((v) => `<button class="t-row" data-focus data-action="sp-highlights" data-q="${esc(v.headline || `${g.away.name} ${g.home.name} highlights`)}"><span class="t-logo t-letter">▶</span><span class="t-row-name">${esc(v.headline || 'Highlights')}<span class="small">Watch on YouTube</span></span><span class="t-row-act">Play</span></button>`).join('');
+      main.innerHTML = (art || '') + (leaders ? `<div class="eyebrow">Top scorers</div><div class="g-leaders">${leaders}</div>` : '') + (vids ? `<div class="eyebrow">Highlights</div>${vids}` : '')
+        || `<p class="small">${g.state === 'pre' ? `Tip-off ${esc(whenText(g.date))}. The report and highlights appear here after the game.` : 'No report yet.'}</p>`;
+    } catch {
+      const main = refs.xpanel.querySelector('[data-g-main]');
+      if (main) main.innerHTML = '<p class="small">Couldn\'t load the game details. Is the TV online?</p>';
+    }
+  }
+
+  // Highlights open in YouTube, searched for the game or the clip's title.
+  function openHighlights(q) {
+    const yt = D.apps.find((a) => a.id === 'youtube');
+    if (!yt || !yt.pkg) { toast('YouTube isn\'t on this TV'); return; }
+    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+    nativeCall('watchNextOpen', `intent://${url.replace(/^https:\/\//, '')}#Intent;scheme=https;package=${yt.pkg};end`, yt.pkg);
+  }
+
+  function watchNow() {
+    const app = watchApp();
+    if (app) launchApp(app.id);
+    else { state.nbaTab = 'teams'; openView('sports'); renderSports(); toast(`${watchInfo().name} isn't on this TV. Pick where you watch`); }
+  }
+
+  // ---------- The NBA card on Home ----------
+  function renderGameWidget() {
+    const el = stage.querySelector('.w-game');
+    if (!el) return;
+    const size = el.dataset.size || 'wide';
+    const g = featuredGame(nbaGames);
+    if (!g) {
+      el.innerHTML = `<span class="w-label">NBA</span><span class="w-empty-title">No games this week</span>`;
+      return;
+    }
+    const sc = g.state !== 'pre';
+    if (size === 'small') {
+      el.innerHTML = `<span class="w-label">${g.state === 'in' ? '<span class="sp-dot"></span>Live' : 'NBA'}</span>
+        <span class="wg-line">${teamBadge(g.away, 26)}<b>${esc(g.away.abbr)}</b><span>${sc ? esc(g.away.score) : ''}</span></span>
+        <span class="wg-line">${teamBadge(g.home, 26)}<b>${esc(g.home.abbr)}</b><span>${sc ? esc(g.home.score) : ''}</span></span>
+        <span class="small">${esc(statusText(g))}</span>`;
+    } else if (size === 'big') {
+      const list = [g, ...nbaGames.filter((x) => x !== g && x.state !== 'post')].slice(0, 5);
+      el.innerHTML = `<span class="w-label">NBA tonight</span><div class="wg-list">${list.map((x) => `
+        <span class="wg-item${followed(x) ? ' mine' : ''}">${teamBadge(x.away, 28)}<b>${esc(x.away.abbr)}</b><span class="wg-sc">${x.state !== 'pre' ? `${esc(x.away.score)}–${esc(x.home.score)}` : '@'}</span><b>${esc(x.home.abbr)}</b>${teamBadge(x.home, 28)}<span class="small wg-when">${x.state === 'in' ? '<span class="sp-dot"></span>' : ''}${esc(statusText(x))}</span></span>`).join('')}</div>`;
+    } else {
+      el.innerHTML = `<span class="w-label">${g.state === 'in' ? '<span class="sp-dot"></span>Live now' : followed(g) ? 'Your team next' : 'NBA next'}</span>
+        <span class="wg-wide">${teamBadge(g.away, 52)}<span class="wg-mid"><span class="wg-score">${sc ? `${esc(g.away.score)} – ${esc(g.home.score)}` : esc(clockText(g.date))}</span><span class="small">${esc(g.away.short)} at ${esc(g.home.short)}</span></span>${teamBadge(g.home, 52)}</span>
+        <span class="small wg-foot">${esc(g.state === 'pre' ? whenText(g.date).replace(/ \d.*$/, '') : statusText(g))} · ${esc(watchInfo().name)}</span>`;
+    }
+  }
+
+
+  // ---------- Your Home layout ----------
+  // Home has five places: two small ones on the left, a big one in the middle,
+  // and two wide ones on the right. Each can show one of the cards that fit
+  // it. Edit Home (Customize, or Settings > Appearance), then OK on a card
+  // changes what that place shows; Back when you're done.
+  const SLOT_GRID = { a: '1 / 1', b: '2 / 1', c: '1 / 2 / 3 / 4', d: '1 / 4 / 2 / 6', e: '2 / 4 / 3 / 6' };
+  const SLOT_SIZE = { a: 'small', b: 'small', c: 'big', d: 'wide', e: 'wide' };
+  const SLOT_KINDS = {
+    a: ['room', 'weather', 'game', 'starred'], b: ['weather', 'room', 'game', 'starred'],
+    c: ['music', 'game', 'starred'], d: ['hero', 'game', 'starred'], e: ['auto', 'game', 'starred', 'scenes'],
+  };
+  const KIND_LABEL = { room: 'Room', weather: 'Weather', music: 'Now playing', hero: 'Continue watching', game: 'NBA', starred: 'Starred', scenes: 'Scenes', auto: 'Continue watching' };
+  const KIND_SEL = { room: '.w-room', weather: '.w-weather', music: '.w-music', hero: '.w-hero', game: '.w-game', starred: '.w-starred', scenes: '.w-scenes' };
+  const DEFAULT_LAYOUT = { a: 'room', b: 'weather', c: 'music', d: 'hero', e: 'auto' };
+
+  function homeLayout() {
+    const l = { ...DEFAULT_LAYOUT, ...(state.homeLayout || {}) };
+    // A card can only be in one place: a repeat falls back to the first card not shown yet.
+    const used = new Set();
+    Object.keys(SLOT_KINDS).forEach((k) => {
+      if (!SLOT_KINDS[k].includes(l[k])) l[k] = DEFAULT_LAYOUT[k];
+      if (l[k] !== 'auto' && used.has(l[k])) l[k] = SLOT_KINDS[k].find((x) => x === 'auto' || !used.has(x)) || DEFAULT_LAYOUT[k];
+      used.add(l[k]);
+    });
+    return l;
+  }
+
+  function applyHomeLayout() {
+    const home = stage.querySelector('.view-home .widgets');
+    if (!home) return;
+    const l = homeLayout();
+    const slotOf = {};
+    Object.entries(l).forEach(([slot, kind]) => { if (kind !== 'auto') slotOf[kind] = slot; });
+    Object.entries(KIND_SEL).forEach(([kind, sel]) => {
+      const el = home.querySelector(sel);
+      if (!el) return;
+      const slot = slotOf[kind];
+      el.classList.toggle('off-layout', !slot && !(kind === 'scenes' && l.e === 'auto'));
+      if (slot) {
+        el.style.gridArea = SLOT_GRID[slot];
+        el.dataset.slot = slot;
+        el.dataset.size = SLOT_SIZE[slot];
+        el.dataset.kindLabel = KIND_LABEL[kind];
+        if (kind === 'scenes') el.hidden = false;
+      } else if (kind === 'scenes' && l.e === 'auto') {
+        el.style.gridArea = '';
+        el.dataset.slot = 'e';
+        el.dataset.kindLabel = KIND_LABEL.auto;
+      } else {
+        delete el.dataset.slot;
+      }
+    });
+    home.querySelectorAll('[data-cw]').forEach((el) => {
+      el.classList.toggle('off-layout', l.e !== 'auto');
+      el.dataset.slot = 'e';
+      el.dataset.kindLabel = KIND_LABEL.auto;
+    });
+    const sizes = [home.querySelector('.w-game')?.dataset.size, home.querySelector('.w-starred')?.dataset.size].join();
+    if (sizes !== applyHomeLayout.last) { applyHomeLayout.last = sizes; renderGameWidget(); renderStarWidget(); }
+  }
+
+  function cycleSlot(slot) {
+    const l = homeLayout();
+    const kinds = SLOT_KINDS[slot];
+    const used = new Set(Object.entries(l).filter(([k]) => k !== slot).map(([, v]) => v));
+    let i = kinds.indexOf(l[slot]);
+    for (let n = 0; n < kinds.length; n++) {
+      i = (i + 1) % kinds.length;
+      if (!used.has(kinds[i]) || kinds[i] === 'auto') break;
+    }
+    l[slot] = kinds[i];
+    state.homeLayout = l;
+    saveSoon();
+    applyHomeLayout();
+    const el = stage.querySelector(`.view-home .widgets [data-slot="${slot}"]:not(.off-layout):not([hidden])`);
+    el?.focus();
+    toast(`${KIND_LABEL[l[slot]]}`);
+  }
+
+  function startHomeEdit() {
+    if (!refs.sheet.hidden) closeSheet();
+    if (state.view !== 'home') openView('home');
+    state.homeEdit = true;
+    stage.classList.add('home-edit');
+    stage.querySelectorAll('.view-home .widgets .widget').forEach((w) => { if (!w.hasAttribute('tabindex')) { w.setAttribute('tabindex', '0'); w.dataset.editTab = '1'; } w.setAttribute('data-focus', ''); });
+    applyHomeLayout();
+    setTimeout(() => stage.querySelector('.view-home .widgets [data-slot]:not(.off-layout):not([hidden])')?.focus(), 50);
+    toast('Press OK on a card to change what it shows. Back when you\'re done');
+  }
+
+  function endHomeEdit() {
+    state.homeEdit = false;
+    stage.classList.remove('home-edit');
+    toast('Home saved');
+  }
+
+  // ---------- Starred ----------
+  // Star a film or series on its page. Once a day (and at start) each one is
+  // checked: when it arrives on one of your apps, goes free, or gets a new
+  // episode, it is marked on the Starred row and you're told when the TV
+  // comes on. What was seen last time is kept with the star, so each change
+  // is only announced once.
+  const isStarred = (h) => state.starred.some((x) => x.id === h.id && x.type === (h.media_type === 'tv' ? 'tv' : 'movie'));
+
+  function toggleStar(h) {
+    const type = h.media_type === 'tv' ? 'tv' : 'movie';
+    if (isStarred(h)) {
+      state.starred = state.starred.filter((x) => !(x.id === h.id && x.type === type));
+      toast(`Removed ${h.title || h.name} from Starred`);
+    } else {
+      if (state.starred.length >= 40) { toast('Starred is full (40). Remove one first'); return; }
+      state.starred = [{ id: h.id, type, title: String(h.title || h.name || '').slice(0, 80), poster: h.poster_path || null, backdrop: h.backdrop_path || null, seen: null, badge: '', line: '', added: Date.now() }, ...state.starred];
+      toast(`Starred. You'll hear when ${h.title || h.name} is on your apps or has a new episode`);
+      checkStarred([state.starred[0]]);
+    }
+    saveSoon();
+    renderStarred();
+    const btn = refs.xpanel.querySelector('[data-action="title-star"]');
+    if (btn) btn.outerHTML = starButton(h);
+    refs.xpanel.querySelector('[data-action="title-star"]')?.focus();
+  }
+
+  const starButton = (h) => `<button class="btn lg t-star${isStarred(h) ? ' on' : ''}" data-focus data-action="title-star">${isStarred(h) ? filledIcon('star', 16) : icon('star', 16)} ${isStarred(h) ? 'Starred' : 'Star'}</button>`;
+
+  const dayStr = (d) => d.toISOString().slice(0, 10);
+  const prettyDay = (s) => { const d = new Date(`${s}T12:00:00`); return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); };
+
+  let starCheckAt = 0;
+  async function checkStarred(only) {
+    if (!tmdbReady()) return;
+    const list = only || state.starred;
+    if (!only) starCheckAt = Date.now();
+    const news = [];
+    for (const s of list.slice(0, 40)) {
+      try {
+        const [p, d] = await Promise.all([
+          tmdb(`${s.type}/${s.id}/watch/providers`),
+          s.type === 'tv' ? tmdb(`tv/${s.id}`, { language: 'en-GB' }) : Promise.resolve(null),
+        ]);
+        const g = (p.results || {}).GB || {};
+        // On your apps: free first, then subscription.
+        const mine = [];
+        [['free', 'free'], ['ads', 'free'], ['flatrate', 'sub']].forEach(([k, kind]) => (g[k] || []).forEach((x) => {
+          const app = appForProvider(x.provider_name);
+          if (app && !mine.some((m) => m.app === app.id)) mine.push({ app: app.id, name: app.short || app.name, kind });
+        }));
+        const keys = mine.map((m) => `${m.kind}:${m.app}`);
+        const last = d && d.last_episode_to_air && d.last_episode_to_air.air_date;
+        const next = d && d.next_episode_to_air && d.next_episode_to_air.air_date;
+        const seen = s.seen;
+        let badge = s.badge || '';
+        if (seen) {
+          const added = mine.filter((m) => !seen.keys.includes(`${m.kind}:${m.app}`));
+          if (added.length) badge = added[0].kind === 'free' ? `Now free on ${added[0].name}` : `Now on ${added[0].name}`;
+        }
+        // A new episode: aired since we last looked, or this week the first time.
+        if (s.type === 'tv' && last && last <= dayStr(new Date()) && (seen ? last > (seen.ep || '') : last >= dayStr(new Date(Date.now() - 2 * 86400000)))) {
+          const ep = d.last_episode_to_air;
+          badge = `New episode${ep.season_number ? ` S${ep.season_number} E${ep.episode_number}` : ''}`;
+        }
+        s.line = mine.length ? `${mine[0].kind === 'free' ? 'Free on' : 'On'} ${mine.map((m) => m.name).slice(0, 2).join(', ')}`
+          : next ? `Next episode ${prettyDay(next)}` : 'Not on your apps yet';
+        if (next && mine.length && s.type === 'tv') s.line += ` · next ${prettyDay(next)}`;
+        if (badge && badge !== s.badge) news.push(`${s.title}, ${badge.charAt(0).toLowerCase()}${badge.slice(1)}`);
+        s.badge = badge;
+        s.seen = { keys, ep: last || (seen && seen.ep) || '' };
+      } catch { /* try again next time */ }
+    }
+    saveSoon();
+    renderStarred();
+    if (news.length && !only) toast(news.length === 1 ? `Starred: ${news[0]}` : `Starred: ${news.length} updates. ${news.slice(0, 2).join('; ')}`);
+  }
+
+  function starCard(s, i) {
+    const art = tmdbImg('w780', s.backdrop) || tmdbImg('w342', s.poster);
+    return `
+      <button class="show glass sr-card" data-focus data-action="star-open" data-i="${i}" aria-label="${esc(s.title)}${s.badge ? `. ${esc(s.badge)}` : ''}">
+        <div class="show-art" style="${art ? `background:url('${art}') center / cover` : ''}">${s.badge ? `<span class="sr-badge">${esc(s.badge)}</span>` : ''}</div>
+        <div class="show-body"><div class="show-title">${esc(s.title)}</div><div class="small show-meta">${esc(s.line || (s.type === 'tv' ? 'Series' : 'Film'))}</div></div>
+      </button>`;
+  }
+
+  function renderStarred() {
+    const el = stage.querySelector('[data-shows="starred"]');
+    const head = stage.querySelector('[data-sr-head]');
+    if (el) {
+      const show = !state.query.trim() && state.starred.length;
+      head.hidden = !show;
+      el.hidden = !show;
+      // Changes first, then the newest stars.
+      const order = state.starred.map((s, i) => [s, i]).sort((a, b) => (b[0].badge ? 1 : 0) - (a[0].badge ? 1 : 0));
+      el.innerHTML = show ? order.slice(0, 5).map(([s, i]) => starCard(s, i)).join('') : '';
+    }
+    renderStarWidget();
+  }
+
+  function openStarred(i) {
+    const s = state.starred[i];
+    if (!s) return;
+    s.badge = ''; // seen
+    saveSoon();
+    openTitle({ id: s.id, media_type: s.type, title: s.title, name: s.title, poster_path: s.poster, backdrop_path: s.backdrop });
+    setTimeout(renderStarred, 400);
+  }
+
+  // ---------- The Starred card on Home ----------
+  function renderStarWidget() {
+    const el = stage.querySelector('.w-starred');
+    if (!el) return;
+    const size = el.dataset.size || 'wide';
+    const list = [...state.starred].sort((a, b) => (b.badge ? 1 : 0) - (a.badge ? 1 : 0));
+    if (!list.length) {
+      el.innerHTML = `<span class="w-label">Starred</span><span class="w-empty-title">Nothing starred yet</span><span class="small">Press Star on a film or series in Search</span>`;
+      return;
+    }
+    const news = list.filter((s) => s.badge).length;
+    if (size === 'small') {
+      el.innerHTML = `<span class="w-label">Starred</span><span class="ws-count">${list.length}</span><span class="small">${news ? `${news} with news` : 'Nothing new'}</span>${list[0].badge ? `<span class="small ws-first">${esc(list[0].title)}: ${esc(list[0].badge)}</span>` : ''}`;
+      return;
+    }
+    const n = size === 'big' ? 6 : 3;
+    el.innerHTML = `<span class="w-label">Starred${news ? ` · ${news} new` : ''}</span><div class="ws-grid ws-${size}">${list.slice(0, n).map((s) => {
+      const art = tmdbImg('w342', s.poster) || tmdbImg('w780', s.backdrop);
+      return `<span class="ws-item"><span class="ws-art" style="${art ? `background:url('${art}') center / cover` : ''}">${s.badge ? `<span class="sr-badge">${esc(s.badge)}</span>` : ''}</span><span class="ws-title">${esc(s.title)}</span></span>`;
+    }).join('')}</div>`;
   }
 
   // ---------- Show search (TMDB) ----------
@@ -1358,6 +1964,7 @@
         row('open-wallpapers', icon('image'), 'Wallpaper photos', 'Choose one, or add your own from your phone', 'wp'),
         row('cycle-ambient', icon('moon'), 'Screensaver', 'Photos and the clock when nothing is happening', 'ambient'),
         row('cycle-clock', icon('timer'), 'Clock', '12-hour or 24-hour', 'clock'),
+        row('edit-home', icon('home'), 'Home layout', 'Choose what each card on Home shows', 'homelayout'),
         row('screen-fit', icon('live'), 'Fit to screen', 'If the edges are cut off', 'fit'),
         row('cycle-motion', icon('live'), 'Animations', 'Fast turns them off, for a slow TV', 'motion'),
         NATIVE ? '' : row('toggle-sample', icon('apps'), 'Sample content', 'Turn off to see empty widgets', 'sample'),
@@ -1789,6 +2396,10 @@
           <div class="sheet-row" data-edge-hue hidden>
             <span class="sheet-label">Glow colour</span>
             <span class="slider-wrap">${sliderMarkup('edgehue', 'Glow colour')}</span>
+          </div>
+          <div class="sheet-row">
+            <span class="sheet-label">Home<span class="sheet-help">Choose what each card shows</span></span>
+            <button class="btn lg" data-focus data-action="edit-home">Edit Home</button>
           </div>
           <div class="sheet-row">
             <span class="sheet-label">Trailers<span class="sheet-help">Behind a film's page</span></span>
@@ -2276,7 +2887,7 @@
 
       <div class="bottom-blur" aria-hidden="true"></div>
       <div class="views">
-        ${homeView()}${searchView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}${wallpapersView()}${cleanupView()}${rolesView()}${guestView()}${deepView()}${scenesView()}${diagView()}
+        ${homeView()}${searchView()}${sportsView()}${musicView()}${appsView()}${gamesView()}${roomView()}${settingsView()}${wallpapersView()}${cleanupView()}${rolesView()}${guestView()}${deepView()}${scenesView()}${diagView()}
       </div>
 
       ${overlay()}
@@ -2389,6 +3000,7 @@
       wn: state.wnCheck || 'Press OK',
       update: state.update || 'Press OK',
       devclean: 'Open',
+      homelayout: 'Edit',
       hidedev: '',
       welcome: '',
       channel: state.updateChannel === 'beta' ? 'Beta' : 'Stable',
@@ -2439,6 +3051,7 @@
     all('[data-cw]').forEach((el) => { el.hidden = NATIVE ? Number(el.dataset.i) >= state.cw.length - 1 : !sample; });
     all('[data-scenes]').forEach((el) => { el.hidden = NATIVE ? state.cw.length >= 3 : sample; });
     all('[data-recent]').forEach((el) => { el.hidden = sample || (NATIVE && state.cw.length > 1); });
+    applyHomeLayout();
 
     stage.querySelector('[data-games-sub]').textContent = g.autoSwitch
       ? `Opening Games switches the TV to HDMI ${g.hdmiPort}${g.countdownSec ? ` after a ${g.countdownSec} second countdown` : ' straight away'}.`
@@ -2602,7 +3215,7 @@
 
   function renderSearch() {
     const q = state.query.trim().toLowerCase();
-    if (NATIVE) { renderForYou(); return renderTvSearch(q); }
+    if (NATIVE) { renderForYou(); renderStarred(); return renderTvSearch(q); }
     const results = D.catalogue.filter((s) => APP[s.app] && (!q
       || s.title.toLowerCase().includes(q)
       || s.meta.toLowerCase().includes(q)
@@ -2797,6 +3410,7 @@
     if (id === 'deepclean') renderDeep();
     if (id === 'myscenes') renderMyScenes();
     if (id === 'diag') renderDiag();
+    if (id === 'sports') renderSports();
     if (id === 'guest') renderGuest();
     animateView(id);
     moveTabGlow();
@@ -2889,6 +3503,10 @@
   // ---------- Input ----------
 
   stage.addEventListener('click', (e) => {
+    if (state.homeEdit) {
+      const w = e.target.closest('.view-home .widgets [data-slot]');
+      if (w) { e.preventDefault(); cycleSlot(w.dataset.slot); return; }
+    }
     const card = e.target.closest('[data-expand]');
     const inner = e.target.closest('button');
     if (card && (!inner || inner === card) && refs.x.hidden) {
@@ -2938,6 +3556,23 @@
     else if (act === 'title') openTitle(state.titleRows[Number(b.dataset.i)]);
     else if (act === 'title-go') goTitleRow(titleRowsNow[Number(b.dataset.i)]);
     else if (act === 'trailers') state.trailers = b.dataset.id === 'on';
+    else if (act === 'edit-home') startHomeEdit();
+    else if (act === 'title-star') { if (titleNow) toggleStar(titleNow); }
+    else if (act === 'star-open') openStarred(Number(b.dataset.i));
+    else if (act === 'sp-tab') { state.nbaTab = b.dataset.id; renderSports(); }
+    else if (act === 'sp-game') openGame(b.dataset.id);
+    else if (act === 'sp-watch') { if (!refs.x.hidden) closeExpand(); watchNow(); }
+    else if (act === 'sp-highlights') openHighlights(b.dataset.q || 'NBA highlights');
+    else if (act === 'sp-video') { const a = state.nbaNews.find((x) => x.id === b.dataset.id); openHighlights(a ? a.headline : 'NBA highlights'); }
+    else if (act === 'sp-story') openStory(b.dataset.id);
+    else if (act === 'sp-watch-pick') { state.nbaWatch = b.dataset.id; saveSoon(); renderSports(); renderGameWidget(); }
+    else if (act === 'sp-follow') {
+      const id = b.dataset.id;
+      state.nbaTeams = state.nbaTeams.includes(id) ? state.nbaTeams.filter((x) => x !== id) : [...state.nbaTeams, id];
+      saveSoon();
+      renderSports().then(() => stage.querySelector(`[data-action="sp-follow"][data-id="${id}"]`)?.focus());
+      renderGameWidget();
+    }
     else if (act === 'foryou') openForYou(state.forYou[Number(b.dataset.i)]);
     else if (act === 'theme') state.appearance = { auto: 'light', light: 'dark', dark: 'auto' }[state.appearance];
     else if (act === 'customize') openSheet();
@@ -3310,7 +3945,9 @@
   }
 
   function goBack() {
-    if (!refs.x.hidden) {
+    if (state.homeEdit) {
+      endHomeEdit();
+    } else if (!refs.x.hidden) {
       if (refs.xpanel.classList.contains('xwelcome')) closeWelcome(); else closeExpand();
     } else if (!refs.setup.hidden) {
       closeSetup();
@@ -3608,6 +4245,8 @@
     renderContinue();
     tmdbOn = nativeCall('tmdbReady') === true;
     if (!state.forYou.length) loadForYou();
+    if (Date.now() - nbaLoadedAt > 10 * 60000) loadNba();
+    if (Date.now() - starCheckAt > 12 * 3600000) checkStarred();
     pollNowPlaying();
     refreshNativeStatus();
     if (state.view === 'cleanup') renderCleanup(); // back from the TV's Settings
@@ -3658,6 +4297,10 @@
       syncVolume();
       tmdbOn = nativeCall('tmdbReady') === true;
       setTimeout(loadForYou, 1500);
+      setTimeout(loadNba, 2500);
+      setTimeout(checkStarred, 4000);
+      setInterval(() => { if (!document.hidden && Date.now() - starCheckAt > 12 * 3600000) checkStarred(); }, 3600000);
+      setInterval(() => { if (!document.hidden && (state.view === 'sports' || nbaGames.some((g) => g.state === 'in'))) loadNba(); }, 5 * 60000);
       renderInputs();
       nativeCall('launcherReady'); // tells the start-up watchdog the page is working
       nativeCall('saveBackup', localStorage.getItem('settings') || '{}');
