@@ -288,6 +288,8 @@
     volume: (step) => { tv.vol = Math.max(0, Math.min(100, tv.vol + Math.sign(step))); },
     volumeInfo: () => JSON.stringify({ level: tv.vol, max: 100, muted: tv.muted }),
     toggleMute: () => { tv.muted = !tv.muted; },
+    airplay: () => JSON.stringify({ on: tv.airplay !== false, running: tv.airplay !== false, streaming: false, name: 'Living Room TV', error: '' }),
+    setAirplay: (on) => { tv.airplay = !!on; },
     keepMode: () => tv.keep,
     setKeepMode: (m) => { tv.keep = m; },
 

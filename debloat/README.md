@@ -48,3 +48,8 @@ Settings > Apps > **Check for updates** reads `version.json` in this repository,
 - **A welcome on first start** with what is set up (lights, films and series, weather) and Set up with my phone, instead of the fit-the-screen tool (still in Appearance > Fit to screen).
 - **Focus lifts instead of ringing:** cards grow with a deeper shadow and a sheen; buttons, rows and tabs turn white.
 - **Labels on the top-right icons**, placeholder cards while searching, For you says why it is empty, dark by default, a softer edge glow, a thin strip of white glass at the bottom when there is more to scroll, and a fade-in at start.
+
+## What's new in v0.22
+
+- **AirPlay speaker.** The TV shows up as "Living Room TV" in the AirPlay list on your iPhone or iPad (Control Centre, or the AirPlay button in any app). Music from any app (YouTube Music, Apple Music, Spotify, podcasts) plays inside the launcher, so no other app opens, and Now playing shows the song, artist and artwork; play, pause and skip on the TV control the phone. Settings > Apps > AirPlay speaker turns it off. Audio only (AirPlay 1), about 2 seconds behind the phone, same Wi-Fi needed.
+- **Fixed:** Settings > Apps > Music in the background now changes when you press OK (the switch had lost its connection to the Android side in v0.18). A new test stops that kind of break from shipping again.

@@ -787,6 +787,26 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
     private fun netEvent(id: Int, ok: Boolean, status: Int, body: String) =
         host.emit("net", JSONObject().put("id", id).put("ok", ok).put("status", status).put("body", body).toString())
 
+    /** The AirPlay speaker: {on, running, streaming, name, error}. */
+    @JavascriptInterface
+    fun airplay(): String {
+        val a = io.github.oxygn02.smarttv.airplay.AirPlayState
+        return JSONObject().put("on", a.enabled(activity)).put("running", a.running).put("streaming", a.streaming)
+            .put("name", a.name(activity)).put("error", a.error).toString()
+    }
+
+    @JavascriptInterface
+    fun setAirplay(on: Boolean) = io.github.oxygn02.smarttv.airplay.AirPlayState.setEnabled(activity, on)
+
+    /** "Music in the background": 0 off, 1 casts only, 2 casts and YouTube Music (see MusicKeeper). */
+    @JavascriptInterface
+    fun keepMode(): Int = activity.getSharedPreferences("keep", Context.MODE_PRIVATE).getInt("mode", 0)
+
+    @JavascriptInterface
+    fun setKeepMode(mode: Int) {
+        activity.getSharedPreferences("keep", Context.MODE_PRIVATE).edit().putInt("mode", mode.coerceIn(0, 2)).apply()
+    }
+
     /** Opens an app's page in the Play Store so it can be installed. */
     @JavascriptInterface
     fun openStore(pkg: String): Boolean {
@@ -862,7 +882,21 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         return json.toString()
     }
 
+    private var airArtVersion = -1
+    private var airArt: Bitmap? = null
+
     private fun findPlaying(): Playing? {
+        // 0. Music played to this TV over AirPlay (it plays inside the launcher).
+        val air = io.github.oxygn02.smarttv.airplay.AirPlayState
+        if (air.streaming) {
+            if (air.artworkVersion != airArtVersion) {
+                airArtVersion = air.artworkVersion
+                airArt = air.artwork?.let { runCatching { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }.getOrNull() }
+            }
+            val title = air.title.ifEmpty { "Playing from your iPhone" }
+            return Playing("airplay|$title|${air.artist}|$airArtVersion", title, air.artist, air.durationMs, air.position(), air.playing, "", "AirPlay", airArt, true)
+        }
+
         // 1. A media session: the best source, with time and controls.
         controller()?.let { c ->
             val md = c.metadata
@@ -916,6 +950,10 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
     /** "play", "pause", "next" or "prev" on the active media session. */
     @JavascriptInterface
     fun media(action: String) {
+        if (io.github.oxygn02.smarttv.airplay.AirPlayState.streaming) {
+            io.github.oxygn02.smarttv.airplay.AirPlayState.remote(action, activity)
+            return
+        }
         val controls = controller()?.transportControls ?: return
         when (action) {
             "play" -> controls.play()
