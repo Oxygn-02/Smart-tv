@@ -2060,6 +2060,7 @@
       { id: 'home', icon: icon('home'), title: 'Apps', help: 'Home button, apps you don\'t use, music, updates', rows: [
         row('home-role', icon('home'), 'Home button', 'Which screen the Home button opens', 'home'),
         row('open-cleanup', icon('power'), 'Apps you don\'t use', 'Switch them off. You can switch them back on', 'cleanup'),
+        NATIVE ? row('airplay', icon('speaker'), 'AirPlay speaker', 'Play music from your iPhone or iPad here, without leaving this screen', 'airplay') : '',
         NATIVE ? row('keep-front', icon('music'), 'Music in the background', 'When a song starts, come back here and let it play', 'keep') : '',
         NATIVE ? row('update-check', icon('sync'), 'Check for updates', 'Get the newest version of this home screen', 'update') : '',
       ] },
@@ -2084,6 +2085,7 @@
         NATIVE ? row('open-diag', icon('live'), 'Diagnostics', 'Memory, storage, crashes and safety-net events', 'diag') : '',
         NATIVE ? row('grant-np', icon('music'), 'Now playing access', 'Lets this screen see what is playing', 'np-access') : '',
         NATIVE ? row('update-channel', icon('sync'), 'Update channel', 'Beta gets new versions before Stable', 'channel') : '',
+        NATIVE ? row('browse-check', icon('music'), 'YouTube Music check', 'Can this screen play your YouTube Music library in the background? Changes nothing', 'browse') : '',
         NATIVE ? row('wn-check', icon('live'), 'Continue watching check', 'What the TV shares from your apps', 'wn') : '',
         row('speed-test', icon('timer'), 'Speed test', 'Moves around by itself for about 20 seconds. Hands off', 'speed'),
         row('show-welcome', icon('home'), 'Show the welcome again', 'The first-run screen', 'welcome'),
@@ -2693,6 +2695,18 @@
       }
     }
     if (name === 'govee') applyGovee(data);
+    if (name === 'browsecheck') {
+      const apps = data.apps || [];
+      const y = apps.find((a) => a.pkg === 'com.google.android.youtube.tvmusic');
+      const others = apps.filter((a) => a !== y && a.result === 'yes').map((a) => a.label);
+      state.browseCheck = !data.ytmInstalled ? 'YouTube Music isn\'t on this TV'
+        : !y ? 'No: YouTube Music doesn\'t offer it'
+        : y.result === 'yes' ? 'Yes: it can be built'
+        : y.result === 'refused' ? 'No: YouTube Music refused' : 'No answer from YouTube Music';
+      toast(`${state.browseCheck}${y && y.items && y.items.length ? `. It showed: ${y.items.slice(0, 4).join(', ')}` : ''}${others.length ? `. These apps said yes: ${others.join(', ')}` : ''}`);
+      applyState();
+      return;
+    }
     if (name === 'net') {
       const done = netWaiting.get(data.id);
       if (done) { netWaiting.delete(data.id); done(data); }
@@ -3093,6 +3107,8 @@
       update: state.update || 'Press OK',
       devclean: 'Open',
       homelayout: 'Edit',
+      browse: state.browseCheck || 'Press OK',
+      airplay: (() => { const a = (NATIVE && nativeJson('airplay')) || {}; return a.on ? `On, as ${a.name || 'Living Room TV'}` : 'Off'; })(),
       previews: state.clipPreviews ? 'On' : 'Off',
       hidedev: '',
       welcome: '',
@@ -3645,6 +3661,8 @@
     else if (act === 'welcome-later') closeWelcome();
     else if (act === 'show-welcome') openWelcome();
     else if (act === 'welcome-fit') { closeWelcome(); openFit(); }
+    else if (act === 'airplay') { const a = nativeJson('airplay') || {}; nativeCall('setAirplay', !a.on); toast(!a.on ? `AirPlay is on. On your iPhone, pick ${a.name || 'Living Room TV'} from the AirPlay button` : 'AirPlay is off'); }
+    else if (act === 'browse-check') { state.browseCheck = 'Checking...'; nativeCall('musicBrowseCheck'); }
     else if (act === 'keep-front') { const m = ((Number(nativeCall('keepMode')) || 0) + 1) % 3; nativeCall('setKeepMode', m); toast(['Off', 'On for songs cast to the TV. Music you start in YouTube Music stays put', 'On for cast songs and for music you start in YouTube Music'][m]); }
     else if (act === 'title') openTitle(state.titleRows[Number(b.dataset.i)]);
     else if (act === 'title-go') goTitleRow(titleRowsNow[Number(b.dataset.i)]);

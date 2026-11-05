@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity(), BridgeHost {
         }
 
         bridge = LauncherBridge(this, this)
+        io.github.oxygn02.smarttv.airplay.AirPlayService.sync(this) // the AirPlay speaker, if switched on
 
         // Serve the bundled UI from a https:// origin rather than file://, plus
         // app icons, the current album cover and photos sent from a phone,

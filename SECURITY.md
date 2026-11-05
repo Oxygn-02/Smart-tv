@@ -30,6 +30,11 @@ to switch system apps off over the TV's debug connection. How each is protected:
 - Before Android's installer is asked, the download must match the SHA-256 in `version.json`, be this app, be a newer version, and be signed with the same key as the installed launcher. Downgrades are refused (Android refuses them too).
 - The signing key is not in the repo. Keep a private backup.
 
+## AirPlay speaker
+- While on, the TV listens on your Wi-Fi for AirPlay (version 1) audio, like any AirPlay speaker. There is no password: anyone on the same Wi-Fi can play sound to it, as with most home speakers. Settings > Apps > AirPlay speaker turns it off.
+- The audio key exchange uses the AirPort Express key that every AirPlay 1 speaker uses (published in open-source speakers); it protects nothing of yours.
+- Only audio and song details are accepted. Remote-control requests go only to the phone that is playing, using the IDs it sent.
+
 ## Clean-up and adb
 - Package names come from fixed lists or the installed-app list and must match a strict pattern before being used; protected packages (Android core, Settings, updates, Bluetooth, keyboard, Cast, MediaTek TV services, Freeview guide, Downloader, your apps) are refused.
 - The safety-net helper only re-enables Google's home screen.
