@@ -787,6 +787,70 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
     private fun netEvent(id: Int, ok: Boolean, status: Int, body: String) =
         host.emit("net", JSONObject().put("id", id).put("ok", ok).put("status", status).put("body", body).toString())
 
+    // ---------- Music apps that let other apps browse and play ----------
+
+    /**
+     * Checks which music apps on the TV let this launcher browse their library
+     * and start playback that carries on in the background (Android's media
+     * browser service, the way car screens control phones). YouTube Music is
+     * tried first. Changes nothing. The answer arrives as a "browsecheck"
+     * event: {apps: [{pkg, label, result, items}]}, result "yes", "refused"
+     * or "timeout"; items are the names at the top of the library when allowed.
+     */
+    @JavascriptInterface
+    fun musicBrowseCheck() {
+        val services = pm.queryIntentServices(Intent("android.media.browse.MediaBrowserService"), 0)
+            .map { it.serviceInfo }
+            .filter { it.packageName != activity.packageName }
+            .sortedBy { if (it.packageName == "com.google.android.youtube.tvmusic") 0 else 1 }
+            .take(8)
+        val results = JSONArray()
+        val ytm = runCatching { pm.getApplicationInfo("com.google.android.youtube.tvmusic", 0); true }.getOrDefault(false)
+        if (services.isEmpty()) {
+            host.emit("browsecheck", JSONObject().put("apps", results).put("ytmInstalled", ytm).toString())
+            return
+        }
+        val ui = Handler(Looper.getMainLooper())
+        var left = services.size
+        fun done(info: android.content.pm.ServiceInfo, result: String, items: List<String>) {
+            synchronized(results) {
+                results.put(JSONObject().put("pkg", info.packageName).put("label", runCatching { pm.getApplicationLabel(pm.getApplicationInfo(info.packageName, 0)).toString() }.getOrDefault(info.packageName))
+                    .put("result", result).put("items", JSONArray(items.take(6))))
+                left--
+                if (left == 0) host.emit("browsecheck", JSONObject().put("apps", results).put("ytmInstalled", ytm).toString())
+            }
+        }
+        ui.post {
+            services.forEach { info ->
+                var finished = false
+                lateinit var browser: android.media.browse.MediaBrowser
+                fun finish(result: String, items: List<String> = emptyList()) {
+                    if (finished) return
+                    finished = true
+                    runCatching { browser.disconnect() }
+                    done(info, result, items)
+                }
+                browser = android.media.browse.MediaBrowser(activity, ComponentName(info.packageName, info.name), object : android.media.browse.MediaBrowser.ConnectionCallback() {
+                    override fun onConnected() {
+                        val root = runCatching { browser.root }.getOrNull()
+                        if (root == null) { finish("yes"); return }
+                        browser.subscribe(root, object : android.media.browse.MediaBrowser.SubscriptionCallback() {
+                            override fun onChildrenLoaded(parentId: String, children: MutableList<android.media.browse.MediaBrowser.MediaItem>) {
+                                finish("yes", children.mapNotNull { it.description.title?.toString() })
+                            }
+                            override fun onError(parentId: String) = finish("yes")
+                        })
+                        ui.postDelayed({ finish("yes") }, 5000)
+                    }
+                    override fun onConnectionFailed() = finish("refused")
+                    override fun onConnectionSuspended() = finish("refused")
+                }, null)
+                runCatching { browser.connect() }.onFailure { finish("refused") }
+                ui.postDelayed({ finish("timeout") }, 8000)
+            }
+        }
+    }
+
     /** The AirPlay speaker: {on, running, streaming, name, error}. */
     @JavascriptInterface
     fun airplay(): String {

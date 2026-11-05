@@ -2,6 +2,6 @@
   "versionCode": 32,
   "versionName": "0.22",
   "apk": "tv.apk",
-  "sha256": "132b0a7784bce62a69df1b838e9b618791f33ef6a4c8532f81724e02b8615fac",
+  "sha256": "ef60af0a2b121dbba38dab1bd0fd7caa58ca5f4b61e08d45f3ecd22b0091447a",
   "notes": "New: the TV is an AirPlay speaker. Play music from your iPhone or iPad and stay on the home screen. Also fixes the Music in the background switch."
 }
