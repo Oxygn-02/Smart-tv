@@ -54,3 +54,9 @@ Settings > Apps > **Check for updates** reads `version.json` in this repository,
 - **AirPlay speaker.** The TV shows up as "Living Room TV" in the AirPlay list on your iPhone or iPad (Control Centre, or the AirPlay button in any app). Music from any app (YouTube Music, Apple Music, Spotify, podcasts) plays inside the launcher, so no other app opens, and Now playing shows the song, artist and artwork; play, pause and skip on the TV control the phone. Settings > Apps > AirPlay speaker turns it off. Audio only (AirPlay 1), about 2 seconds behind the phone, same Wi-Fi needed.
 - **Fixed:** Settings > Apps > Music in the background now changes when you press OK (the switch had lost its connection to the Android side in v0.18). A new test stops that kind of break from shipping again.
 - **YouTube Music check** (Developer options): asks YouTube Music, and any other music app that offers it, whether this launcher may browse its library and play in the background. Shows Yes or No and which apps said yes. Changes nothing.
+
+## What's new in v0.23
+
+- **AirPlay fixes** after the first try on the TV (the iPhone connected but no sound played): the challenge answer uses the TV's plain IPv4 address, the speaker now asks the iPhone for its clock every 3 seconds as AirPlay speakers do, the decoder can't be used by two parts of the speaker at once, it presents itself as an original AirPort Express (AirPlay 1 only), and volume follows the phone more naturally.
+- **AirPlay log.** Developer options > Diagnostics shows every step of each AirPlay connection (newest first), and the phone page's diagnostics report includes it. The TV also says when an iPhone connects, when music starts, and anything that went wrong.
+- **AirPlay test tone** (Developer options): a one-second beep through the same sound path, to check the TV's sound output.

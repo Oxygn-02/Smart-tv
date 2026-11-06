@@ -288,6 +288,7 @@
     volume: (step) => { tv.vol = Math.max(0, Math.min(100, tv.vol + Math.sign(step))); },
     volumeInfo: () => JSON.stringify({ level: tv.vol, max: 100, muted: tv.muted }),
     toggleMute: () => { tv.muted = !tv.muted; },
+    airplayTestTone: () => note('plays a one-second beep through the TV speakers'),
     musicBrowseCheck: () => emit('browsecheck', { ytmInstalled: true, apps: [{ pkg: 'com.google.android.youtube.tvmusic', label: 'YouTube Music', result: 'refused', items: [] }, { pkg: 'com.spotify.tv.android', label: 'Spotify', result: 'yes', items: ['Home', 'Your Library', 'Made for you'] }] }, 1200),
     airplay: () => JSON.stringify({ on: tv.airplay !== false, running: tv.airplay !== false, streaming: false, name: 'Living Room TV', error: '' }),
     setAirplay: (on) => { tv.airplay = !!on; },

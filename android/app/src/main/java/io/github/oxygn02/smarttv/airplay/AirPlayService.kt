@@ -43,7 +43,9 @@ class AirPlayService : Service() {
         val s = RaopServer(mac, sink, AirPlayState.listener, PREFERRED_PORT).also { server = it }
         val port = runCatching { s.start() }.getOrElse { RaopServer(mac, sink, AirPlayState.listener, 0).also { server = it }.start() }
         announce(mac, port)
+        AirPlayState.port = port
         AirPlayState.running = true
+        AirPlayState.log("Speaker on as ${AirPlayState.name(this)}, port $port")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
@@ -75,13 +77,13 @@ class AirPlayService : Service() {
             setPort(port)
             mapOf(
                 "txtvers" to "1", "ch" to "2", "cn" to "0,1", "et" to "0,1", "md" to "0,1,2", "pw" to "false",
-                "sr" to "44100", "ss" to "16", "tp" to "UDP", "vn" to "3", "vs" to "130.14", "am" to "AirPort10,115",
+                "sr" to "44100", "ss" to "16", "tp" to "UDP", "vn" to "3", "vs" to "130.14", "am" to "AirPort4,107", "ek" to "1", "sm" to "false",
                 "sf" to "0x4", "da" to "true", "sv" to "false",
             ).forEach { (k, v) -> setAttribute(k, v) }
         }
         val l = object : NsdManager.RegistrationListener {
-            override fun onServiceRegistered(s: NsdServiceInfo) {}
-            override fun onRegistrationFailed(s: NsdServiceInfo, code: Int) { AirPlayState.error = "Couldn't announce on Wi-Fi ($code)" }
+            override fun onServiceRegistered(s: NsdServiceInfo) { AirPlayState.log("Announced on Wi-Fi as ${s.serviceName}") }
+            override fun onRegistrationFailed(s: NsdServiceInfo, code: Int) { AirPlayState.error = "Couldn't announce on Wi-Fi ($code)"; AirPlayState.log(AirPlayState.error) }
             override fun onServiceUnregistered(s: NsdServiceInfo) {}
             override fun onUnregistrationFailed(s: NsdServiceInfo, code: Int) {}
         }
@@ -91,7 +93,7 @@ class AirPlayService : Service() {
     }
 
     /** Plays the stream through the TV, and holds audio focus while it plays. */
-    private class TrackSink(private val context: Context) : AudioSink {
+    internal class TrackSink(private val context: Context) : AudioSink {
         private var track: AudioTrack? = null
         private var level = 1f
         private val audio = context.getSystemService(AudioManager::class.java)
@@ -108,6 +110,7 @@ class AirPlayService : Service() {
                 .setBufferSizeInBytes(maxOf(min * 4, sampleRate * channels * 2 / 2))
                 .setTransferMode(AudioTrack.MODE_STREAM)
                 .build().also { it.setVolume(level); it.play() }
+            track?.let { AirPlayState.log("Sound output ready (state ${it.state}, playing ${it.playState == AudioTrack.PLAYSTATE_PLAYING}, volume ${"%.2f".format(level)})") }
             focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                 .setAudioAttributes(attrs)
                 .setOnAudioFocusChangeListener { change ->
@@ -117,9 +120,15 @@ class AirPlayService : Service() {
                 .build().also { audio?.requestAudioFocus(it) }
         }
 
+        private var writes = 0
+
         override fun write(pcm: ShortArray, samples: Int) {
             AirPlayState.lastAudioAt = System.currentTimeMillis()
-            track?.write(pcm, 0, samples * 2)
+            val t = track
+            if (t == null) { if (writes++ == 0) AirPlayState.log("Sound output isn't open"); return }
+            val n = t.write(pcm, 0, samples * 2)
+            if (writes++ == 0) AirPlayState.log("First sound sent to the TV speakers")
+            if (n < 0 && writes < 5) AirPlayState.log("Sound output refused audio ($n)")
         }
 
         override fun flush() {
@@ -127,6 +136,7 @@ class AirPlayService : Service() {
         }
 
         override fun setVolume(level: Float) {
+            AirPlayState.log("Volume ${"%.2f".format(level)}")
             this.level = level
             track?.setVolume(level)
         }
@@ -159,6 +169,7 @@ class AirPlayService : Service() {
  */
 object AirPlayState {
     @Volatile var running = false
+    @Volatile var port = 0
     @Volatile var streaming = false
     @Volatile var error = ""
     @Volatile var title = ""
@@ -175,6 +186,45 @@ object AirPlayState {
     @Volatile private var client: InetAddress? = null
     @Volatile private var dacpPort = 0
     private var appContext: Context? = null
+    private val lines = ArrayDeque<String>()
+
+    /** Called with (kind, text) for things worth showing on screen: "connected", "playing", "stopped", "error". */
+    @Volatile var onEvent: ((String, String) -> Unit)? = null
+
+    fun log(line: String) {
+        val stamped = "${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.UK).format(java.util.Date())}  $line"
+        synchronized(lines) { lines.addFirst(stamped); while (lines.size > 60) lines.removeLast() }
+        val kind = when {
+            line.startsWith("Connection from") -> "connected"
+            line == "Playing" -> "playing"
+            line.startsWith("Couldn't") || line.startsWith("Stopped:") || line.contains("refused") || line.contains("isn't open") -> "error"
+            else -> null
+        }
+        if (kind != null) runCatching { onEvent?.invoke(kind, line) }
+    }
+
+    fun logLines(): List<String> = synchronized(lines) { lines.toList() }
+
+    /** Plays a one-second tone through the same sound path AirPlay uses. */
+    fun testTone(context: Context) {
+        Thread {
+            val sink = AirPlayService.TrackSink(context.applicationContext)
+            runCatching {
+                sink.start(44100, 2)
+                sink.setVolume(0.6f)
+                val pcm = ShortArray(44100 * 2)
+                for (i in 0 until 44100) {
+                    val fade = minOf(1.0, minOf(i, 44100 - i) / 2000.0)
+                    val v = (Math.sin(2 * Math.PI * 523.25 * i / 44100) * 9000 * fade).toInt().toShort()
+                    pcm[2 * i] = v; pcm[2 * i + 1] = v
+                }
+                for (c in 0 until 44100 step 4410) sink.write(pcm.copyOfRange(c * 2, (c + 4410) * 2), 4410)
+                Thread.sleep(600)
+            }.onFailure { log("Test tone failed: ${it.javaClass.simpleName} ${it.message.orEmpty()}") }
+            sink.stop()
+            log("Test tone played")
+        }.start()
+    }
 
     /** Music is coming in now (the phone pauses by stopping the stream). */
     val playing get() = streaming && System.currentTimeMillis() - lastAudioAt < 1500
@@ -210,7 +260,9 @@ object AirPlayState {
             artworkVersion++
         }
 
-        override fun onStreamStop() { streaming = false }
+        override fun onStreamStop() { streaming = false; log("Stream ended") }
+
+        override fun onLog(line: String) = log(line)
 
         override fun onMetadata(title: String, artist: String, album: String) {
             this@AirPlayState.title = title
