@@ -36,6 +36,8 @@ interface RaopListener {
     fun onProgress(positionMs: Long, durationMs: Long) {}
     fun onVolume(level: Float) {}
     fun onRemote(dacpId: String, activeRemote: String, client: InetAddress) {}
+    /** One line for the AirPlay log (Diagnostics), e.g. each request and anything that went wrong. */
+    fun onLog(line: String) {}
 }
 
 /**
@@ -119,7 +121,10 @@ class RaopServer(
         return Request(first[0], first[1], headers, body)
     }
 
+    private fun log(line: String) = runCatching { listener.onLog(line) }
+
     private fun serve(socket: Socket) {
+        log("Connection from ${socket.inetAddress.hostAddress}")
         socket.tcpNoDelay = true
         val input = BufferedInputStream(socket.getInputStream())
         val output = socket.getOutputStream()
@@ -127,11 +132,15 @@ class RaopServer(
         try {
             while (true) {
                 val req = readRequest(input) ?: break
+                log("${req.method} ${req.uri.substringAfterLast('/')}" + (req.header("Content-Type")?.let { " ($it)" } ?: ""))
                 val extra = LinkedHashMap<String, String>()
                 var body: ByteArray? = null
                 var status = "200 OK"
 
-                req.header("Apple-Challenge")?.let { extra["Apple-Response"] = appleResponse(it, socket.localAddress) }
+                req.header("Apple-Challenge")?.let {
+                    extra["Apple-Response"] = appleResponse(it, socket.localAddress)
+                    log("Answered the challenge for ${plainAddress(socket.localAddress).hostAddress}")
+                }
                 val dacp = req.header("DACP-ID")
                 val remote = req.header("Active-Remote")
                 if (dacp != null && remote != null) listener.onRemote(dacp, remote, socket.inetAddress)
@@ -140,7 +149,9 @@ class RaopServer(
                     "OPTIONS" -> extra["Public"] = "ANNOUNCE, SETUP, RECORD, PAUSE, FLUSH, TEARDOWN, OPTIONS, GET_PARAMETER, SET_PARAMETER, POST, GET"
                     "ANNOUNCE" -> {
                         session?.close()
-                        val s = Session(socket.inetAddress, parseSdp(String(req.body)))
+                        val sdp = parseSdp(String(req.body))
+                        log("Stream: ${if (sdp.format.alac) "Apple Lossless" else "PCM"}, ${sdp.format.frameLength} per packet, ${if (sdp.key != null) "encrypted" else "not encrypted"}")
+                        val s = Session(socket.inetAddress, sdp)
                         session = s
                         mine = s
                     }
@@ -152,12 +163,13 @@ class RaopServer(
                                 Regex("control_port=(\\d+)").find(t)?.groupValues?.get(1)?.toInt() ?: 0,
                                 Regex("timing_port=(\\d+)").find(t)?.groupValues?.get(1)?.toInt() ?: 0,
                             )
+                            log("Ports: audio ${ports[0]}, control ${ports[1]}, timing ${ports[2]}")
                             extra["Transport"] = "RTP/AVP/UDP;unicast;mode=record;server_port=${ports[0]};control_port=${ports[1]};timing_port=${ports[2]}"
                             extra["Session"] = "1"
                         }
                     }
                     "RECORD" -> {
-                        (mine ?: session)?.record()
+                        try { (mine ?: session)?.record() } catch (e: Throwable) { log("Couldn't start playing: ${e.javaClass.simpleName} ${e.message.orEmpty()}") }
                         extra["Audio-Latency"] = "11025"
                     }
                     "FLUSH" -> (mine ?: session)?.flush()
@@ -176,11 +188,13 @@ class RaopServer(
                     else -> status = "501 Not Implemented"
                 }
                 respond(output, status, req.header("CSeq") ?: "0", extra, body)
+                if (!status.startsWith("200")) log("  answered $status")
                 if (req.method == "TEARDOWN") break
             }
-        } catch (_: Exception) {
-            // The phone went away; tidy up below.
+        } catch (e: Throwable) {
+            log("Stopped: ${e.javaClass.simpleName} ${e.message.orEmpty()}".trim())
         } finally {
+            log("Connection closed")
             runCatching { socket.close() }
             if (mine != null && session === mine) { mine.close(); session = null }
         }
@@ -201,7 +215,7 @@ class RaopServer(
     /** Signs the iPhone's challenge with this speaker's address, proving it holds the speaker key. */
     internal fun appleResponse(challengeB64: String, local: InetAddress): String {
         val challenge = b64(challengeB64)
-        val ip = local.address
+        val ip = plainAddress(local).address
         val data = ByteArray(maxOf(32, challenge.size + ip.size + mac.size))
         System.arraycopy(challenge, 0, data, 0, challenge.size)
         System.arraycopy(ip, 0, data, challenge.size, ip.size)
@@ -209,6 +223,15 @@ class RaopServer(
         val c = Cipher.getInstance("RSA/ECB/PKCS1Padding")
         c.init(Cipher.ENCRYPT_MODE, RaopKeys.privateKey)
         return Base64.getEncoder().withoutPadding().encodeToString(c.doFinal(data))
+    }
+
+    /** An IPv4 address that Android reports in its IPv6 form (::ffff:a.b.c.d) as plain IPv4, as the iPhone expects. */
+    private fun plainAddress(a: InetAddress): InetAddress {
+        val b = a.address
+        if (b.size == 16 && (0 until 10).all { b[it].toInt() == 0 } && b[10] == 0xFF.toByte() && b[11] == 0xFF.toByte()) {
+            return InetAddress.getByAddress(b.copyOfRange(12, 16))
+        }
+        return a
     }
 
     // ---------- Song details and volume ----------
@@ -223,7 +246,7 @@ class RaopServer(
                 if (k == "volume") {
                     val db = v.toDoubleOrNull() ?: return@forEach
                     currentVolumeDb = db
-                    val level = if (db <= -144.0) 0f else (((db + 30.0) / 30.0).coerceIn(0.0, 1.0)).let { (it * it).toFloat() }
+                    val level = if (db <= -144.0) 0f else ((db + 30.0) / 30.0).coerceIn(0.0, 1.0).toFloat()
                     sink.setVolume(level)
                     listener.onVolume(level)
                 }
@@ -296,6 +319,9 @@ class RaopServer(
         private val control = DatagramSocket(0)
         private val timing = DatagramSocket(0)
         private var clientControlPort = 0
+        private var clientTimingPort = 0
+        private var packets = 0
+        private var decodeErrors = 0
         private val decoder = if (sdp.format.alac) AlacDecoder(sdp.format.frameLength, 16, sdp.format.pb, sdp.format.mb, sdp.format.kb, sdp.format.channels) else null
         private val aes = sdp.key?.let { SecretKeySpec(it, "AES") }
         private val cipher = Cipher.getInstance("AES/CBC/NoPadding")
@@ -306,21 +332,25 @@ class RaopServer(
         @Volatile private var open = true
         @Volatile private var playing = false
         private val frameSamples = sdp.format.frameLength * sdp.format.channels
+        private val decoderLock = Object()
 
         fun setup(controlPort: Int, timingPort: Int): IntArray {
             clientControlPort = controlPort
+            clientTimingPort = timingPort
             listOf(audio to "raop-audio", control to "raop-control").forEach { (sock, name) ->
                 Thread({ receive(sock) }, name).apply { isDaemon = true }.start()
             }
             Thread({ timingReplies() }, "raop-timing").apply { isDaemon = true }.start()
+            Thread({ timingRequests() }, "raop-clock").apply { isDaemon = true }.start()
             return intArrayOf(audio.localPort, control.localPort, timing.localPort)
         }
 
         fun record() {
             if (playing) return
             playing = true
-            sink.start(sdp.format.sampleRate, sdp.format.channels)
             listener.onStreamStart(client)
+            sink.start(sdp.format.sampleRate, sdp.format.channels)
+            log("Playing")
             Thread({ play() }, "raop-play").apply { isDaemon = true }.start()
         }
 
@@ -353,11 +383,19 @@ class RaopServer(
                 if (type != 0x60) continue
                 val seq = ((buf[off + 2].toInt() and 0xFF) shl 8) or (buf[off + 3].toInt() and 0xFF)
                 val payload = buf.copyOfRange(off + 12, pkt.length)
-                val frame = decrypt(payload)
-                val samples = try {
-                    if (decoder != null) decoder.decode(frame, frame.size, pcm)
-                    else bigEndianPcm(frame, pcm)
-                } catch (_: Exception) { continue }
+                // One packet at a time through the key and the decoder (the audio and control ports share them).
+                val samples = synchronized(decoderLock) {
+                    try {
+                        val frame = decrypt(payload)
+                        if (decoder != null) decoder.decode(frame, frame.size, pcm) else bigEndianPcm(frame, pcm)
+                    } catch (e: Throwable) {
+                        if (decodeErrors++ < 3) log("Couldn't decode a packet: ${e.javaClass.simpleName} ${e.message.orEmpty()}")
+                        -1
+                    }
+                }
+                packets++
+                if (packets == 1) log("First audio arrived")
+                if (packets % 2000 == 0) log("$packets audio packets, $decodeErrors couldn't be decoded")
                 if (samples <= 0) continue
                 val copy = pcm.copyOf(samples * sdp.format.channels)
                 synchronized(lock) {
@@ -424,6 +462,17 @@ class RaopServer(
             if (clientControlPort == 0 || count <= 0) return
             val p = byteArrayOf(0x80.toByte(), 0xD5.toByte(), 0, 1, (seq ushr 8).toByte(), seq.toByte(), (count ushr 8).toByte(), count.toByte())
             runCatching { control.send(DatagramPacket(p, p.size, client, clientControlPort)) }
+        }
+
+        /** Asks the sender for its clock every 3 seconds, as AirPlay speakers do (type 0x52); it answers on the timing port. */
+        private fun timingRequests() {
+            while (open && clientTimingPort != 0) {
+                val req = ByteArray(32)
+                req[0] = 0x80.toByte(); req[1] = 0xD2.toByte(); req[3] = 7
+                System.arraycopy(ntpNow(), 0, req, 24, 8)
+                runCatching { timing.send(DatagramPacket(req, req.size, client, clientTimingPort)) }
+                try { Thread.sleep(3000) } catch (_: InterruptedException) { break }
+            }
         }
 
         /** Answers the sender's clock questions (type 0x52) so it can keep time. */

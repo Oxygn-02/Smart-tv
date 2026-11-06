@@ -168,13 +168,30 @@ class RaopServerTest {
         assertEquals(5, events.art!!.size)
         assertEquals(1000L, events.progress.first)
         assertEquals(5000L, events.progress.second)
-        assertEquals(0.25f, sink.level, 0.001f)
+        assertEquals(0.5f, sink.level, 0.001f) // -15 dB of the phone's -30..0 range is half volume
         assertEquals("ABCDEF0123456789/1234567", events.dacp)
+
+        // The speaker asks the sender for its clock (0xD2) on the sender's timing port.
+        timing.soTimeout = 4000
+        val clock = DatagramPacket(ByteArray(64), 64)
+        timing.receive(clock)
+        assertEquals(0xD2, clock.data[1].toInt() and 0xFF)
 
         send("TEARDOWN")
         Thread.sleep(200)
         assertTrue(events.stopped)
         server.stop()
+    }
+
+    @Test
+    fun answersTheChallengeWithThePlainIpv4Address() {
+        // Android can report an IPv4 connection's address in its IPv6 form (::ffff:a.b.c.d); the
+        // iPhone signs the plain four bytes, so both must give the same answer.
+        val server = RaopServer(mac, CollectSink(), Events())
+        val v4 = InetAddress.getByAddress(byteArrayOf(192.toByte(), 168.toByte(), 1, 50))
+        val mapped = java.net.Inet6Address.getByAddress(null, ByteArray(10) + byteArrayOf(0xFF.toByte(), 0xFF.toByte(), 192.toByte(), 168.toByte(), 1, 50), -1)
+        val challenge = Base64.getEncoder().encodeToString(ByteArray(16) { it.toByte() })
+        assertEquals(server.appleResponse(challenge, v4), server.appleResponse(challenge, mapped))
     }
 
     private fun cafPackets(bytes: ByteArray): List<ByteArray> {

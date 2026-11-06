@@ -66,6 +66,13 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
 
     private val pm = activity.packageManager
     private val audio = activity.getSystemService(AudioManager::class.java)
+
+    init {
+        // AirPlay news for the screen: an iPhone connecting, music starting, anything that went wrong.
+        io.github.oxygn02.smarttv.airplay.AirPlayState.onEvent = { kind, text ->
+            host.emit("airplay", JSONObject().put("kind", kind).put("text", text).toString())
+        }
+    }
     private val govee = GoveeHub(activity) { json -> host.emit("govee", json) }
     private val main = Handler(Looper.getMainLooper())
 
@@ -856,8 +863,11 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
     fun airplay(): String {
         val a = io.github.oxygn02.smarttv.airplay.AirPlayState
         return JSONObject().put("on", a.enabled(activity)).put("running", a.running).put("streaming", a.streaming)
-            .put("name", a.name(activity)).put("error", a.error).toString()
+            .put("name", a.name(activity)).put("error", a.error).put("port", a.port).put("log", JSONArray(a.logLines())).toString()
     }
+
+    @JavascriptInterface
+    fun airplayTestTone() = io.github.oxygn02.smarttv.airplay.AirPlayState.testTone(activity)
 
     @JavascriptInterface
     fun setAirplay(on: Boolean) = io.github.oxygn02.smarttv.airplay.AirPlayState.setEnabled(activity, on)
@@ -1330,6 +1340,7 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
             .put("switchedOff", switchedOffByUs().size)
             .put("exits", exits)
             .put("events", events)
+            .put("airplay", JSONArray(io.github.oxygn02.smarttv.airplay.AirPlayState.logLines().take(30)))
             .toString()
     }
 
@@ -1343,6 +1354,8 @@ class LauncherBridge(private val activity: Activity, private val host: BridgeHos
         o.optJSONArray("exits")?.let { a -> for (i in 0 until a.length()) sb.append("  ").append(a.getString(i)).append('\n') }
         sb.append("\nSafety net:\n")
         o.optJSONArray("events")?.let { a -> for (i in 0 until a.length()) sb.append("  ").append(a.getString(i)).append('\n') }
+        sb.append("\nAirPlay:\n")
+        o.optJSONArray("airplay")?.let { a -> for (i in 0 until a.length()) sb.append("  ").append(a.getString(i)).append('\n') }
         sb.append("\nSwitched off by the launcher:\n")
         switchedOffByUs().forEach { sb.append("  ").append(it).append('\n') }
         return sb.toString()
